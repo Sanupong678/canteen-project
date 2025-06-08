@@ -1,11 +1,21 @@
 <template>
-    <div>
-      <h1>Admin Page</h1>
-      <Card title="Admin Dashboard" />
+  <LayoutAdmin>
+    <div class="admin-dashboard">
+      <BannerAd :read-only="false" />
+      <NewsSection />
     </div>
-  </template>
-  
-  <script setup>
-  import Card from '~/components/Card.vue'
-  </script>
-  
+  </LayoutAdmin>
+</template>
+
+<script setup>
+import LayoutAdmin from '~/components/LayoutAdmin.vue'
+import BannerAd from '~/components/BannerAd.vue'
+import NewsSection from '~/components/NewsSection.vue'
+</script>
+
+<style scoped>
+.admin-dashboard {
+  padding: 20px;
+}
+</style>
+    

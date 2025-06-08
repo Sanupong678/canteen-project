@@ -1,0 +1,239 @@
+<template>
+    <LayoutAdmin>
+      <div class="canteen-management">
+        <h1>จัดการโรงอาหาร</h1>
+        <div class="canteen-grid">
+          <div 
+            v-for="canteen in canteens" 
+            :key="canteen.id" 
+            class="canteen-container"
+          >
+            <div class="canteen-image">
+              <img :src="canteen.image" :alt="canteen.name">
+            </div>
+            <div class="canteen-info">
+              <h2>{{ canteen.name }}</h2>         
+              <button class="select-btn" @click="selectCanteen(canteen)">
+                เลือก
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </LayoutAdmin>
+  </template>
+  
+  <script>
+  export default {
+    name: 'CanteenManagement',
+    data() {
+      return {
+        canteens: [
+          {
+            id: 1,
+            name: 'โรงอาหาร C5',
+            image: '/images/c5.png',
+            path: '/admin/canteen/c5',
+          },
+          {
+            id: 2,
+            name: 'โรงอาหาร D1',
+            image: '/images/d1.png',
+            path: '/admin/canteen/d1',
+            shops: []
+          },
+          {
+            id: 3,
+            name: 'โรงอาหาร Dormity',
+            image: '/images/dorm.png',
+            path: '/admin/canteen/dormity',
+            shops: []
+          },
+          {
+            id: 4,
+            name: 'โรงอาหาร Epark',
+            image: '/images/epark.png',
+            path: '/admin/canteen/epark',
+            shops: []
+          },
+          {
+            id: 5,
+            name: 'โรงอาหาร E1',
+            image: '/images/e1.png',
+            path: '/admin/canteen/e1',
+            shops: []
+          },
+          {
+            id: 6,
+            name: 'โรงอาหาร E2',
+            image: '/images/e2.png',
+            path: '/admin/canteen/e2',
+            shops: []
+          },
+          {
+            id: 7,
+            name: 'โรงอาหาร Msquare',
+            image: '/images/msquare.png',
+            path: '/admin/canteen/msquare',
+            shops: []
+          },
+          {
+            id: 8,
+            name: 'โรงอาหาร RuemRim',
+            image: '/images/ruem.png',
+            path: '/admin/canteen/ruemrim',
+            shops: []
+          },
+          {
+            id: 9,
+            name: 'โรงอาหาร S2',
+            image: '/images/s2.png',
+            path: '/admin/canteen/s2',
+            shops: []
+          }
+        ]
+      }
+    },
+    methods: {
+      selectCanteen(canteen) {
+        this.$router.push(canteen.path)
+      },
+      viewShopDetails(shop) {
+        this.$router.push({
+          name: 'shop-details',
+          params: { shop }
+        })
+      }
+    }
+  }
+  </script>
+  
+  <style scoped>
+  .canteen-management {
+    padding: 20px;
+  }
+  
+  h1 {
+    color: #333;
+    margin-bottom: 30px;
+    font-size: 28px;
+  }
+  
+  .canteen-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    padding: 20px;
+  }
+  
+  .canteen-container {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s;
+  }
+  
+  .canteen-container:hover {
+    transform: translateY(-5px);
+  }
+  
+  .canteen-image {
+    height: 200px;
+    overflow: hidden;
+  }
+  
+  .canteen-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  
+  .canteen-info {
+    padding: 15px;
+  }
+  
+  .canteen-info h2 {
+    color: #333;
+    margin-bottom: 15px;
+    font-size: 18px;
+  }
+  
+  .shops-list {
+    margin-bottom: 15px;
+  }
+  
+  .shop-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px;
+    margin-bottom: 8px;
+    background-color: #f7fafc;
+    border-radius: 4px;
+  }
+  
+  .shop-item.expired {
+    background-color: #fff5f5;
+  }
+  
+  .shop-name {
+    flex: 1;
+    color: #2d3748;
+    font-weight: 500;
+  }
+  
+  .shop-item.expired .shop-name {
+    color: #f56565;
+  }
+  
+  .shop-status {
+    margin: 0 10px;
+    padding: 2px 8px;
+    background-color: #48bb78;
+    color: white;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  
+  .shop-status.expired {
+    background-color: #f56565;
+  }
+  
+  .details-button {
+    padding: 4px 8px;
+    background-color: #4299e1;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  
+  .details-button:hover {
+    background-color: #3182ce;
+  }
+  
+  .no-shops {
+    text-align: center;
+    color: #718096;
+    padding: 10px;
+    font-size: 14px;
+  }
+  
+  .select-btn {
+    width: 100%;
+    padding: 8px 20px;
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s;
+  }
+  
+  .select-btn:hover {
+    background-color: #c0392b;
+  }
+  </style> 

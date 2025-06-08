@@ -1,11 +1,17 @@
 <template>
-  <v-container>
-    <v-row>
-      <v-col cols="12" md="6">
-        <v-btn color="primary">Hello Vuetify!</v-btn>
-      </v-col>
-    </v-row>
-  </v-container>
+  <div>
+    
+  </div>
 </template>
+
+<script>
+export default {
+  name: 'IndexPage',
+  middleware: 'auth',
+  mounted() {
+    this.$router.push('/login')
+  }
+}
+</script>
 
 

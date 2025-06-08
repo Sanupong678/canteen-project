@@ -6,5 +6,11 @@ export default defineNuxtConfig({
     transpile: ['vuetify'],
   },
 
+  runtimeConfig: {
+    public: {
+      apiBase: process.env.API_BASE_URL || 'http://localhost:4000'
+    }
+  },
+
   compatibilityDate: '2025-04-27',
 })

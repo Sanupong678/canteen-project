@@ -1,11 +1,21 @@
 <template>
-    <div>
-      <h1>User Page</h1>
-      <Card title="User Dashboard" />
+  <LayoutUser>
+    <div class="user-dashboard">
+      <BannerAd :read-only="true" />
+      <NewsSection :read-only="true" />
     </div>
-  </template>
-  
-  <script setup>
-  import Card from '~/components/Card.vue'
-  </script>
-  
+  </LayoutUser>
+</template>
+
+<script setup>
+import LayoutUser from '~/components/LayoutUser.vue'
+import BannerAd from '~/components/BannerAd.vue'
+import NewsSection from '~/components/NewsSection.vue'
+</script>
+
+<style scoped>
+.user-dashboard {
+  padding: 20px;
+}
+</style>
+    
