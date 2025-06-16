@@ -8,19 +8,17 @@ import IndexUser from "~/pages/user/index.vue";
 import Management from "~/pages/admin/management.vue";
 import C5 from "~/pages/admin/canteen/c5.vue";
 import D1 from "~/pages/admin/canteen/d1.vue";
-import E1 from "~/pages/admin/canteen/e1.vue";
+import E1 from "@/pages/admin/canteen/e1.vue";
 import E2 from "~/pages/admin/canteen/e2.vue";
 import Msquare from "~/pages/admin/canteen/Msquare.vue";
 import RuemRim from "~/pages/admin/canteen/RuemRim.vue";
 import S2 from "~/pages/admin/canteen/s2.vue";
 import Epark from "~/pages/admin/canteen/epark.vue";
-import Leave from "~/pages/user/leave.vue";
-import Leave from "~/pages/admin/leave.vue";
-import C5 from "~/pages/admin/canteen/c5.vue";
-import Repair from "~/pages/user/repair.vue";
-import Paymentadmin from "~/pages/admin/paymentadmin.vue";
-import PaymentUser from "~/pages/user/paymentuser.vue";
-import Repair from "~/pages/admin/repair.vue";
+import UserLeave from "~/pages/user/leave.vue";
+import AdminLeave from "~/pages/admin/leave.vue";
+import UserRepair from "~/pages/user/repair.vue";
+import AdminRepair from "~/pages/admin/repair.vue";
+import BillAdmin from "~/pages/admin/bill.vue";
 
 const routes = [
   // หน้า Login
@@ -29,12 +27,6 @@ const routes = [
     name: "Login",
     component: Login,
     meta: { requiresAuth: false }
-  },
-  {
-    path: "/leave",
-    name: "Leave",
-    component: Leave,
-    meta: { requiresAuth: true, role: 'user' }
   },
   // หน้า Admin
   {
@@ -48,16 +40,20 @@ const routes = [
         component: IndexAdmin
       },
       {
-        path:"repairadmin",
-        name:"repairadmin",
-        component:Repair
+        path: "leave",
+        name: "adminLeave",
+        component: AdminLeave
       },
       {
-        path:"paymentadmin",
-        name:"paymentadmin",
-        component:Paymentadmin
+        path:"repairadmin",
+        name:"repairadmin",
+        component: AdminRepair
       },
-
+      {
+        path:"bill",
+        name:"bill",
+        component: BillAdmin
+      },
       {
         path: "canteen",
         name: "canteen",
@@ -128,21 +124,20 @@ const routes = [
       },
       {
         path: "leave",
-        name: "leave",
-        component: Leave,
+        name: "userLeave",
+        component: UserLeave,
         meta: { requiresAuth: true, role: 'user' }
       },
       {
         path: "repair",
-        name: "repair",
-        component: Repair
+        name: "userRepair",
+        component: UserRepair
       },
       {
-        path:"paymentuser",
-        name:"paymentuser",
-        component: PaymentUser
+        path: "bill",
+        name: "bill",
+        component: () => import('~/pages/user/bill.vue')
       }
-
     ]
   }
 ];

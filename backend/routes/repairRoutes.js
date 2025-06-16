@@ -1,5 +1,5 @@
 import express from 'express';
-import { verifyToken } from '../middleware/authMiddleware.js';
+import { verifyToken, isAdmin } from '../middleware/authMiddleware.js';
 import { 
   getRepairs, 
   getUserRepairs,
@@ -14,7 +14,7 @@ const router = express.Router();
 router.use(verifyToken);
 
 // Admin routes
-router.get('/admin', getRepairs);
+router.get('/admin', isAdmin, getRepairs);
 
 // User routes
 router.get('/user', getUserRepairs);

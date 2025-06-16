@@ -55,7 +55,9 @@ export default {
   data() {
     return {
       showUserMenu: false,
-      displayName: localStorage.getItem('displayName') || 'User Name'
+      displayName: localStorage.getItem('displayName') || 'User Name',
+      shopData: JSON.parse(localStorage.getItem('shopData') || '{}'),
+      userId: localStorage.getItem('userId')
     }
   },
   methods: {
@@ -66,7 +68,20 @@ export default {
       localStorage.removeItem('userRole')
       localStorage.removeItem('isAuthenticated')
       localStorage.removeItem('displayName')
+      localStorage.removeItem('userId')
+      localStorage.removeItem('shopData')
       this.$router.push('/')
+    }
+  },
+  computed: {
+    shopName() {
+      return this.shopData.name || ''
+    },
+    shopType() {
+      return this.shopData.type || ''
+    },
+    shopLocation() {
+      return this.shopData.location || ''
     }
   }
 }

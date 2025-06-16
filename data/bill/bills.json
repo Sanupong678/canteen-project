@@ -1,0 +1,200 @@
+[
+  {
+    "_id": "bill_c5_001",
+    "shopName": "C5",
+    "shopId": "ShopID001",
+    "canteenId": "โรงอาหารC5",
+    "contractStartDate": "2025-06-12T00:00:00.000+00:00",
+    "contractEndDate": "2025-07-06T00:00:00.000+00:00",
+    "billType": "ค่าน้ำ",
+    "status": "รอตรวจสอบ",
+    "month": "มิถุนายน"
+  },
+  {
+    "_id": "bill_c5_002",
+    "shopName": "C5",
+    "shopId": "ShopID001",
+    "canteenId": "โรงอาหารC5",
+    "contractStartDate": "2025-06-12T00:00:00.000+00:00",
+    "contractEndDate": "2025-07-06T00:00:00.000+00:00",
+    "billType": "ค่าไฟ",
+    "status": "รอตรวจสอบ",
+    "month": "มิถุนายน"
+  },
+  {
+    "_id": "bill_d1_001",
+    "shopName": "D1 Shop",
+    "shopId": "ShopID003",
+    "canteenId": "โรงอาหารD1",
+    "contractStartDate": "2025-06-12T00:00:00.000+00:00",
+    "contractEndDate": "2025-07-06T00:00:00.000+00:00",
+    "billType": "ค่าน้ำ",
+    "status": "รอตรวจสอบ",
+    "month": "มิถุนายน"
+  },
+  {
+    "_id": "bill_d1_002",
+    "shopName": "D1 Shop",
+    "shopId": "ShopID003",
+    "canteenId": "โรงอาหารD1",
+    "contractStartDate": "2025-06-12T00:00:00.000+00:00",
+    "contractEndDate": "2025-07-06T00:00:00.000+00:00",
+    "billType": "ค่าไฟ",
+    "status": "รอตรวจสอบ",
+    "month": "มิถุนายน"
+  },
+  {
+    "_id": "bill_dorm_001",
+    "shopName": "Dorm Shop",
+    "shopId": "ShopID004",
+    "canteenId": "โรงอาหารDormitory",
+    "contractStartDate": "2025-06-12T00:00:00.000+00:00",
+    "contractEndDate": "2025-07-06T00:00:00.000+00:00",
+    "billType": "ค่าน้ำ",
+    "status": "รอตรวจสอบ",
+    "month": "มิถุนายน"
+  },
+  {
+    "_id": "bill_dorm_002",
+    "shopName": "Dorm Shop",
+    "shopId": "ShopID004",
+    "canteenId": "โรงอาหารDormitory",
+    "contractStartDate": "2025-06-12T00:00:00.000+00:00",
+    "contractEndDate": "2025-07-06T00:00:00.000+00:00",
+    "billType": "ค่าไฟ",
+    "status": "รอตรวจสอบ",
+    "month": "มิถุนายน"
+  },
+  {
+    "_id": "bill_e1_001",
+    "shopName": "E1 Shop",
+    "shopId": "ShopID005",
+    "canteenId": "โรงอาหารE1",
+    "contractStartDate": "2025-06-12T00:00:00.000+00:00",
+    "contractEndDate": "2025-07-06T00:00:00.000+00:00",
+    "billType": "ค่าน้ำ",
+    "status": "รอตรวจสอบ",
+    "month": "มิถุนายน"
+  },
+  {
+    "_id": "bill_e1_002",
+    "shopName": "E1 Shop",
+    "shopId": "ShopID005",
+    "canteenId": "โรงอาหารE1",
+    "contractStartDate": "2025-06-12T00:00:00.000+00:00",
+    "contractEndDate": "2025-07-06T00:00:00.000+00:00",
+    "billType": "ค่าไฟ",
+    "status": "รอตรวจสอบ",
+    "month": "มิถุนายน"
+  },
+  {
+    "_id": "bill_e2_001",
+    "shopName": "E2 Shop",
+    "shopId": "ShopID006",
+    "canteenId": "โรงอาหารE2",
+    "contractStartDate": "2025-06-12T00:00:00.000+00:00",
+    "contractEndDate": "2025-07-06T00:00:00.000+00:00",
+    "billType": "ค่าน้ำ",
+    "status": "รอตรวจสอบ",
+    "month": "มิถุนายน"
+  },
+  {
+    "_id": "bill_e2_002",
+    "shopName": "E2 Shop",
+    "shopId": "ShopID006",
+    "canteenId": "โรงอาหารE2",
+    "contractStartDate": "2025-06-12T00:00:00.000+00:00",
+    "contractEndDate": "2025-07-06T00:00:00.000+00:00",
+    "billType": "ค่าไฟ",
+    "status": "รอตรวจสอบ",
+    "month": "มิถุนายน"
+  },
+  {
+    "_id": "bill_epark_001",
+    "shopName": "EPark Shop",
+    "shopId": "ShopID007",
+    "canteenId": "โรงอาหารEpark",
+    "contractStartDate": "2025-06-12T00:00:00.000+00:00",
+    "contractEndDate": "2025-07-06T00:00:00.000+00:00",
+    "billType": "ค่าน้ำ",
+    "status": "รอตรวจสอบ",
+    "month": "มิถุนายน"
+  },
+  {
+    "_id": "bill_epark_002",
+    "shopName": "EPark Shop",
+    "shopId": "ShopID007",
+    "canteenId": "โรงอาหารEpark",
+    "contractStartDate": "2025-06-12T00:00:00.000+00:00",
+    "contractEndDate": "2025-07-06T00:00:00.000+00:00",
+    "billType": "ค่าไฟ",
+    "status": "รอตรวจสอบ",
+    "month": "มิถุนายน"
+  },
+  {
+    "_id": "bill_msquare_001",
+    "shopName": "MSquare Shop",
+    "shopId": "ShopID008",
+    "canteenId": "โรงอาหารMsquare",
+    "contractStartDate": "2025-06-12T00:00:00.000+00:00",
+    "contractEndDate": "2025-07-06T00:00:00.000+00:00",
+    "billType": "ค่าน้ำ",
+    "status": "รอตรวจสอบ",
+    "month": "มิถุนายน"
+  },
+  {
+    "_id": "bill_msquare_002",
+    "shopName": "MSquare Shop",
+    "shopId": "ShopID008",
+    "canteenId": "โรงอาหารMsquare",
+    "contractStartDate": "2025-06-12T00:00:00.000+00:00",
+    "contractEndDate": "2025-07-06T00:00:00.000+00:00",
+    "billType": "ค่าไฟ",
+    "status": "รอตรวจสอบ",
+    "month": "มิถุนายน"
+  },
+  {
+    "_id": "bill_ruemrim_001",
+    "shopName": "Ruemrim Shop",
+    "shopId": "ShopID009",
+    "canteenId": "โรงอาหารRuemrim",
+    "contractStartDate": "2025-06-12T00:00:00.000+00:00",
+    "contractEndDate": "2025-07-06T00:00:00.000+00:00",
+    "billType": "ค่าน้ำ",
+    "status": "รอตรวจสอบ",
+    "month": "มิถุนายน"
+  },
+  {
+    "_id": "bill_ruemrim_002",
+    "shopName": "Ruemrim Shop",
+    "shopId": "ShopID009",
+    "canteenId": "โรงอาหารRuemrim",
+    "contractStartDate": "2025-06-12T00:00:00.000+00:00",
+    "contractEndDate": "2025-07-06T00:00:00.000+00:00",
+    "billType": "ค่าไฟ",
+    "status": "รอตรวจสอบ",
+    "month": "มิถุนายน"
+  },
+  {
+    "_id": "bill_s2_001",
+    "shopName": "S2",
+    "shopId": "ShopID002",
+    "canteenId": "โรงอาหารS2",
+    "contractStartDate": "2025-06-13T00:00:00.000+00:00",
+    "contractEndDate": "2025-07-04T00:00:00.000+00:00",
+    "billType": "ค่าน้ำ",
+    "status": "รอตรวจสอบ",
+    "month": "มิถุนายน"
+  },
+  {
+    "_id": "bill_s2_002",
+    "shopName": "S2",
+    "shopId": "ShopID002",
+    "canteenId": "โรงอาหารS2",
+    "contractStartDate": "2025-06-13T00:00:00.000+00:00",
+    "contractEndDate": "2025-07-04T00:00:00.000+00:00",
+    "billType": "ค่าไฟ",
+    "status": "รอตรวจสอบ",
+    "month": "มิถุนายน"
+  }
+] 

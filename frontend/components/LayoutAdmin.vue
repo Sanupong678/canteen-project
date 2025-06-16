@@ -67,7 +67,19 @@ export default {
       localStorage.removeItem('isAuthenticated')
       localStorage.removeItem('displayName')
       this.$router.push('/')
+    },
+    checkAuth() {
+      if (process.client) {
+        const isAuthenticated = localStorage.getItem('isAuthenticated')
+        const userRole = localStorage.getItem('userRole')
+        if (!isAuthenticated || userRole !== 'admin') {
+          this.$router.push('/login')
+        }
+      }
     }
+  },
+  mounted() {
+    this.checkAuth()
   }
 }
 </script>

@@ -1,10 +1,12 @@
 import express from 'express';
-import { verifyToken } from '../middleware/authMiddleware.js';
-import { 
-  getLeaves, 
-  createLeave, 
-  updateLeave, 
-  deleteLeave 
+import { verifyToken, isAdmin } from '../middleware/authMiddleware.js';
+import {
+  getLeaves,
+  getUserLeaves,
+  createLeave,
+  updateLeave,
+  deleteLeave,
+  updateLeaveStatus
 } from '../controllers/leaveController.js';
 
 const router = express.Router();
@@ -12,10 +14,14 @@ const router = express.Router();
 // ใช้ middleware กับทุก routes
 router.use(verifyToken);
 
-// Routes ที่ต้องการป้องกัน
-router.get('/', getLeaves);
-router.post('/', createLeave);
+// Admin routes
+router.get('/admin', isAdmin, getLeaves);
+
+// User routes
+router.get('/user', getUserLeaves);
+router.post('/', express.json(), createLeave);
 router.put('/:id', updateLeave);
 router.delete('/:id', deleteLeave);
+router.put('/:id/status', isAdmin, updateLeaveStatus);
 
 export default router; 

@@ -7,7 +7,9 @@
   "scripts": {
     "start": "set NODE_NO_WARNINGS=1 && node server.js",
     "dev": "set NODE_NO_WARNINGS=1 && nodemon server.js",
-    "remove-email-index": "node scripts/removeEmailIndex.js"
+    "remove-email-index": "node scripts/removeEmailIndex.js",
+    "create-bills": "node scripts/createBillsForExistingShops.js",
+    "reset-bills": "node scripts/resetBills.js"
   },
   "keywords": [],
   "engines": {

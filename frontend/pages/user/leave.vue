@@ -92,6 +92,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import LayoutUser from '@/components/LayoutUser.vue'
+import { useNuxtApp } from '#app'
 
 const startDate = ref('')
 const endDate = ref('')
@@ -99,10 +100,63 @@ const reason = ref('')
 const showHistory = ref(false)
 const leaveHistory = ref([])
 const dateError = ref('')
+const isLoading = ref(false)
+
+const { $axios } = useNuxtApp()
 
 const isFormValid = computed(() => {
   return startDate.value && endDate.value && reason.value.trim().length > 0 && !dateError.value
 })
+
+// ดึงประวัติการลาจาก API
+const fetchLeaveHistory = async () => {
+  try {
+    const response = await $axios.get('/api/leaves/user')
+    if (response.data && response.data.data) {
+      leaveHistory.value = response.data.data
+    }
+  } catch (error) {
+    console.error('Error fetching leave history:', error)
+    alert('ไม่สามารถดึงข้อมูลประวัติการลาได้')
+  }
+}
+
+// โหลดข้อมูลประวัติการลาเมื่อเปิดหน้า
+onMounted(() => {
+  fetchLeaveHistory()
+})
+
+const submitLeave = async () => {
+  if (!isFormValid.value || isLoading.value) return
+  
+  isLoading.value = true
+  try {
+    // ส่งข้อมูลไปยัง backend API
+    const response = await $axios.post('/api/leaves', {
+      startDate: startDate.value,
+      endDate: endDate.value,
+      issue: reason.value // เปลี่ยนจาก reason เป็น issue ตาม leaveModel
+    })
+
+    if (response.data && response.data.data) {
+      // เพิ่มข้อมูลใหม่เข้าไปในประวัติ
+      await fetchLeaveHistory() // ดึงข้อมูลใหม่จาก API
+      
+      // Reset form
+      startDate.value = ''
+      endDate.value = ''
+      reason.value = ''
+      dateError.value = ''
+      
+      alert('บันทึกการลาสำเร็จ')
+    }
+  } catch (error) {
+    console.error('Error submitting leave:', error)
+    alert(error.response?.data?.message || 'ไม่สามารถบันทึกการลาได้ กรุณาลองใหม่อีกครั้ง')
+  } finally {
+    isLoading.value = false
+  }
+}
 
 const validateDateRange = () => {
   if (!startDate.value || !endDate.value) return
@@ -110,6 +164,7 @@ const validateDateRange = () => {
   const start = new Date(startDate.value)
   const end = new Date(endDate.value)
   const today = new Date()
+  today.setHours(0, 0, 0, 0) // รีเซ็ตเวลาเป็น 00:00:00
 
   // Reset error
   dateError.value = ''
@@ -122,7 +177,7 @@ const validateDateRange = () => {
 
   // Check if start date is in the past
   if (start < today) {
-    dateError.value = 'ไม่สามารถลาล่วงหน้าได้'
+    dateError.value = 'ไม่สามารถลาย้อนหลังได้'
     return
   }
 
@@ -147,62 +202,6 @@ const getStatusText = (status) => {
     rejected: 'ไม่อนุมัติ'
   }
   return statusMap[status] || status
-}
-
-const cleanupOldHistory = () => {
-  const oneMonthAgo = new Date()
-  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
-
-  leaveHistory.value = leaveHistory.value.filter(leave => {
-    const leaveDate = new Date(leave.startDate)
-    return leaveDate >= oneMonthAgo
-  })
-
-  localStorage.setItem('leaveHistory', JSON.stringify(leaveHistory.value))
-}
-
-// Fetch leave history from localStorage on component mount
-onMounted(() => {
-  const savedHistory = localStorage.getItem('leaveHistory')
-  if (savedHistory) {
-    leaveHistory.value = JSON.parse(savedHistory)
-    cleanupOldHistory()
-  }
-})
-
-const submitLeave = () => {
-  if (isFormValid.value) {
-    // Create new leave request
-    const newLeave = {
-      id: Date.now(), // Simple unique ID
-      startDate: startDate.value,
-      endDate: endDate.value,
-      reason: reason.value,
-      status: 'pending',
-      employeeName: 'User Name', // This should come from user profile
-      submittedAt: new Date().toISOString()
-    }
-    
-    // Add to history
-    leaveHistory.value.push(newLeave)
-    
-    // Save to localStorage
-    localStorage.setItem('leaveHistory', JSON.stringify(leaveHistory.value))
-    
-    // Save to admin leave requests
-    const adminLeaveRequests = JSON.parse(localStorage.getItem('adminLeaveRequests') || '[]')
-    adminLeaveRequests.push(newLeave)
-    localStorage.setItem('adminLeaveRequests', JSON.stringify(adminLeaveRequests))
-    
-    // Reset form
-    startDate.value = ''
-    endDate.value = ''
-    reason.value = ''
-    dateError.value = ''
-    
-    // Show success message
-    alert('บันทึกการลาสำเร็จ')
-  }
 }
 </script>
 

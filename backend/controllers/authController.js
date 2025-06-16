@@ -91,150 +91,32 @@ export const updateShopPassword = async (req, res) => {
 
 export const login = async (req, res) => {
   console.log('\n=== Login Request Started ===');
-  console.log('Time:', new Date().toISOString());
-  console.log('Request body:', JSON.stringify(req.body, null, 2));
   
   const { username, password } = req.body;
   
   try {
-    // Debug: Show all shops in database
-    const allShops = await Shop.find({});
-    console.log('\nAll shops in database:', JSON.stringify(allShops.map(shop => ({
-      id: shop._id,
-      name: shop.name,
-      credentials: {
-        username: shop.credentials.username,
-        password: shop.credentials.password,
-        password_hash: shop.credentials.password_hash
-      }
-    })), null, 2));
-
-    // Find shop by username (case-insensitive)
-    console.log('\nLooking for shop with username:', username);
-    const shop = await Shop.findOne({
-      'credentials.username': { $regex: new RegExp(`^${username}$`, 'i') }
-    });
-    
-    if (shop) {
-      console.log('Found shop:', {
-        id: shop._id,
-        name: shop.name,
-        credentials: {
-          username: shop.credentials.username,
-          password: shop.credentials.password,
-          password_hash: shop.credentials.password_hash
-        }
-      });
-
-      // Check if password_hash exists
-      if (!shop.credentials.password_hash && shop.credentials.password) {
-        // Create password hash if it doesn't exist
-        console.log('Creating password hash for shop:', shop.name);
-        shop.credentials.password_hash = await hashPassword(shop.credentials.password);
-        await shop.save();
-        console.log('Password hash created and saved');
-      }
-
-      // Compare password with hash
-      console.log('Comparing passwords:');
-      console.log('Input password:', password);
-      console.log('Stored password:', shop.credentials.password);
-      console.log('Stored hash:', shop.credentials.password_hash);
+    // ตรวจสอบ admin ก่อนเป็นอันดับแรก
+    if (username === 'admin' && password === '1234') {
+      console.log('Admin login successful');
       
-      const isPasswordValid = await bcrypt.compare(password, shop.credentials.password_hash);
-      console.log('Password comparison result:', isPasswordValid);
+      // สร้าง token สำหรับ admin
+      const adminData = {
+        username: 'admin',
+        role: 'admin',
+        displayName: 'Administrator'
+      };
+      console.log('Creating admin token with:', adminData);
       
-      if (isPasswordValid) {
-        console.log('Credentials matched! Creating session...');
-        const role = 'user';
-        const displayName = shop.name;
-        
-        const token = generateToken({ 
-          username, 
-          role,
-          shopId: shop._id,
-          displayName
-        });
-        
-        // Create session
-        const session = new Session({
-          userId: shop._id,
-          token,
-          deviceInfo: {
-            userAgent: req.headers['user-agent'],
-            ipAddress: req.ip
-          },
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-        });
-        
-        await session.save();
-        console.log('Session created:', session._id);
-        
-        // Create login record
-        const loginRecord = new Login({
-          username,
-          role,
-          displayName,
-          ipAddress: req.ip,
-          userAgent: req.headers['user-agent'],
-          token,
-          deviceInfo: {
-            userAgent: req.headers['user-agent']
-          },
-          status: 'active'
-        });
-        
-        await loginRecord.save();
-        console.log('Login record created:', loginRecord._id);
-        
-        // Set HTTP-only cookie
-        res.cookie('token', token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax', // เปลี่ยนจาก 'strict' เป็น 'lax' เพื่อให้ทำงานได้ดีขึ้น
-          maxAge: 24 * 60 * 60 * 1000 // 24 hours
-        });
-        
-        console.log('\n=== Login Successful ===');
-        return res.json({ 
-          success: true, 
-          role,
-          displayName,
-          userData: {
-            id: shop._id,
-            name: shop.name,
-            username: shop.credentials.username,
-            type: shop.type,
-            description: shop.description,
-            location: shop.location,
-            contractStartDate: shop.contractStartDate,
-            contractEndDate: shop.contractEndDate,
-            image: shop.image
-          }
-        });
-      } else {
-        console.log('Password mismatch');
-      }
-    } else {
-      console.log('No shop found with username:', username);
-    }
+      const token = generateToken(adminData);
+      console.log('====== Token Information ======');
+      console.log('Your token:', token);
+      console.log('==============================');
 
-    // Check admin/user
-    if ((username === 'admin' && password === '1234') || (username === 'user' && password === '12345')) {
-      console.log('\nAdmin/User login detected');
-      const role = username === 'admin' ? 'admin' : 'user';
-      const displayName = role === 'admin' ? 'Administrator' : 'User';
-      
-      const token = generateToken({ 
-        username, 
-        role,
-        displayName
-      });
-      
+      // บันทึกประวัติการ login
       const loginRecord = new Login({
-        username,
-        role,
-        displayName,
+        username: 'admin',
+        role: 'admin',
+        displayName: 'Administrator',
         ipAddress: req.ip,
         userAgent: req.headers['user-agent'],
         token,
@@ -243,41 +125,124 @@ export const login = async (req, res) => {
         },
         status: 'active'
       });
-      
       await loginRecord.save();
-      console.log('Login record created:', loginRecord._id);
-      
-      // Set HTTP-only cookie
+
+      console.log('====== Login Response ======');
+      console.log('Setting cookie with token');
+
+      // ตั้งค่า cookie
       res.cookie('token', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 24 * 60 * 60 * 1000
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
       });
-      
-      console.log('\n=== Login Successful ===');
-      return res.json({ 
-        success: true, 
-        role,
-        displayName,
-        userData: {
-          username,
-          role,
-          displayName
-        }
+
+      console.log('Cookie set successfully');
+      console.log('==========================');
+
+      return res.json({
+        success: true,
+        role: 'admin',
+        displayName: 'Administrator',
+        userData: adminData
       });
     }
 
-    console.log('\n=== Login Failed: Invalid credentials ===');
-    return res.status(401).json({ 
-      success: false, 
-      message: 'Invalid credentials' 
+    // ถ้าไม่ใช่ admin จึงค่อยตรวจสอบ shop
+    console.log('Not admin, checking shop credentials...');
+    const shop = await Shop.findOne({
+      'credentials.username': { $regex: new RegExp(`^${username}$`, 'i') }
     });
+
+    if (!shop) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Invalid credentials' 
+      });
+    }
+
+    // ตรวจสอบ password ของ shop
+    if (!shop.credentials.password_hash && shop.credentials.password) {
+      shop.credentials.password_hash = await hashPassword(shop.credentials.password);
+      await shop.save();
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, shop.credentials.password_hash);
+    
+    if (!isPasswordValid) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Invalid credentials' 
+      });
+    }
+
+    // สร้าง token สำหรับ shop
+    const token = generateToken({ 
+      username: shop.credentials.username,
+      role: 'user',
+      shopId: shop._id,
+      userId: shop.userId,
+      displayName: shop.name
+    });
+
+    // สร้าง session สำหรับ shop
+    const session = new Session({
+      userId: shop.userId,
+      shopId: shop._id,
+      token,
+      deviceInfo: {
+        userAgent: req.headers['user-agent'],
+        ipAddress: req.ip
+      },
+      status: 'active',
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+    });
+    await session.save();
+
+    // บันทึกประวัติการ login
+    const loginRecord = new Login({
+      username: shop.credentials.username,
+      role: 'user',
+      userId: shop.userId,
+      displayName: shop.name,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      token,
+      deviceInfo: {
+        userAgent: req.headers['user-agent']
+      },
+      status: 'active'
+    });
+    await loginRecord.save();
+
+    // ตั้งค่า cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000
+    });
+
+    return res.json({
+      success: true,
+      role: 'user',
+      displayName: shop.name,
+      userData: {
+        id: shop._id,
+        name: shop.name,
+        username: shop.credentials.username,
+        type: shop.type,
+        description: shop.description,
+        location: shop.location,
+        contractStartDate: shop.contractStartDate,
+        contractEndDate: shop.contractEndDate,
+        image: shop.image
+      }
+    });
+
   } catch (error) {
-    console.error('\n=== Login Error ===');
-    console.error('Error type:', error.name);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
+    console.error('Login error:', error);
     return res.status(500).json({ 
       success: false, 
       message: 'Error during login' 

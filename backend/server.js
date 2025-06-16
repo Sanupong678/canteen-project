@@ -20,6 +20,7 @@
   import backgroundRoutes from './routes/backgroundRoutes.js';
   import authRoutes from './routes/authRoutes.js';
   import shopRoutes from './routes/shopRoutes.js';
+  import billRoutes from './routes/billRoutes.js';
 
   dotenv.config();
   const app = express();
@@ -69,6 +70,7 @@
   app.use('/api/backgrounds', backgroundRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/shops', shopRoutes);
+  app.use('/api/bills', billRoutes);
 
   // MongoDB Connection
   const connectDB = async () => {

@@ -8,23 +8,12 @@
           <v-card-text>
             <v-form ref="form" v-model="isFormValid">
               <v-row>
-                <v-col cols="12" sm="6">
-                  <v-select
-                    v-model="selectedCanteen"
-                    :items="canteenOptions"
-                    label="โรงอาหาร"
-                    :rules="[v => !!v || 'กรุณาเลือกโรงอาหาร']"
-                    outlined
-                    dense
-                    class="custom-select"
-                  ></v-select>
-                </v-col>
-                <v-col cols="12" sm="6">
+                <v-col cols="12">
                   <v-select
                     v-model="selectedCategory"
                     :items="categoryOptions"
                     label="หมวดหมู่"
-                    :rules="[v => !!v || 'กรุณาเลือกหมวดหมู่']"
+                    :rules="categoryRules"
                     outlined
                     dense
                     class="custom-select"
@@ -34,7 +23,7 @@
                   <v-textarea
                     v-model="issue"
                     label="รายละเอียดปัญหา"
-                    :rules="[v => !!v || 'กรุณากรอกรายละเอียดปัญหา']"
+                    :rules="issueRules"
                     outlined
                     rows="4"
                     class="custom-textarea"
@@ -114,12 +103,17 @@
                     <h3 class="canteen-name">{{ repair.canteen }}</h3>
                     <span class="report-date">{{ formatDate(repair.report_date) }}</span>
                   </div>
-                  <span 
-                    class="status-badge"
-                    :class="getStatusClass(repair.status)"
-                  >
-                    {{ getStatusText(repair.status) }}
-                  </span>
+                  <div class="status-info">
+                    <span 
+                      class="status-badge"
+                      :class="getStatusClass(repair.status)"
+                    >
+                      {{ getStatusText(repair.status) }}
+                    </span>
+                    <span v-if="repair.statusNote" class="status-note">
+                      หมายเหตุ: {{ repair.statusNote }}
+                    </span>
+                  </div>
                 </div>
                 <div class="history-item-content">
                   <p class="category">หมวดหมู่: {{ getCategoryText(repair.category) }}</p>
@@ -159,26 +153,18 @@
 </template>
 
 <script setup>
-import { ref, computed, onUnmounted, defineComponent, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import LayoutUser from '@/components/LayoutUser.vue'
 import axios from 'axios'
-import { format, addMonths } from 'date-fns'
-import { useRouter } from 'vue-router'
-
-defineComponent({
-  name: 'RepairPage',
-  components: {
-    LayoutUser
-  }
-})
+import { format } from 'date-fns'
 
 const router = useRouter()
 
-// Form data
+// Form refs and data
 const form = ref(null)
 const isFormValid = ref(false)
 const loading = ref(false)
-const selectedCanteen = ref('')
 const selectedCategory = ref('')
 const issue = ref('')
 const images = ref([])
@@ -189,169 +175,123 @@ const selectedImages = ref([])
 const fileInput = ref(null)
 const showHistory = ref(false)
 
-// Store repair data
-const repairData = ref([])
+// ดึงข้อมูลร้านค้าจาก localStorage
+const shopData = ref(JSON.parse(localStorage.getItem('shopData') || '{}'))
+const userId = ref(localStorage.getItem('userId'))
 
 // Options
-const canteenOptions = [
-  'โรงอาหารC5',
-  'โรงอาหารD1',
-  'โรงอาหารDormitory',
-  'โรงอาหารE1',
-  'โรงอาหารE2',
-  'โรงอาหารEpark',
-  'โรงอาหารMsquare',
-  'โรงอาหารRuemrim',
-  'โรงอาหารS2'
-]
-
 const categoryOptions = [
-  'น้ำ',
-  'ไฟ',
-  'สาธารณูปโภค',
+  'อุปกรณ์ไฟฟ้า',
+  'ระบบน้ำ',
+  'โครงสร้างอาคาร',
+  'ความสะอาด',
   'อื่นๆ'
 ]
 
+// Add these in the script setup section after the other refs
+const categoryRules = [v => !!v || 'กรุณาเลือกหมวดหมู่']
+const issueRules = [v => !!v || 'กรุณากรอกรายละเอียดปัญหา']
+
 // Methods
 const handleImageChange = (event) => {
-  const files = event.target.files
-  if (files) {
-    images.value = Array.from(files)
-    imagePreview.value = []
-    Array.from(files).forEach(file => {
-      const reader = new FileReader()
-      reader.onload = e => {
-        imagePreview.value.push(e.target.result)
-      }
-      reader.readAsDataURL(file)
-    })
-  }
+  const files = Array.from(event.target.files)
+  images.value = [...images.value, ...files]
+  
+  files.forEach(file => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      imagePreview.value.push(e.target.result)
+    }
+    reader.readAsDataURL(file)
+  })
 }
 
 const removeImage = (index) => {
-  imagePreview.value.splice(index, 1)
   images.value.splice(index, 1)
+  imagePreview.value.splice(index, 1)
 }
 
 const handleSubmit = async () => {
-  if (!form.value.validate()) return
+  if (!selectedCategory.value || !issue.value) {
+    const missingFields = []
+    if (!selectedCategory.value) missingFields.push('หมวดหมู่')
+    if (!issue.value) missingFields.push('รายละเอียดปัญหา')
+    alert(`กรุณากรอก${missingFields.join(' และ ')}`)
+    return
+  }
 
   loading.value = true
+
   try {
-    // สร้างข้อมูลที่จะส่งไป MongoDB
-    const repairData = {
-      customId: 'CANTEEN001',
-      canteen: selectedCanteen.value,
+    let base64Images = []
+    if (images.value.length > 0) {
+      const imagePromises = images.value.map(file => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = e => resolve(e.target.result)
+          reader.onerror = e => reject(e)
+          reader.readAsDataURL(file)
+        })
+      })
+      base64Images = await Promise.all(imagePromises)
+    }
+
+    const payload = {
       category: selectedCategory.value,
       issue: issue.value,
-      status: 'รอดำเนินการ',
-      report_date: new Date().toISOString(),
-      images: imagePreview.value // ส่ง base64 images โดยตรง
+      images: base64Images
     }
 
-    console.log('Sending data:', repairData) // เพิ่ม log
+    const response = await axios.post('http://localhost:4000/api/repairs', payload)
 
-    // ส่งข้อมูลไปยัง API
-    const response = await axios.post('/api/repairs', repairData, {
-      headers: {
-        'Content-Type': 'application/json'
+    if (response.data.success) {
+      if (form.value) {
+        form.value.reset()
       }
-    })
-
-    console.log('Server response:', response.data) // เพิ่ม log
-
-    // รีเซ็ตฟอร์ม
-    form.value.reset()
-    selectedCanteen.value = ''
-    selectedCategory.value = ''
-    issue.value = ''
-    images.value = []
-    imagePreview.value = []
-    
-    // เคลียร์ช่องไฟล์
-    if (fileInput.value) {
-      fileInput.value.value = ''
-    }
-
-    // แสดงข้อความสำเร็จ
-    alert('ส่งเรื่องแจ้งซ่อมเรียบร้อยแล้ว')
-    
-    // รีเฟรชประวัติ
-    await fetchRepairHistory()
-    
-    // แสดงประวัติการแจ้งซ่อม
-    showHistory.value = true
-
-  } catch (error) {
-    console.error('Error submitting repair:', error)
-    if (error.response && error.response.data) {
-      console.log('Server response:', error.response.data)
-      alert('ส่งเรื่องแจ้งซ่อมเรียบร้อยแล้ว แต่มีข้อผิดพลาดในการแสดงผล')
+      
+      selectedCategory.value = null
+      issue.value = ''
+      images.value = []
+      imagePreview.value = []
+      
+      alert('บันทึกการแจ้งซ่อมเรียบร้อยแล้ว')
       await fetchRepairHistory()
-    } else {
-      alert('เกิดข้อผิดพลาดในการส่งเรื่อง กรุณาลองใหม่อีกครั้ง')
+      showHistory.value = true
     }
+  } catch (error) {
+    console.error('Error details:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status
+    })
+    alert(error.response?.data?.message || error.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง')
   } finally {
     loading.value = false
   }
 }
 
-// Clean up expired images
-const cleanupExpiredImages = () => {
-  const now = new Date()
-  repairData.value = repairData.value.map(repair => ({
-    ...repair,
-    images: repair.images?.filter(img => {
-      const isExpired = new Date(img.expiresAt) <= now
-      if (isExpired) {
-        URL.revokeObjectURL(img.url)
-      }
-      return !isExpired
-    })
-  }))
-}
-
-let cleanupInterval = null
-
-// Set up cleanup interval
-onMounted(() => {
-  cleanupInterval = setInterval(cleanupExpiredImages, 24 * 60 * 60 * 1000)
-})
-
-// Clean up on component unmount
-onUnmounted(() => {
-  if (cleanupInterval) {
-    clearInterval(cleanupInterval)
-  }
-  // Clean up all image URLs
-  repairData.value.forEach(repair => {
-    repair.images?.forEach(img => URL.revokeObjectURL(img.url))
-  })
-})
-
-// Fetch repair history
 const fetchRepairHistory = async () => {
-  loading.value = true
   try {
-    const response = await axios.get('/api/repairs/user')
-    console.log('History response:', response.data)
-
-    if (response.data && response.data.data) {
-      repairHistory.value = response.data.data.map(repair => ({
-        customId: repair.customId,
-        canteen: repair.canteen,
-        category: repair.category,
-        issue: repair.issue,
-        status: repair.status,
-        images: repair.images || [],
-        report_date: repair.report_date || new Date().toISOString(),
-        _id: repair._id
-      }))
+    loading.value = true
+    const token = localStorage.getItem('token')
+    
+    const response = await axios.get('http://localhost:4000/api/repairs/user', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    console.log('API Response:', response.data)
+    if (response.data && Array.isArray(response.data)) {
+      repairHistory.value = response.data
+    } else if (response.data && Array.isArray(response.data.data)) {
+      repairHistory.value = response.data.data
     } else {
+      console.warn('Unexpected response format:', response.data)
       repairHistory.value = []
     }
   } catch (error) {
     console.error('Error fetching repair history:', error)
+    alert('ไม่สามารถดึงข้อมูลประวัติการแจ้งซ่อมได้ กรุณาลองใหม่อีกครั้ง')
     repairHistory.value = []
   } finally {
     loading.value = false
@@ -362,31 +302,36 @@ const formatDate = (date) => {
   return format(new Date(date), 'dd/MM/yyyy HH:mm')
 }
 
-const getCategoryText = (category) => {
-  return category
-}
-
-const getCategoryColor = (category) => {
-  const colorMap = {
-    'น้ำ': 'blue',
-    'ไฟ': 'orange',
-    'สาธารณูปโภค': 'green',
-    'อื่นๆ': 'grey'
+const getStatusClass = (status) => {
+  const statusClasses = {
+    'pending': 'status-pending',
+    'in_progress': 'status-progress',
+    'completed': 'status-completed',
+    'cancelled': 'status-cancelled',
+    'รอดำเนินการ': 'status-pending',
+    'กำลังดำเนินการ': 'status-progress',
+    'ซ่อมแล้ว': 'status-completed',
+    'ยกเลิก': 'status-cancelled'
   }
-  return colorMap[category] || 'grey'
+  return statusClasses[status] || 'status-pending'
 }
 
 const getStatusText = (status) => {
-  return status
+  const statusTexts = {
+    'pending': 'รอดำเนินการ',
+    'in_progress': 'กำลังดำเนินการ',
+    'completed': 'ซ่อมแล้ว',
+    'cancelled': 'ยกเลิก',
+    'รอดำเนินการ': 'รอดำเนินการ',
+    'กำลังดำเนินการ': 'กำลังดำเนินการ',
+    'ซ่อมแล้ว': 'ซ่อมแล้ว',
+    'ยกเลิก': 'ยกเลิก'
+  }
+  return statusTexts[status] || 'รอดำเนินการ'
 }
 
-const getStatusColor = (status) => {
-  const colorMap = {
-    'รอดำเนินการ': 'warning',
-    'กำลังดำเนินการ': 'info',
-    'ซ่อมแล้ว': 'success'
-  }
-  return colorMap[status] || 'grey'
+const getCategoryText = (category) => {
+  return category
 }
 
 const viewImages = (images) => {
@@ -394,8 +339,10 @@ const viewImages = (images) => {
   imageDialog.value = true
 }
 
-// Fetch data on component mount
-fetchRepairHistory()
+// Fetch repair history on mount
+onMounted(async () => {
+  await fetchRepairHistory()
+})
 </script>
 
 <style scoped>
@@ -544,11 +491,46 @@ fetchRepairHistory()
   color: #718096;
 }
 
+.status-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.status-note {
+  font-size: 0.875rem;
+  color: #666;
+  font-style: italic;
+  max-width: 300px;
+  text-align: right;
+}
+
 .status-badge {
   padding: 0.25rem 0.75rem;
   border-radius: 9999px;
   font-size: 0.875rem;
   font-weight: 500;
+}
+
+.status-pending {
+  background-color: #FEF3C7;
+  color: #92400E;
+}
+
+.status-progress {
+  background-color: #DBEAFE;
+  color: #1E40AF;
+}
+
+.status-completed {
+  background-color: #D1FAE5;
+  color: #065F46;
+}
+
+.status-cancelled {
+  background-color: #FEE2E2;
+  color: #991B1B;
 }
 
 .history-item-content {

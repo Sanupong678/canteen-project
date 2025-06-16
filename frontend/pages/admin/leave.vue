@@ -1,67 +1,207 @@
 <template>
   <LayoutAdmin>
     <div class="page-container">
-      <div class="content-container">
-        <h1 class="text-2xl font-bold mb-6">จัดการการลา</h1>
-        
-        <!-- Leave Requests Table -->
-        <div class="table-container">
-          <table class="w-full">
-            <thead>
-              <tr class="bg-gray-100">
-                <th class="table-header text-center">ชื่อพนักงาน</th>
-                <th class="table-header text-center">วันที่ลา</th>
-                <th class="table-header text-center">เหตุผล</th>
-                <th class="table-header text-center">สถานะ</th>
-                <th class="table-header text-center">การจัดการ</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="leave in leaveRequests" :key="leave.id" class="border-b">
-                <td class="table-cell text-center">{{ leave.employeeName }}</td>
-                <td class="table-cell text-center">
-                  {{ formatDate(leave.startDate) }} ถึง {{ formatDate(leave.endDate) }}
-                </td>
-                <td class="table-cell text-center">{{ leave.reason }}</td>
-                <td class="table-cell text-center">
-                  <span class="status-badge" :class="leave.status">
-                    {{ getStatusText(leave.status) }}
-                  </span>
-                </td>
-                <td class="table-cell text-center">
-                  <div class="flex justify-center gap-2" v-if="leave.status === 'pending'">
-                    <button
-                      @click="updateLeaveStatus(leave.id, 'approved')"
-                      class="action-button approve"
-                    >
-                      อนุมัติ
-                    </button>
-                    <button
-                      @click="updateLeaveStatus(leave.id, 'rejected')"
-                      class="action-button reject"
-                    >
-                      ไม่อนุมัติ
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+      <div class="content-wrapper">
+        <div class="header-section">
+          <h1 class="page-title">จัดการการลา</h1>
         </div>
+
+        <!-- Filters Section -->
+        <div class="filters-section">
+          <v-row>
+            <v-col cols="12" sm="6">
+              <v-select
+                v-model="filters.canteen"
+                :items="canteenOptions"
+                label="โรงอาหาร"
+                clearable
+                outlined
+                dense
+                hide-details
+                class="custom-select"
+              ></v-select>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-select
+                v-model="filters.status"
+                :items="statusOptions"
+                label="สถานะ"
+                clearable
+                outlined
+                dense
+                hide-details
+                class="custom-select"
+              ></v-select>
+            </v-col>
+          </v-row>
+        </div>
+
+        <!-- Data Table -->
+        <v-data-table
+          :headers="headers"
+          :items="filteredLeaves"
+          :loading="isLoading"
+          class="elevation-1 custom-table"
+          :items-per-page="10"
+          :footer-props="{
+            'items-per-page-options': [10, 20, 50],
+            'items-per-page-text': 'รายการต่อหน้า'
+          }"
+          :no-data-text="'ยังไม่มีรายการลา'"
+          :no-results-text="'ไม่พบรายการที่ค้นหา'"
+          :loading-text="'กำลังโหลดข้อมูล...'"
+        >
+          <!-- Header Labels -->
+          <template v-slot:header.shopName>
+            <span><b>ชื่อร้านค้า</b></span>
+          </template>
+          <template v-slot:header.canteen>
+            <span><b>โรงอาหาร</b></span>
+          </template>
+          <template v-slot:header.dateRange>
+            <span><b>วันที่ลา</b></span>
+          </template>
+          <template v-slot:header.issue>
+            <span><b>เหตุผล</b></span>
+          </template>
+          <template v-slot:header.status>
+            <span><b>สถานะ</b></span>
+          </template>
+          <template v-slot:header.actions>
+            <span><b>การจัดการ</b></span>
+          </template>
+
+          <!-- Shop Name Column -->
+          <template v-slot:item.shopName="{ item }">
+            <div class="d-flex align-center">
+              <span class="font-weight-medium">{{ item.shopName }}</span>
+            </div>
+          </template>
+
+          <!-- Canteen Column -->
+          <template v-slot:item.canteen="{ item }">
+            <div class="d-flex align-center">
+              <span class="font-weight-medium">{{ item.canteen }}</span>
+            </div>
+          </template>
+
+          <!-- Date Range Column -->
+          <template v-slot:item.dateRange="{ item }">
+            <div class="date-range">
+              {{ formatDate(item.startDate) }} ถึง {{ formatDate(item.endDate) }}
+            </div>
+          </template>
+
+          <!-- Issue Column -->
+          <template v-slot:item.issue="{ item }">
+            <div class="issue-cell">
+              <span class="issue-text">{{ item.issue }}</span>
+            </div>
+          </template>
+
+          <!-- Status Column -->
+          <template v-slot:item.status="{ item }">
+            <v-chip
+              :color="getStatusColor(item.status)"
+              small
+              class="font-weight-medium status-chip"
+            >
+              {{ getStatusText(item.status) }}
+            </v-chip>
+          </template>
+
+          <!-- Actions Column -->
+          <template v-slot:item.actions="{ item }">
+            <div class="action-buttons" v-if="item.status === 'pending'">
+              <v-btn
+                small
+                @click="updateLeaveStatus(item._id, 'approved')"
+                class="action-btn confirm-btn"
+                :loading="isLoading"
+              >
+                อนุมัติ
+              </v-btn>
+              <v-btn
+                small
+                @click="updateLeaveStatus(item._id, 'rejected')"
+                class="action-btn reject-btn"
+                :loading="isLoading"
+              >
+                ไม่อนุมัติ
+              </v-btn>
+            </div>
+          </template>
+        </v-data-table>
       </div>
     </div>
   </LayoutAdmin>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import LayoutAdmin from '@/components/LayoutAdmin.vue'
+import { useNuxtApp } from '#app'
+import { format } from 'date-fns'
+import { th } from 'date-fns/locale'
 
+const { $axios } = useNuxtApp()
 const leaveRequests = ref([])
+const isLoading = ref(false)
+
+// Filters
+const filters = ref({
+  canteen: '',
+  status: ''
+})
+
+// Table headers
+const headers = [
+  { text: 'ชื่อร้านค้า', value: 'shopName', align: 'center' },
+  { text: 'โรงอาหาร', value: 'canteen', align: 'center' },
+  { text: 'วันที่ลา', value: 'dateRange', align: 'center' },
+  { text: 'เหตุผล', value: 'issue', align: 'center' },
+  { text: 'สถานะ', value: 'status', align: 'center' },
+  { text: 'การจัดการ', value: 'actions', align: 'center', sortable: false }
+]
+
+// Options for filters
+const statusOptions = [
+  { text: 'ทั้งหมด', value: '' },
+  { text: 'รออนุมัติ', value: 'pending' },
+  { text: 'อนุมัติแล้ว', value: 'approved' },
+  { text: 'ไม่อนุมัติ', value: 'rejected' }
+]
+
+const canteenOptions = [
+  'โรงอาหารC5',
+  'โรงอาหารD1',
+  'โรงอาหารDormitory',
+  'โรงอาหารE1',
+  'โรงอาหารE2',
+  'โรงอาหารEpark',
+  'โรงอาหารMsquare',
+  'โรงอาหารRuemrim',
+  'โรงอาหารS2'
+  
+]
+
+// Filtered leaves based on selected filters
+const filteredLeaves = computed(() => {
+  let filtered = [...leaveRequests.value]
+  
+  if (filters.value.canteen) {
+    filtered = filtered.filter(leave => leave.canteen === filters.value.canteen)
+  }
+  
+  if (filters.value.status) {
+    filtered = filtered.filter(leave => leave.status === filters.value.status)
+  }
+  
+  return filtered
+})
 
 const formatDate = (dateString) => {
-  const options = { year: 'numeric', month: 'long', day: 'numeric' }
-  return new Date(dateString).toLocaleDateString('th-TH', options)
+  return format(new Date(dateString), 'dd MMMM yyyy', { locale: th })
 }
 
 const getStatusText = (status) => {
@@ -73,107 +213,186 @@ const getStatusText = (status) => {
   return statusMap[status] || status
 }
 
-const updateLeaveStatus = (leaveId, newStatus) => {
-  // Update in user's leave history
-  const userLeaveHistory = JSON.parse(localStorage.getItem('leaveHistory') || '[]')
-  const updatedHistory = userLeaveHistory.map(leave => {
-    if (leave.id === leaveId) {
-      return { ...leave, status: newStatus }
-    }
-    return leave
-  })
-  localStorage.setItem('leaveHistory', JSON.stringify(updatedHistory))
-  
-  // Update local state
-  leaveRequests.value = updatedHistory
+const getStatusColor = (status) => {
+  const colors = {
+    pending: 'warning',
+    approved: 'success',
+    rejected: 'error'
+  }
+  return colors[status] || 'grey'
 }
 
+// ดึงข้อมูลการลาทั้งหมด
+const fetchLeaveRequests = async () => {
+  isLoading.value = true
+  try {
+    const response = await $axios.get('/api/leaves/admin')
+    if (response.data && response.data.data) {
+      leaveRequests.value = response.data.data
+    }
+  } catch (error) {
+    console.error('Error fetching leave requests:', error)
+    alert('ไม่สามารถดึงข้อมูลการลาได้')
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// อัพเดทสถานะการลา
+const updateLeaveStatus = async (leaveId, newStatus) => {
+  if (!confirm(`คุณต้องการ${newStatus === 'approved' ? 'อนุมัติ' : 'ไม่อนุมัติ'}การลานี้ใช่หรือไม่?`)) {
+    return
+  }
+
+  isLoading.value = true
+  try {
+    await $axios.put(`/api/leaves/${leaveId}/status`, { status: newStatus })
+    await fetchLeaveRequests()
+    alert('อัพเดทสถานะเรียบร้อยแล้ว')
+  } catch (error) {
+    console.error('Error updating leave status:', error)
+    alert(error.response?.data?.message || 'ไม่สามารถอัพเดทสถานะได้')
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// Auto refresh data every 30 seconds
 onMounted(() => {
-  // Fetch leave history from user's localStorage
-  const userLeaveHistory = JSON.parse(localStorage.getItem('leaveHistory') || '[]')
-  leaveRequests.value = userLeaveHistory
+  fetchLeaveRequests()
+  const refreshInterval = setInterval(fetchLeaveRequests, 30000)
+  
+  onUnmounted(() => {
+    clearInterval(refreshInterval)
+  })
 })
 </script>
 
 <style scoped>
 .page-container {
   padding: 2rem;
-  min-height: calc(100vh - 200px);
   background-color: #f5f6fa;
+  min-height: calc(100vh - 64px);
 }
 
-.content-container {
+.content-wrapper {
   max-width: 1200px;
   margin: 0 auto;
 }
 
-.table-container {
+.header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.filters-section {
   background-color: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.custom-select {
+  background-color: white;
+}
+
+.custom-select :deep(.v-select__selections) {
+  font-size: 14px;
+}
+
+.custom-table :deep(.v-data-table__wrapper) {
+  border-radius: 8px;
   overflow: hidden;
 }
 
-.table-header {
-  padding: 1rem;
-  text-align: center;
-  font-weight: 600;
-  color: #4a5568;
-  background-color: #f7fafc;
-  width: 20%;
+.status-chip {
+  min-width: 120px;
+  justify-content: center;
 }
 
-.table-cell {
-  padding: 1rem;
+.issue-cell {
+  max-width: 300px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.date-range {
+  font-weight: 500;
   color: #2d3748;
-  text-align: center;
 }
 
-.status-badge {
-  padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  display: inline-block;
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
 }
 
-.status-badge.pending {
-  background-color: #fffaf0;
-  color: #c05621;
-}
-
-.status-badge.approved {
-  background-color: #f0fff4;
-  color: #2f855a;
-}
-
-.status-badge.rejected {
-  background-color: #fff5f5;
-  color: #c53030;
-}
-
-.action-button {
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  font-weight: 500;
-  transition: all 0.2s;
-}
-
-.action-button.approve {
-  background-color: #48bb78;
+.action-btn {
+  border-radius: 20px;
+  min-width: 80px;
+  height: 32px;
+  padding: 0 16px;
+  margin: 0 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  font-size: 14px;
+  text-transform: none;
+  letter-spacing: normal;
   color: white;
 }
 
-.action-button.approve:hover {
-  background-color: #38a169;
+.confirm-btn {
+  background-color: #4CAF50;
 }
 
-.action-button.reject {
-  background-color: #f56565;
-  color: white;
+.confirm-btn:hover {
+  background-color: #388E3C;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
 }
 
-.action-button.reject:hover {
-  background-color: #e53e3e;
+.reject-btn {
+  background-color: #F44336;
+}
+
+.reject-btn:hover {
+  background-color: #D32F2F;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+  .page-container {
+    padding: 1rem;
+  }
+
+  .header-section {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .filters-section {
+    padding: 0.5rem;
+  }
+
+  .status-chip {
+    min-width: 100px;
+  }
+}
+
+.font-weight-medium {
+  font-weight: 500;
 }
 </style> 

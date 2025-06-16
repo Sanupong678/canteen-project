@@ -52,10 +52,40 @@
           :no-results-text="'ไม่พบรายการที่ค้นหา'"
           :loading-text="'กำลังโหลดข้อมูล...'"
         >
+          <!-- Header Labels -->
+          <template v-slot:header.canteen>
+            <span><b>โรงอาหาร</b></span>
+          </template>
+          <template v-slot:header.shopName>
+            <span><b>ชื่อร้านค้า</b></span>
+          </template>
+          <template v-slot:header.category>
+            <span><b>หมวดหมู่</b></span>
+          </template>
+          <template v-slot:header.issue>
+            <span><b>ปัญหา</b></span>
+          </template>
+          <template v-slot:header.status>
+            <span><b>สถานะ</b></span>
+          </template>
+          <template v-slot:header.report_date>
+            <span><b>วันที่แจ้ง</b></span>
+          </template>
+          <template v-slot:header.actions>
+            <span><b>การจัดการ</b></span>
+          </template>
+
           <!-- Canteen Column -->
           <template v-slot:item.canteen="{ item }">
             <div class="d-flex align-center">
-              <span class="font-weight-medium">{{ getCanteenText(item.canteen) }}</span>
+              <span class="font-weight-medium">{{ item.canteen }}</span>
+            </div>
+          </template>
+
+          <!-- Shop Name Column -->
+          <template v-slot:item.shopName="{ item }">
+            <div class="d-flex align-center">
+              <span class="font-weight-medium">{{ item.shopName }}</span>
             </div>
           </template>
 
@@ -159,13 +189,6 @@
               outlined
               :rules="[v => !!v || 'กรุณาเลือกสถานะ']"
             ></v-select>
-            <v-textarea
-              v-model="statusNote"
-              label="หมายเหตุ (ถ้ามี)"
-              outlined
-              rows="3"
-              placeholder="กรอกหมายเหตุเพิ่มเติม (ถ้ามี)"
-            ></v-textarea>
           </v-card-text>
           <v-card-actions>
             <v-spacer></v-spacer>
@@ -179,30 +202,6 @@
               :disabled="!selectedStatus || updating"
             >
               บันทึก
-            </v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
-
-      <!-- Note Dialog -->
-      <v-dialog v-model="noteDialog" max-width="500px">
-        <v-card>
-          <v-card-title class="headline">
-            หมายเหตุ
-          </v-card-title>
-          <v-card-text>
-            <v-textarea
-              v-model="selectedNote"
-              label="หมายเหตุ"
-              outlined
-              rows="5"
-              readonly
-            ></v-textarea>
-          </v-card-text>
-          <v-card-actions>
-            <v-spacer></v-spacer>
-            <v-btn color="primary" text @click="noteDialog = false">
-              ปิด
             </v-btn>
           </v-card-actions>
         </v-card>
@@ -223,11 +222,8 @@ const repairs = ref([])
 const search = ref('')
 const imageDialog = ref(false)
 const statusDialog = ref(false)
-const noteDialog = ref(false)
 const selectedImages = ref([])
 const selectedStatus = ref('')
-const statusNote = ref('')
-const selectedNote = ref('')
 const selectedRepair = ref(null)
 const updating = ref(false)
 
@@ -256,9 +252,23 @@ const statusOptions = [
   'ซ่อมแล้ว'
 ]
 
+// เพิ่ม canteenMap
+const canteenMap = {
+  1: 'โรงอาหารC5',
+  2: 'โรงอาหารD1',
+  3: 'โรงอาหารDormitory',
+  4: 'โรงอาหารE1',
+  5: 'โรงอาหารE2',
+  6: 'โรงอาหารEpark',
+  7: 'โรงอาหารMsquare',
+  8: 'โรงอาหารRuemrim',
+  9: 'โรงอาหารS2'
+}
+
 // Table Headers
 const headers = [
   { text: 'โรงอาหาร', value: 'canteen', sortable: true },
+  { text: 'ร้านค้า', value: 'shopName', sortable: true },
   { text: 'หมวดหมู่', value: 'category', sortable: true },
   { text: 'รายละเอียดปัญหา', value: 'issue', sortable: true },
   { text: 'สถานะ', value: 'status', sortable: true },
@@ -278,7 +288,11 @@ const filteredRepairs = computed(() => {
     result = result.filter(repair => repair.status === filters.value.status)
   }
 
-  return result
+  return result.map(repair => ({
+    ...repair,
+    canteen: repair.canteen || canteenMap[repair.canteenId] || 'ไม่ระบุโรงอาหาร',
+    shopName: repair.shopName || 'ไม่ระบุร้านค้า'
+  }))
 })
 
 // Methods
@@ -291,7 +305,9 @@ const fetchRepairs = async () => {
     if (response.data && Array.isArray(response.data)) {
       repairs.value = response.data.map(repair => ({
         _id: repair._id,
-        canteen: repair.canteen,
+        canteenId: repair.canteenId,
+        canteen: repair.canteen || canteenMap[repair.canteenId] || 'ไม่ระบุโรงอาหาร',
+        shopName: repair.shopName || 'ไม่ระบุร้านค้า',
         category: repair.category,
         issue: repair.issue,
         status: repair.status,
@@ -302,7 +318,9 @@ const fetchRepairs = async () => {
     } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
       repairs.value = response.data.data.map(repair => ({
         _id: repair._id,
-        canteen: repair.canteen,
+        canteenId: repair.canteenId,
+        canteen: repair.canteen || canteenMap[repair.canteenId] || 'ไม่ระบุโรงอาหาร',
+        shopName: repair.shopName || 'ไม่ระบุร้านค้า',
         category: repair.category,
         issue: repair.issue,
         status: repair.status,
@@ -361,7 +379,6 @@ const viewImages = (images) => {
 const openStatusDialog = (item) => {
   selectedRepair.value = item
   selectedStatus.value = item.status
-  statusNote.value = item.note || ''
   statusDialog.value = true
 }
 
@@ -373,10 +390,8 @@ const updateStatus = async () => {
   
   updating.value = true
   try {
-    // ตรวจสอบข้อมูลก่อนส่ง request
     const updateData = {
-      status: selectedStatus.value,
-      note: statusNote.value || ''
+      status: selectedStatus.value
     }
 
     console.log('Sending update request:', {
@@ -384,66 +399,33 @@ const updateStatus = async () => {
       data: updateData
     })
 
-    // อัปเดตสถานะผ่าน API
     const response = await axios.put(`/api/repairs/${selectedRepair.value._id}/status`, updateData)
     
     if (response.data) {
-      // อัปเดตข้อมูลในตาราง admin
       const index = repairs.value.findIndex(repair => repair._id === selectedRepair.value._id)
       if (index !== -1) {
-        // สร้าง object ใหม่เพื่อให้ Vue ตรวจจับการเปลี่ยนแปลง
         const updatedRepair = {
           ...repairs.value[index],
           status: selectedStatus.value,
-          note: statusNote.value || '',
           updated_at: new Date().toISOString()
         }
         
-        // อัปเดตข้อมูลในอาร์เรย์
         repairs.value.splice(index, 1, updatedRepair)
-        
-        // รีเฟรชข้อมูลทั้งหมด
         await fetchRepairs()
       }
       
-      // ปิด dialog
       statusDialog.value = false
-      
-      // รีเซ็ตค่า
       selectedStatus.value = ''
-      statusNote.value = ''
       selectedRepair.value = null
 
-      // แสดงข้อความสำเร็จ
       alert('อัปเดตสถานะเรียบร้อยแล้ว')
     }
   } catch (error) {
     console.error('Error updating status:', error)
-    if (error.response) {
-      // กรณีมี response จาก server
-      console.error('Server response:', error.response.data)
-      alert(`เกิดข้อผิดพลาด: ${error.response.data.message || 'กรุณาลองใหม่อีกครั้ง'}`)
-    } else if (error.request) {
-      // กรณีไม่ได้รับ response
-      console.error('No response received:', error.request)
-      alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง')
-    } else {
-      // กรณีอื่นๆ
-      console.error('Error message:', error.message)
-      alert('เกิดข้อผิดพลาดในการอัปเดตสถานะ กรุณาลองใหม่อีกครั้ง')
-    }
+    alert('เกิดข้อผิดพลาดในการอัปเดตสถานะ กรุณาลองใหม่อีกครั้ง')
   } finally {
     updating.value = false
   }
-}
-
-const openNoteDialog = (item) => {
-  selectedNote.value = item.note || 'ไม่มีหมายเหตุ'
-  noteDialog.value = true
-}
-
-const getCanteenText = (value) => {
-  return value || ''
 }
 
 // เพิ่มฟังก์ชันสำหรับรีเฟรชข้อมูล
@@ -591,5 +573,9 @@ onMounted(() => {
   .status-chip {
     min-width: 100px;
   }
+}
+
+.font-weight-medium {
+  font-weight: 500;
 }
 </style> 

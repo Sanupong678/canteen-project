@@ -259,7 +259,7 @@ export default {
       const diff = end - now
       return diff > 0 ? Math.ceil(diff / (1000 * 60 * 60 * 24)) : 0
     },
-    async e1Shops() {
+    async loadE1Shops() {
       try {
         const response = await shopService.getE1Shops()
         if (response && Array.isArray(response)) {
@@ -340,7 +340,7 @@ export default {
             }
 
             // Reload all shops to ensure data consistency
-            await this.loade1Shops()
+            await this.loadE1Shops()
             
             // Update selectedShop if it's the same shop being edited
             if (this.selectedShop && this.selectedShop._id === this.shopToEdit._id) {
@@ -371,7 +371,7 @@ export default {
             }
 
             // Reload all shops to ensure data consistency
-            await this.loade1Shops()
+            await this.loadE1Shops()
             this.closeShopForm()
           } catch (createError) {
             console.error('Error creating shop:', createError)
@@ -408,7 +408,7 @@ export default {
         }
 
         // รีโหลดข้อมูลร้านค้าทั้งหมดเพื่อให้แสดงข้อมูลล่าสุด
-        await this.loade1Shops()
+        await this.loadE1Shops()
         
         // อัพเดตข้อมูลร้านค้าที่เลือกอยู่ถ้าเป็นร้านค้าที่เพิ่งแก้ไข
         if (this.selectedShop._id === updatedShop._id) {
@@ -439,7 +439,7 @@ export default {
     },
     startRealtimeUpdate() {
       this.timer = setInterval(() => {
-        this.loade1Shops()
+        this.loadE1Shops()
       }, 60000) // Update every minute
     },
     stopRealtimeUpdate() {

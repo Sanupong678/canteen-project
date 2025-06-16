@@ -4,36 +4,62 @@ import Session from '../models/sessionModel.js';
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 export const generateToken = (user) => {
-  return jwt.sign(
-    { 
-      username: user.username,
-      role: user.role,
-      shopId: user.shopId,
-      displayName: user.displayName
-    },
-    JWT_SECRET,
-    { expiresIn: '24h' }
-  );
+  console.log('Generating token for user:', user);
+  const token = jwt.sign(user, JWT_SECRET, { expiresIn: '24h' });
+  console.log('Generated token payload:', jwt.decode(token));
+  return token;
 };
 
 export const verifyToken = async (req, res, next) => {
   try {
-    const token = req.cookies.token;
+    console.log('\n=== Token Verification Started ===');
+    console.log('Headers:', {
+      authorization: req.headers.authorization,
+      cookie: req.headers.cookie
+    });
+    console.log('Cookies:', req.cookies);
+    
+    let token;
+    
+    // ตรวจสอบ token จาก Authorization header
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+      console.log('✅ Found token in Authorization header:', token.substring(0, 20) + '...');
+    }
+    // ตรวจสอบ token จาก cookies
+    else if (req.cookies.token) {
+      token = req.cookies.token;
+      console.log('✅ Found token in cookies:', token.substring(0, 20) + '...');
+    }
+
     if (!token) {
+      console.log('❌ No token found in request');
       return res.status(401).json({ message: 'No token provided' });
     }
 
+    console.log('Attempting to verify token...');
     const decoded = jwt.verify(token, JWT_SECRET);
-    
-    // ตรวจสอบ session
+    console.log('✅ Token verified successfully');
+    console.log('Decoded token:', decoded);
+
+    // ถ้าเป็น admin ไม่ต้องตรวจสอบ session
+    if (decoded.role === 'admin') {
+      req.user = decoded;
+      console.log('✅ Admin access granted');
+      return next();
+    }
+
+    // ตรวจสอบ session สำหรับ user ทั่วไป
     const session = await Session.findOne({ 
       token,
       status: 'active',
       logoutTime: null,
       expiresAt: { $gt: new Date() }
     });
+    console.log('Session found:', session ? '✅ Yes' : '❌ No');
 
     if (!session) {
+      console.log('❌ No valid session found');
       return res.status(401).json({ message: 'Invalid or expired session' });
     }
 
@@ -42,8 +68,29 @@ export const verifyToken = async (req, res, next) => {
     await session.save();
 
     req.user = decoded;
+    console.log('✅ User verified successfully');
+    console.log('=== Token Verification Completed ===\n');
     next();
   } catch (error) {
+    console.error('❌ Token verification error:', error);
     return res.status(401).json({ message: 'Invalid token' });
   }
+};
+
+export const isAdmin = async (req, res, next) => {
+  console.log('Checking admin role...');
+  console.log('User in request:', req.user);
+  
+  if (!req.user) {
+    console.log('No user found in request');
+    return res.status(401).json({ message: 'User not authenticated' });
+  }
+
+  if (req.user.role !== 'admin') {
+    console.log('User is not admin. Role:', req.user.role);
+    return res.status(403).json({ message: 'Access denied. Admin role required.' });
+  }
+
+  console.log('Admin access granted');
+  next();
 }; 

@@ -61,20 +61,35 @@ export default {
         })
         
         if (response.data.success) {
-          // เก็บเฉพาะข้อมูลที่ไม่สำคัญใน localStorage
+          // เก็บข้อมูลใน localStorage
           localStorage.setItem('userRole', response.data.role)
           localStorage.setItem('displayName', response.data.displayName)
+          localStorage.setItem('isAuthenticated', 'true')
           
-          // ตั้งค่า axios ให้ส่ง cookies ไปด้วยทุกครั้ง
+          // เก็บข้อมูลเพิ่มเติมสำหรับร้านค้า
+          if (response.data.role === 'user' && response.data.userData) {
+            localStorage.setItem('userId', response.data.userData.id)
+            localStorage.setItem('shopData', JSON.stringify({
+              name: response.data.userData.name,
+              type: response.data.userData.type,
+              description: response.data.userData.description,
+              location: response.data.userData.location,
+              image: response.data.userData.image,
+              contractStartDate: response.data.userData.contractStartDate,
+              contractEndDate: response.data.userData.contractEndDate
+            }))
+          }
+          
+          // ตั้งค่า axios
           axios.defaults.withCredentials = true
           
-          // ตรวจสอบ role และ redirect ไปยังหน้าที่เหมาะสม
+          // Redirect ตาม role
           if (response.data.role === 'admin') {
-            this.$router.push('/admin')
+            await this.$router.push('/admin')
           } else if (response.data.role === 'user') {
-            this.$router.push('/user')
+            await this.$router.push('/user')
           } else {
-            this.$router.push('/')
+            await this.$router.push('/')
           }
         }
       } catch (error) {
