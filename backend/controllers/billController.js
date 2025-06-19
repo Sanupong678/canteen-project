@@ -167,7 +167,10 @@ export const getAllBills = async (req, res) => {
       month: getThaiMonth(bill.month),
       year: bill.year,
       createdAt: bill.createdAt,
-      updatedAt: bill.updatedAt
+      updatedAt: bill.updatedAt,
+      amount: bill.amount || null,
+      image: bill.image || null,
+      slip_image_url: bill.slip_image_url || null
     }));
 
     // บันทึกข้อมูลลงใน data/bill

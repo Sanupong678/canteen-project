@@ -32,7 +32,28 @@ export const getLeaves = async (req, res) => {
 export const getUserLeaves = async (req, res) => {
   try {
     const userId = req.user.userId;
+    const shopId = req.user.shopId;
+
+    // ตรวจสอบว่ามี userId และ shopId หรือไม่
+    if (!userId || !shopId) {
+      console.log('User has no userId or shopId:', { userId, shopId });
+      return res.json({ 
+        data: [],
+        message: 'ยังไม่เคยแจ้งลามาก่อน',
+        hasHistory: false
+      });
+    }
+
     const leaves = await Leave.find({ userId }).sort({ createdAt: -1 });
+
+    // ถ้าไม่มีประวัติการลา
+    if (leaves.length === 0) {
+      return res.json({ 
+        data: [],
+        message: 'ยังไม่เคยแจ้งลามาก่อน',
+        hasHistory: false
+      });
+    }
 
     // ดึงข้อมูลร้านค้าและโรงอาหารเพิ่มเติม
     const leavesWithDetails = await Promise.all(leaves.map(async (leave) => {
@@ -44,8 +65,12 @@ export const getUserLeaves = async (req, res) => {
       };
     }));
 
-    res.json({ data: leavesWithDetails });
+    res.json({ 
+      data: leavesWithDetails,
+      hasHistory: true
+    });
   } catch (error) {
+    console.error('Error fetching user leaves:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -56,6 +81,14 @@ export const createLeave = async (req, res) => {
     const userId = req.user.userId;
     const shopId = req.user.shopId;
     const { startDate, endDate, issue } = req.body;
+
+    // ตรวจสอบว่ามี userId และ shopId หรือไม่
+    if (!userId || !shopId) {
+      return res.status(400).json({
+        success: false,
+        message: 'ไม่พบข้อมูลร้านค้าหรือผู้ใช้ กรุณาติดต่อผู้ดูแลระบบ'
+      });
+    }
 
     const newLeave = new Leave({
       userId,

@@ -1,51 +1,58 @@
 <template>
   <LayoutUser>
-    <div class="bill-container">
-      <!-- Payment Type Buttons -->
-      <div class="payment-type-dropdown">
-        
-        <select id="paymentTypeSelect" v-model="selectedType" class="select-type">
-          <option value="water">ค่าน้ำ</option>
-        <option value="electricity">ค่าไฟ</option>
-        </select>
-        <label for="paymentTypeSelect" class="re-only">เลือกประเภท</label>
-      </div>
+    <div class="page-container">
+      <div class="content-wrapper">
+        <div class="header-section">
+          <h1 class="page-title">บิลค่าบริการ</h1>
+        </div>
 
-      <!-- Bill List -->
-      <div class="bills-list">
-        <div v-for="bill in filteredBills" :key="bill.id" class="bill-card">
-          <div class="bill-details">
-            <div class="left-section">
-              <div class="bill-period">
-                <h3>{{ getBillTypeText(bill.type) }}ประจำเดือน {{ formatMonth(bill.billMonth) }}</h3>
-                <p class="date">วันที่ {{ formatDate(bill.createdAt) }}</p>
-              </div>
+        <div class="bill-container">
+          <!-- Payment Type Buttons -->
+          <div class="payment-type-dropdown">
+            <select id="paymentTypeSelect" v-model="selectedType" class="select-type">
+              <option value="water">ค่าน้ำ</option>
+              <option value="electricity">ค่าไฟ</option>
+            </select>
+            <label for="paymentTypeSelect" class="re-only">เลือกประเภท</label>
+          </div>
 
-              <div class="due-date">
-                <p>วันครบกำหนดชำระ: {{ formatDate(bill.dueDate) }}</p>
-                <p v-if="bill.paymentDate">วันที่ชำระ: {{ formatDate(bill.paymentDate) }}</p>
-              </div>
+          <!-- Bill List -->
+          <div class="bills-list">
+            <div v-for="bill in filteredBills" :key="bill.id" class="bill-card">
+              <div class="bill-details">
+                <div class="left-section">
+                  <div class="bill-period">
+                    <h3>{{ getBillTypeText(bill.type) }}ประจำเดือน {{ formatMonth(bill.billMonth) }}</h3>
+                    <p class="date">วันที่ {{ formatDate(bill.createdAt) }}</p>
+                  </div>
 
-              <div class="status-section">
-                <span :class="['status-badge', getStatusClass(bill)]">
-                  {{ getStatusText(bill) }}
-                </span>
-              </div>
-            </div>
+                  <div class="due-date">
+                    <p>วันครบกำหนดชำระ: {{ formatDate(bill.dueDate) }}</p>
+                    <p v-if="bill.paymentDate">วันที่ชำระ: {{ formatDate(bill.paymentDate) }}</p>
+                  </div>
 
-            <div class="right-section">
-              <div class="payment-info">
-                <h3 class="amount">฿{{ formatAmount(bill.amount) }}</h3>
-                <div class="account-info">
-                  <p>เลขบัญชี: {{ bill.accountNumber }}</p>
-                  <p>ชื่อบัญชี: {{ bill.accountName }}</p>
+                  <div class="status-section">
+                    <span :class="['status-badge', getStatusClass(bill)]">
+                      {{ getStatusText(bill) }}
+                    </span>
+                  </div>
                 </div>
-                <input type="file" :ref="'fileInput_' + bill.id" accept="image/*" class="hidden-file-input"
-                  @change="handleFileUpload($event, bill)" />
-                <button v-if="!bill.paymentDate && !isExpired(bill)" class="pay-button"
-                  @click="triggerFileInput(bill.id)">
-                  อัปโหลดสลิป
-                </button>
+
+                <div class="right-section">
+                  <div class="payment-info">
+                    <h3 class="amount">฿{{ formatAmount(bill.amount) }}</h3>
+                    <div class="account-info">
+                      <p>เลขบัญชี: {{ bill.accountNumber }}</p>
+                      <p>ชื่อบัญชี: {{ bill.accountName }}</p>
+                    </div>
+                    <input type="file" :ref="'fileInput_' + bill.id" accept="image/*" class="hidden-file-input"
+                      @change="handleFileUpload($event, bill)" />
+                    <button v-if="!bill.paymentDate && !isExpired(bill)" class="pay-button"
+                      @click="triggerFileInput(bill.id)">
+                      อัปโหลดสลิป
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -188,48 +195,97 @@ export default {
 </script>
 
 <style scoped>
+.page-container {
+  padding: 2rem;
+  background-color: #f0f2f5;
+  min-height: calc(100vh - 64px);
+  overflow: hidden;
+}
+
+.content-wrapper {
+  max-width: 1200px;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.header-section {
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+  padding: 24px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(231, 76, 60, 0.15);
+}
+
+.page-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: white;
+  margin: 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
 .bill-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 0;
 }
 
 .payment-type-dropdown {
-
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(231, 76, 60, 0.1);
   display: flex;
-  flex-direction: column; /* ทำให้ label อยู่ใต้ select */
+  flex-direction: column;
   align-items: center;
-  gap: 6px; /* ช่องว่างระหว่าง select กับ label */
-  margin-bottom: 30px;
+  gap: 12px;
 }
 
-
 .select-type {
-  padding: 10px 20px;
+  padding: 12px 24px;
   font-size: 16px;
   border-radius: 8px;
-  border: 1px solid #ccc;
-  min-width: 150px;
+  border: 1px solid #e2e8f0;
+  min-width: 200px;
   cursor: pointer;
+  background: white;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(231, 76, 60, 0.1);
+}
+
+.select-type:focus {
+  outline: none;
+  border-color: #e74c3c;
+  box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.1);
 }
 
 .select-label {
   font-size: 14px;
-  color: #666;
-  user-select: none; /* ป้องกันเลือกข้อความโดยไม่ตั้งใจ */
+  color: #4a5568;
+  font-weight: 600;
+  user-select: none;
 }
 
 .bills-list {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
 }
 
 .bill-card {
   background: white;
   border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(231, 76, 60, 0.1);
+  transition: all 0.3s ease;
+  border-left: 4px solid #e74c3c;
+}
+
+.bill-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(231, 76, 60, 0.15);
 }
 
 .bill-details {
@@ -245,45 +301,57 @@ export default {
 .right-section {
   flex: 1;
   padding-left: 30px;
+  border-left: 1px solid #e2e8f0;
 }
 
 .bill-period h3 {
-  font-size: 18px;
-  color: #333;
+  font-size: 20px;
+  color: #2d3748;
   margin-bottom: 8px;
+  font-weight: 700;
 }
 
 .date {
-  color: #666;
+  color: #718096;
   font-size: 14px;
+  font-weight: 500;
 }
 
 .due-date {
-  margin: 15px 0;
-  color: #666;
+  margin: 20px 0;
+  color: #4a5568;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.due-date p {
+  margin: 4px 0;
 }
 
 .status-badge {
   display: inline-block;
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  font-weight: 600;
   font-size: 14px;
+  min-width: 120px;
+  text-align: center;
+  transition: all 0.3s ease;
 }
 
 .status-pending {
-  background-color: #fff3cd;
-  color: #856404;
+  background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+  color: #92400E;
 }
 
 .status-paid {
-  background-color: #d4edda;
-  color: #155724;
+  background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%);
+  color: #065F46;
 }
 
 .status-expired {
-  background-color: #f8d7da;
-  color: #721c24;
+  background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%);
+  color: #991B1B;
 }
 
 .payment-info {
@@ -291,14 +359,22 @@ export default {
 }
 
 .amount {
-  font-size: 24px;
-  color: #1976d2;
-  margin-bottom: 15px;
+  font-size: 28px;
+  color: #e74c3c;
+  margin-bottom: 20px;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(231, 76, 60, 0.1);
 }
 
 .account-info {
-  color: #666;
-  margin-bottom: 20px;
+  color: #4a5568;
+  margin-bottom: 24px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.account-info p {
+  margin: 4px 0;
 }
 
 .hidden-file-input {
@@ -306,32 +382,82 @@ export default {
 }
 
 .pay-button {
-  background-color: #4caf50;
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
   color: white;
   border: none;
-  padding: 10px 20px;
-  border-radius: 4px;
+  padding: 12px 24px;
+  border-radius: 8px;
   cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.3s;
+  font-weight: 600;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.2);
+  min-width: 140px;
 }
 
 .pay-button:hover {
-  background-color: #388e3c;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(231, 76, 60, 0.3);
 }
 
+.pay-button:disabled {
+  background: #cbd5e0;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ซ่อน Scrollbar */
+::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+/* Responsive Design */
 @media (max-width: 768px) {
+  .page-container {
+    padding: 1rem;
+  }
+
+  .header-section {
+    padding: 16px;
+  }
+
+  .payment-type-dropdown {
+    padding: 16px;
+  }
+
+  .bill-card {
+    padding: 20px;
+  }
+
   .bill-details {
     flex-direction: column;
+    gap: 20px;
   }
 
   .right-section {
     padding-left: 0;
     padding-top: 20px;
+    border-left: none;
+    border-top: 1px solid #e2e8f0;
   }
 
   .payment-info {
     text-align: left;
+  }
+
+  .amount {
+    font-size: 24px;
+  }
+
+  .pay-button {
+    width: 100%;
+    padding: 14px 24px;
   }
 }
 </style>

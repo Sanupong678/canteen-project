@@ -1,87 +1,92 @@
 <template>
   <LayoutUser>
     <div class="page-container">
-      <div class="form-container">
-        <h1 class="text-2xl font-bold mb-6 text-center">แบบฟอร์มการลา</h1>
-        
-        <div class="form-content">
-          <!-- Leave Date Selection -->
-          <div class="form-group">
-            <label class="form-label" for="leaveDate">
-              วันที่ลา
-            </label>
-            <div class="date-inputs">
-              <input
-                type="date"
-                id="startDate"
-                v-model="startDate"
-                class="form-input"
-                @change="validateDateRange"
-              />
-              <span class="date-separator">ถึง</span>
-              <input
-                type="date"
-                id="endDate"
-                v-model="endDate"
-                class="form-input"
-                @change="validateDateRange"
-              />
-            </div>
-            <p v-if="dateError" class="error-message">{{ dateError }}</p>
-          </div>
+      <div class="content-wrapper">
+        <div class="header-section">
+          <h1 class="page-title">แบบฟอร์มการลา</h1>
+        </div>
 
-          <!-- Reason Text Area -->
-          <div class="form-group">
-            <label class="form-label" for="reason">
-              เหตุผล
-            </label>
-            <textarea
-              id="reason"
-              v-model="reason"
-              rows="4"
-              class="form-textarea"
-              placeholder="กรุณากรอกเหตุผลการลา"
-            ></textarea>
-          </div>
-
-          <!-- Leave History Section -->
-          <div class="form-group">
-            <button
-              @click="showHistory = !showHistory"
-              class="history-button"
-            >
-              ประวัติการลา
-            </button>
-            
-            <div v-if="showHistory" class="history-container">
-              <div v-if="leaveHistory.length === 0" class="text-gray-500 text-center">
-                ไม่มีประวัติการลา
+        <div class="form-container">
+          <div class="form-content">
+            <!-- Leave Date Selection -->
+            <div class="form-group">
+              <label class="form-label" for="leaveDate">
+                วันที่ลา
+              </label>
+              <div class="date-inputs">
+                <input
+                  type="date"
+                  id="startDate"
+                  v-model="startDate"
+                  class="form-input"
+                  @change="validateDateRange"
+                />
+                <span class="date-separator">ถึง</span>
+                <input
+                  type="date"
+                  id="endDate"
+                  v-model="endDate"
+                  class="form-input"
+                  @change="validateDateRange"
+                />
               </div>
-              <div v-else class="space-y-3">
-                <div
-                  v-for="(leave, index) in leaveHistory"
-                  :key="index"
-                  class="history-item"
-                >
-                  <p class="font-semibold">วันที่ลา: {{ formatDate(leave.startDate) }} ถึง {{ formatDate(leave.endDate) }}</p>
-                  <p>เหตุผล: {{ leave.reason }}</p>
-                  <p class="status-badge" :class="leave.status">
-                    สถานะ: {{ getStatusText(leave.status) }}
-                  </p>
+              <p v-if="dateError" class="error-message">{{ dateError }}</p>
+            </div>
+
+            <!-- Reason Text Area -->
+            <div class="form-group">
+              <label class="form-label" for="reason">
+                เหตุผล
+              </label>
+              <textarea
+                id="reason"
+                v-model="reason"
+                rows="4"
+                class="form-textarea"
+                placeholder="กรุณากรอกเหตุผลการลา"
+              ></textarea>
+            </div>
+
+            <!-- Leave History Section -->
+            <div class="form-group">
+              <button
+                @click="showHistory = !showHistory"
+                class="history-button"
+              >
+                ประวัติการลา
+              </button>
+              
+              <div v-if="showHistory" class="history-container">
+                <div v-if="leaveHistory.length === 0" class="text-gray-500 text-center py-4">
+                  <p class="text-lg font-medium mb-2">ยังไม่เคยแจ้งลามาก่อน</p>
+                  <p class="text-sm text-gray-400">เมื่อคุณแจ้งลาครั้งแรก ข้อมูลจะแสดงที่นี่</p>
+                </div>
+                <div v-else class="space-y-3">
+                  <div
+                    v-for="(leave, index) in leaveHistory"
+                    :key="index"
+                    class="history-item"
+                  >
+                    <p class="font-semibold">วันที่ลา: {{ formatDate(leave.startDate) }} ถึง {{ formatDate(leave.endDate) }}</p>
+                    <p>เหตุผล: {{ leave.issue || leave.reason }}</p>
+                    <p class="status-badge" :class="leave.status">
+                      สถานะ: {{ getStatusText(leave.status) }}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- Submit Button -->
-          <div class="text-center mt-6">
-            <button
-              @click="submitLeave"
-              :disabled="!isFormValid"
-              class="submit-button"
-            >
-              ยืนยันการลา
-            </button>
+            <!-- Submit Button -->
+            <div class="text-center mt-6">
+              <button
+                @click="submitLeave"
+                :disabled="!isFormValid"
+                class="submit-button"
+              >
+                ยืนยันการลา
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -114,10 +119,18 @@ const fetchLeaveHistory = async () => {
     const response = await $axios.get('/api/leaves/user')
     if (response.data && response.data.data) {
       leaveHistory.value = response.data.data
+    } else {
+      leaveHistory.value = []
+    }
+    
+    // ตรวจสอบข้อความจาก backend
+    if (response.data && response.data.message) {
+      console.log('Leave history message:', response.data.message)
     }
   } catch (error) {
     console.error('Error fetching leave history:', error)
-    alert('ไม่สามารถดึงข้อมูลประวัติการลาได้')
+    leaveHistory.value = []
+    // ไม่แสดง alert เพราะอาจเป็นกรณีที่ยังไม่เคยแจ้งลา
   }
 }
 
@@ -207,12 +220,33 @@ const getStatusText = (status) => {
 
 <style scoped>
 .page-container {
-  min-height: calc(100vh - 200px);
-  display: flex;
-  justify-content: center;
-  align-items: center;
   padding: 2rem;
-  background-color: #f5f6fa;
+  background-color: #f0f2f5;
+  min-height: calc(100vh - 64px);
+  overflow: hidden;
+}
+
+.content-wrapper {
+  max-width: 800px;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.header-section {
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+  padding: 24px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(231, 76, 60, 0.15);
+}
+
+.page-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: white;
+  margin: 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .form-container {
@@ -222,10 +256,11 @@ const getStatusText = (status) => {
 }
 
 .form-content {
-  background-color: white;
+  background: #ffffff;
   padding: 2rem;
   border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(231, 76, 60, 0.1);
 }
 
 .form-group {
@@ -234,107 +269,43 @@ const getStatusText = (status) => {
 
 .form-label {
   display: block;
-  color: #4a5568;
+  color: #2d3748;
   font-weight: 600;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 14px;
 }
 
 .form-input {
   width: 100%;
   padding: 0.75rem;
   border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  transition: border-color 0.2s;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(231, 76, 60, 0.1);
+  background: white;
 }
 
 .form-input:focus {
   outline: none;
-  border-color: #4299e1;
-  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+  border-color: #e74c3c;
+  box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.1);
 }
 
 .form-textarea {
   width: 100%;
   padding: 0.75rem;
   border: 1px solid #e2e8f0;
-  border-radius: 6px;
+  border-radius: 8px;
   resize: vertical;
-  transition: border-color 0.2s;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(231, 76, 60, 0.1);
+  background: white;
 }
 
 .form-textarea:focus {
   outline: none;
-  border-color: #4299e1;
-  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
-}
-
-.history-button {
-  color: #4299e1;
-  font-weight: 600;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  transition: background-color 0.2s;
-}
-
-.history-button:hover {
-  background-color: rgba(66, 153, 225, 0.1);
-}
-
-.history-container {
-  margin-top: 1rem;
-  padding: 1rem;
-  background-color: #f7fafc;
-  border-radius: 6px;
-}
-
-.history-item {
-  padding: 1rem;
-  background-color: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-.submit-button {
-  background-color: #4299e1;
-  color: white;
-  font-weight: 600;
-  padding: 0.75rem 2rem;
-  border-radius: 6px;
-  transition: background-color 0.2s;
-}
-
-.submit-button:hover:not(:disabled) {
-  background-color: #3182ce;
-}
-
-.submit-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.status-badge {
-  padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  display: inline-block;
-  margin-top: 0.5rem;
-}
-
-.status-badge.pending {
-  background-color: #fffaf0;
-  color: #c05621;
-}
-
-.status-badge.approved {
-  background-color: #f0fff4;
-  color: #2f855a;
-}
-
-.status-badge.rejected {
-  background-color: #fff5f5;
-  color: #c53030;
+  border-color: #e74c3c;
+  box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.1);
 }
 
 .date-inputs {
@@ -345,12 +316,196 @@ const getStatusText = (status) => {
 
 .date-separator {
   color: #4a5568;
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 14px;
 }
 
 .error-message {
-  color: #e53e3e;
+  color: #e74c3c;
   font-size: 0.875rem;
   margin-top: 0.5rem;
+  font-weight: 500;
+}
+
+.history-button {
+  color: #e74c3c;
+  font-weight: 600;
+  padding: 12px 20px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, #fdf2f2 0%, #fce8e8 100%);
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  box-shadow: 0 2px 8px rgba(231, 76, 60, 0.1);
+  margin-bottom: 1rem;
+}
+
+.history-button:hover {
+  color: #c0392b;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.15);
+}
+
+.history-container {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-top: 1rem;
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.1);
+  border-left: 4px solid #e74c3c;
+}
+
+.history-item {
+  background: linear-gradient(135deg, #fdf2f2 0%, #fce8e8 100%);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  transition: all 0.3s ease;
+}
+
+.history-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.15);
+}
+
+.history-item:last-child {
+  margin-bottom: 0;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+  min-width: 120px;
+  text-align: center;
+}
+
+.status-badge.pending {
+  background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+  color: #92400E;
+}
+
+.status-badge.approved {
+  background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%);
+  color: #065F46;
+}
+
+.status-badge.rejected {
+  background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%);
+  color: #991B1B;
+}
+
+.submit-button {
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.2);
+  margin-top: 1rem;
+}
+
+.submit-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(231, 76, 60, 0.3);
+}
+
+.submit-button:disabled {
+  background: #cbd5e0;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.text-gray-500 {
+  color: #6b7280;
+}
+
+.text-gray-400 {
+  color: #9ca3af;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.py-4 {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.text-lg {
+  font-size: 1.125rem;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.mb-2 {
+  margin-bottom: 0.5rem;
+}
+
+.text-sm {
+  font-size: 0.875rem;
+}
+
+.space-y-3 > * + * {
+  margin-top: 0.75rem;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+/* ซ่อน Scrollbar */
+::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .page-container {
+    padding: 1rem;
+  }
+
+  .header-section {
+    padding: 16px;
+  }
+
+  .form-content {
+    padding: 1.5rem;
+  }
+
+  .date-inputs {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .date-separator {
+    text-align: center;
+  }
+
+  .history-container {
+    padding: 1rem;
+  }
+
+  .submit-button {
+    width: 100%;
+    padding: 14px 24px;
+  }
 }
 </style> 

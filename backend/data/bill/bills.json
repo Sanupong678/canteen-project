@@ -12,7 +12,10 @@
     "month": "มิถุนายน",
     "year": 2025,
     "createdAt": "2025-06-16T15:18:44.426Z",
-    "updatedAt": "2025-06-16T15:18:44.426Z"
+    "updatedAt": "2025-06-16T15:18:44.426Z",
+    "amount": null,
+    "image": null,
+    "slip_image_url": null
   },
   {
     "_id": "685035d47206ab93848e3c37",
@@ -27,7 +30,10 @@
     "month": "มิถุนายน",
     "year": 2025,
     "createdAt": "2025-06-16T15:18:44.333Z",
-    "updatedAt": "2025-06-16T15:18:44.333Z"
+    "updatedAt": "2025-06-16T15:18:44.333Z",
+    "amount": null,
+    "image": null,
+    "slip_image_url": null
   },
   {
     "_id": "684ff34eba1cea2d00c0f9cc",
@@ -42,7 +48,10 @@
     "month": "มิถุนายน",
     "year": 2025,
     "createdAt": "2025-06-16T10:34:54.702Z",
-    "updatedAt": "2025-06-16T10:34:54.702Z"
+    "updatedAt": "2025-06-16T10:34:54.702Z",
+    "amount": null,
+    "image": null,
+    "slip_image_url": null
   },
   {
     "_id": "684ff34eba1cea2d00c0f9c9",
@@ -57,7 +66,10 @@
     "month": "มิถุนายน",
     "year": 2025,
     "createdAt": "2025-06-16T10:34:54.607Z",
-    "updatedAt": "2025-06-16T10:34:54.607Z"
+    "updatedAt": "2025-06-16T10:34:54.607Z",
+    "amount": null,
+    "image": null,
+    "slip_image_url": null
   },
   {
     "_id": "684af0bc6d59db7f0a3081ae",
@@ -72,7 +84,10 @@
     "month": "มิถุนายน",
     "year": 2025,
     "createdAt": "2025-06-12T15:22:36.821Z",
-    "updatedAt": "2025-06-12T15:22:36.821Z"
+    "updatedAt": "2025-06-12T15:22:36.821Z",
+    "amount": null,
+    "image": null,
+    "slip_image_url": null
   },
   {
     "_id": "684af0bc6d59db7f0a3081ab",
@@ -87,7 +102,10 @@
     "month": "มิถุนายน",
     "year": 2025,
     "createdAt": "2025-06-12T15:22:36.714Z",
-    "updatedAt": "2025-06-12T15:22:36.714Z"
+    "updatedAt": "2025-06-12T15:22:36.714Z",
+    "amount": null,
+    "image": null,
+    "slip_image_url": null
   },
   {
     "_id": "684ad208d79763581dfcefc6",
@@ -102,7 +120,10 @@
     "month": "มิถุนายน",
     "year": 2025,
     "createdAt": "2025-06-12T13:11:36.081Z",
-    "updatedAt": "2025-06-12T13:11:36.081Z"
+    "updatedAt": "2025-06-12T13:11:36.081Z",
+    "amount": null,
+    "image": null,
+    "slip_image_url": null
   },
   {
     "_id": "684ad208d79763581dfcefc4",
@@ -117,7 +138,10 @@
     "month": "มิถุนายน",
     "year": 2025,
     "createdAt": "2025-06-12T13:11:36.033Z",
-    "updatedAt": "2025-06-12T13:11:36.033Z"
+    "updatedAt": "2025-06-12T13:11:36.033Z",
+    "amount": null,
+    "image": null,
+    "slip_image_url": null
   },
   {
     "_id": "684ad207d79763581dfcefc2",
@@ -132,7 +156,10 @@
     "month": "มิถุนายน",
     "year": 2025,
     "createdAt": "2025-06-12T13:11:35.987Z",
-    "updatedAt": "2025-06-12T13:11:35.987Z"
+    "updatedAt": "2025-06-12T13:11:35.987Z",
+    "amount": null,
+    "image": null,
+    "slip_image_url": null
   },
   {
     "_id": "684ad207d79763581dfcefc0",
@@ -147,7 +174,10 @@
     "month": "มิถุนายน",
     "year": 2025,
     "createdAt": "2025-06-12T13:11:35.939Z",
-    "updatedAt": "2025-06-12T13:11:35.939Z"
+    "updatedAt": "2025-06-12T13:11:35.939Z",
+    "amount": null,
+    "image": null,
+    "slip_image_url": null
   },
   {
     "_id": "684ad207d79763581dfcefbe",
@@ -162,7 +192,10 @@
     "month": "มิถุนายน",
     "year": 2025,
     "createdAt": "2025-06-12T13:11:35.891Z",
-    "updatedAt": "2025-06-16T15:33:10.642Z"
+    "updatedAt": "2025-06-16T15:33:10.642Z",
+    "amount": 2345,
+    "image": null,
+    "slip_image_url": null
   },
   {
     "_id": "684ad207d79763581dfcefbc",
@@ -177,6 +210,9 @@
     "month": "มิถุนายน",
     "year": 2025,
     "createdAt": "2025-06-12T13:11:35.842Z",
-    "updatedAt": "2025-06-16T15:33:10.589Z"
+    "updatedAt": "2025-06-16T15:33:10.589Z",
+    "amount": 1234,
+    "image": null,
+    "slip_image_url": null
   }
 ]

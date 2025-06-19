@@ -9,7 +9,19 @@
         <!-- Filters Section -->
         <div class="filters-section">
           <v-row>
-            <v-col cols="12" sm="6">
+            <v-col cols="12" sm="4">
+              <v-text-field
+                v-model="search"
+                label="ค้นหาชื่อร้านค้า"
+                outlined
+                dense
+                hide-details
+                class="custom-select"
+                prepend-inner-icon="mdi-magnify"
+                clearable
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="4">
               <v-select
                 v-model="filters.canteen"
                 :items="canteenOptions"
@@ -21,7 +33,7 @@
                 class="custom-select"
               ></v-select>
             </v-col>
-            <v-col cols="12" sm="6">
+            <v-col cols="12" sm="4">
               <v-select
                 v-model="filters.status"
                 :items="statusOptions"
@@ -147,6 +159,7 @@ import { th } from 'date-fns/locale'
 const { $axios } = useNuxtApp()
 const leaveRequests = ref([])
 const isLoading = ref(false)
+const search = ref('')
 
 // Filters
 const filters = ref({
@@ -188,6 +201,13 @@ const canteenOptions = [
 // Filtered leaves based on selected filters
 const filteredLeaves = computed(() => {
   let filtered = [...leaveRequests.value]
+  
+  // ค้นหาตามชื่อร้านค้า
+  if (search.value) {
+    filtered = filtered.filter(leave => 
+      leave.shopName && leave.shopName.toLowerCase().includes(search.value.toLowerCase())
+    )
+  }
   
   if (filters.value.canteen) {
     filtered = filtered.filter(leave => leave.canteen === filters.value.canteen)
@@ -271,47 +291,86 @@ onMounted(() => {
 <style scoped>
 .page-container {
   padding: 2rem;
-  background-color: #f5f6fa;
+  background-color: #f0f2f5;
   min-height: calc(100vh - 64px);
+  overflow: hidden;
 }
 
 .content-wrapper {
   max-width: 1200px;
   margin: 0 auto;
+  overflow: hidden;
 }
 
 .header-section {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+  padding: 24px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(231, 76, 60, 0.15);
 }
 
 .page-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #2d3748;
+  font-size: 2rem;
+  font-weight: 700;
+  color: white;
+  margin: 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .filters-section {
-  background-color: white;
-  padding: 1rem;
-  border-radius: 8px;
-  margin-bottom: 1rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(231, 76, 60, 0.1);
 }
 
 .custom-select {
-  background-color: white;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(231, 76, 60, 0.1);
 }
 
 .custom-select :deep(.v-select__selections) {
   font-size: 14px;
+  font-weight: 500;
 }
 
-.custom-table :deep(.v-data-table__wrapper) {
-  border-radius: 8px;
+.custom-table {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(231, 76, 60, 0.1);
   overflow: hidden;
+}
+
+.v-data-table :deep(.v-data-table__wrapper) {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.v-data-table :deep(tbody tr) {
+  transition: all 0.3s ease;
+}
+
+.v-data-table :deep(tbody tr:hover) {
+  background: linear-gradient(135deg, #fdf2f2 0%, #fce8e8 100%) !important;
+  transform: scale(1.01);
+}
+
+.v-data-table :deep(th) {
+  background: #c0392b !important;
+  color: white !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
+  white-space: nowrap;
+  padding: 16px 12px !important;
+}
+
+.v-data-table :deep(td) {
+  padding: 12px !important;
+  border-bottom: 1px solid #fecaca;
 }
 
 .status-chip {
@@ -338,17 +397,23 @@ onMounted(() => {
 }
 
 .action-btn {
-  border-radius: 20px;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+  transition: all 0.3s ease !important;
   min-width: 80px;
   height: 32px;
   padding: 0 16px;
   margin: 0 4px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
   font-size: 14px;
-  text-transform: none;
   letter-spacing: normal;
   color: white;
+}
+
+.action-btn:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.15) !important;
 }
 
 .confirm-btn {
@@ -357,8 +422,6 @@ onMounted(() => {
 
 .confirm-btn:hover {
   background-color: #388E3C;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
 }
 
 .reject-btn {
@@ -367,12 +430,20 @@ onMounted(() => {
 
 .reject-btn:hover {
   background-color: #D32F2F;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* ซ่อน Scrollbar */
+::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 /* Responsive Design */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .page-container {
     padding: 1rem;
   }
@@ -381,18 +452,25 @@ onMounted(() => {
     flex-direction: column;
     gap: 1rem;
     align-items: flex-start;
+    padding: 16px;
   }
 
   .filters-section {
-    padding: 0.5rem;
+    padding: 16px;
   }
 
   .status-chip {
     min-width: 100px;
   }
-}
 
-.font-weight-medium {
-  font-weight: 500;
+  .action-buttons {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .action-btn {
+    min-width: 70px !important;
+    font-size: 12px !important;
+  }
 }
 </style> 

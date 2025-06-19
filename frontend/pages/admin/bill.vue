@@ -123,23 +123,25 @@
           <!-- ค่าไฟ หรือ ค่าน้ำ ตามประเภทที่เลือก -->
           <template v-slot:item.special="{ item }">
             <span v-if="selectedBillType === 'electricity'">
-              <b>ค่าไฟ:</b>
+              <b>ค่าไฟ: {{ item.amount ? item.amount + ' บาท' : '-' }}</b>
               <span
-                :class="{'yellow--text': !!item.electricityImage}"
-                @click="item.electricityImage && openImagePreview(item.electricityImage)"
-                style="cursor: pointer"
+                v-if="item.image || item.slip_image_url"
+                :class="{'yellow--text': !!item.image || !!item.slip_image_url}"
+                @click="(item.image || item.slip_image_url) && openImagePreview(item.image || item.slip_image_url)"
+                style="cursor: pointer; margin-left: 8px;"
               >
-                {{ item.electricityAmount ? item.electricityAmount + ' บาท' : '-' }}
+                <v-icon small>mdi-image</v-icon>
               </span>
             </span>
             <span v-else>
-              <b>ค่าน้ำ:</b>
+              <b>ค่าน้ำ: {{ item.amount ? item.amount + ' บาท' : '-' }}</b>
               <span
-                :class="{'yellow--text': !!item.waterImage}"
-                @click="item.waterImage && openImagePreview(item.waterImage)"
-                style="cursor: pointer"
+                v-if="item.image || item.slip_image_url"
+                :class="{'yellow--text': !!item.image || !!item.slip_image_url}"
+                @click="(item.image || item.slip_image_url) && openImagePreview(item.image || item.slip_image_url)"
+                style="cursor: pointer; margin-left: 8px;"
               >
-                {{ item.waterAmount ? item.waterAmount + ' บาท' : '-' }}
+                <v-icon small>mdi-image</v-icon>
               </span>
             </span>
           </template>
@@ -382,14 +384,20 @@ export default {
 
         const response = await $axios.get(`/api/bills/admin?${query.toString()}`)
         console.log('API Response:', response.data)
+        console.log('First bill data:', response.data.data[0]) // Debug: ดูข้อมูลบิลแรก
         
         bills.value = response.data.data.map(bill => {
+          console.log('Processing bill:', bill) // Debug: ดูข้อมูลแต่ละบิล
           return {
             ...bill,
             billType: bill.billType === 'water' ? 'ค่าน้ำ' : bill.billType === 'electricity' ? 'ค่าไฟ' : bill.billType,
             canteen: canteenMap[bill.canteenId],
             month: numberToMonth[bill.month] || bill.month,
-            year: bill.year
+            year: bill.year,
+            // ดึงข้อมูล amount จาก MongoDB
+            amount: bill.amount || null,
+            image: bill.image || null,
+            slip_image_url: bill.slip_image_url || null
           }
         })
 
@@ -511,80 +519,84 @@ export default {
   padding: 2rem;
   background-color: #f0f2f5;
   min-height: calc(100vh - 64px);
+  overflow: hidden;
 }
 
 .content-wrapper {
   max-width: 1200px;
   margin: 0 auto;
+  overflow: hidden;
 }
 
 .header-section {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-  padding: 0 1rem;
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+  padding: 24px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(231, 76, 60, 0.15);
 }
 
 .page-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #2d3748;
+  font-size: 2rem;
+  font-weight: 700;
+  color: white;
   margin: 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .filters-section {
-  background-color: white;
-  padding: 1.5rem;
-  border-radius: 8px;
-  margin-bottom: 2rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.filters-section .v-row {
-  margin: 0 -12px;
-}
-
-.filters-section .v-col {
-  padding: 8px 12px;
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(231, 76, 60, 0.1);
 }
 
 .custom-select {
-  background-color: white;
-  margin-bottom: 0.5rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(231, 76, 60, 0.1);
 }
 
 .custom-select :deep(.v-select__selections) {
   font-size: 14px;
+  font-weight: 500;
 }
 
 .custom-table {
-  background-color: white;
-  border-radius: 8px;
-  margin-top: 1rem;
-  padding: 1rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(231, 76, 60, 0.1);
+  overflow: hidden;
 }
 
 .v-data-table :deep(.v-data-table__wrapper) {
-  border-radius: 8px;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .v-data-table :deep(tbody tr) {
-  transition: background-color 0.2s;
+  transition: all 0.3s ease;
 }
 
 .v-data-table :deep(tbody tr:hover) {
-  background-color: #f5f5f5 !important;
+  background: linear-gradient(135deg, #fdf2f2 0%, #fce8e8 100%) !important;
+  transform: scale(1.01);
 }
 
 .v-data-table :deep(th) {
-  font-weight: 600 !important;
+  background: #c0392b !important;
+  color: white !important;
+  font-weight: 700 !important;
   text-transform: none !important;
   white-space: nowrap;
+  padding: 16px 12px !important;
 }
 
 .v-data-table :deep(td) {
-  padding: 8px !important;
+  padding: 12px !important;
+  border-bottom: 1px solid #fecaca;
 }
 
 .v-chip {
@@ -599,8 +611,17 @@ export default {
 }
 
 .v-btn {
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+  transition: all 0.3s ease !important;
   min-width: 100px;
   margin: 4px;
+}
+
+.v-btn:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.15) !important;
 }
 
 .preview-image {
@@ -630,44 +651,8 @@ export default {
   border-top: 1px solid rgba(0, 0, 0, 0.1);
 }
 
-/* Responsive Design */
-@media (max-width: 600px) {
-  .page-container {
-    padding: 1rem;
-  }
-
-  .header-section {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: flex-start;
-    padding: 0 0.5rem;
-  }
-
-  .filters-section {
-    padding: 1rem;
-  }
-
-  .filters-section .v-col {
-    padding: 4px 8px;
-  }
-
-  .v-btn {
-    min-width: 90px;
-    margin: 2px;
-  }
-
-  .v-data-table :deep(td),
-  .v-data-table :deep(th) {
-    padding: 8px !important;
-  }
-}
-
 .font-weight-medium {
   font-weight: 500;
-}
-
-.v-btn {
-  min-width: 120px;
 }
 
 .v-list-item {
@@ -720,5 +705,197 @@ export default {
 .show-bill-btn {
   min-width: 120px;
   border-radius: 8px;
+}
+
+/* เพิ่ม CSS สำหรับการแสดงข้อมูลค่าไฟและค่าน้ำ */
+.bills-display {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: linear-gradient(135deg, #fdf2f2 0%, #fce8e8 100%);
+  border-radius: 12px;
+  border: 1px solid #fecaca;
+  box-shadow: 0 2px 8px rgba(231, 76, 60, 0.1);
+}
+
+.bill-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+  transition: all 0.3s ease;
+}
+
+.bill-row:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.15);
+  border-color: #e74c3c;
+}
+
+.bill-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #495057;
+  min-width: 100px;
+}
+
+.bill-label .v-icon {
+  margin-right: 4px;
+  font-size: 18px;
+}
+
+.bill-amount {
+  font-weight: 700;
+  font-size: 16px;
+  color: #e74c3c;
+  padding: 4px 12px;
+  background: linear-gradient(135deg, #fdf2f2 0%, #fce8e8 100%);
+  border-radius: 20px;
+  border: 2px solid #e74c3c;
+  transition: all 0.3s ease;
+}
+
+.bill-amount:hover {
+  background: linear-gradient(135deg, #fce8e8 0%, #fadbd8 100%);
+  transform: scale(1.05);
+}
+
+.bill-status {
+  margin-top: 4px;
+}
+
+.yellow--text {
+  color: #e74c3c !important;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(231, 76, 60, 0.1);
+  transition: all 0.3s ease;
+}
+
+.yellow--text:hover {
+  color: #c0392b !important;
+  text-decoration: underline;
+  transform: scale(1.02);
+}
+
+/* ปรับปรุง Status section */
+.status-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: linear-gradient(135deg, #fdf2f2 0%, #fce8e8 100%);
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #fecaca;
+}
+
+.status-label {
+  font-weight: 600;
+  color: #495057;
+  font-size: 12px;
+}
+
+/* ปรับปรุง Action buttons */
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: linear-gradient(135deg, #fdf2f2 0%, #fce8e8 100%);
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+}
+
+.action-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.action-label {
+  font-weight: 600;
+  color: #495057;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.no-action {
+  color: #6c757d;
+  font-style: italic;
+  font-size: 12px;
+}
+
+/* ซ่อน Scrollbar */
+::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .page-container {
+    padding: 1rem;
+  }
+
+  .header-section {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+    padding: 16px;
+  }
+
+  .filters-section {
+    padding: 16px;
+  }
+
+  .bill-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .bill-label {
+    min-width: auto;
+  }
+  
+  .status-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .action-buttons {
+    gap: 6px;
+  }
+  
+  .v-btn {
+    min-width: 90px;
+    margin: 2px;
+  }
+
+  .v-data-table :deep(td),
+  .v-data-table :deep(th) {
+    padding: 8px !important;
+  }
 }
 </style> 

@@ -76,11 +76,37 @@ function getCanteenName(canteenId) {
 // Get user's repairs
 export const getUserRepairs = async (req, res) => {
   try {
-    // ดึง userId จาก token
+    // ดึง userId และ shopId จาก token
     const userId = req.user.userId;
+    const shopId = req.user.shopId;
+
+    // ตรวจสอบว่ามี userId และ shopId หรือไม่
+    if (!userId || !shopId) {
+      console.log('User has no userId or shopId:', { userId, shopId });
+      return res.json({ 
+        data: [],
+        message: 'ยังไม่เคยแจ้งซ่อมมาก่อน',
+        hasHistory: false
+      });
+    }
+
     const repairs = await Repair.find({ userId }).sort({ createdAt: -1 });
-    res.json({ data: repairs });
+
+    // ถ้าไม่มีประวัติการแจ้งซ่อม
+    if (repairs.length === 0) {
+      return res.json({ 
+        data: [],
+        message: 'ยังไม่เคยแจ้งซ่อมมาก่อน',
+        hasHistory: false
+      });
+    }
+
+    res.json({ 
+      data: repairs,
+      hasHistory: true
+    });
   } catch (error) {
+    console.error('Error fetching user repairs:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -93,6 +119,14 @@ export const createRepair = async (req, res) => {
     // ดึงข้อมูลจาก token
     const userId = req.user.userId;
     const shopId = req.user.shopId;
+
+    // ตรวจสอบว่ามี userId และ shopId หรือไม่
+    if (!userId || !shopId) {
+      return res.status(400).json({
+        success: false,
+        message: 'ไม่พบข้อมูลร้านค้าหรือผู้ใช้ กรุณาติดต่อผู้ดูแลระบบ'
+      });
+    }
 
     // ดึงข้อมูลที่ user กรอก
     const { category, issue, images = [] } = req.body;
