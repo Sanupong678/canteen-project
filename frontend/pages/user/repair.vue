@@ -154,10 +154,6 @@ const selectedImages = ref([])
 const fileInput = ref(null)
 const showHistory = ref(false)
 
-// ดึงข้อมูลร้านค้าจาก localStorage
-const shopData = ref(JSON.parse(localStorage.getItem('shopData') || '{}'))
-const userId = ref(localStorage.getItem('userId'))
-
 // Options
 const categoryOptions = [
   'อุปกรณ์ไฟฟ้า',
@@ -252,8 +248,10 @@ const handleSubmit = async () => {
 const fetchRepairHistory = async () => {
   try {
     loading.value = true
-    
-    const response = await axios.get('http://localhost:4000/api/repairs/user')
+    const token = localStorage.getItem('token')
+    const response = await axios.get('http://localhost:4000/api/repairs/user', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
     console.log('API Response:', response.data)
     if (response.data && Array.isArray(response.data)) {
       repairHistory.value = response.data

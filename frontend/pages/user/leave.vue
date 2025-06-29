@@ -116,7 +116,10 @@ const isFormValid = computed(() => {
 // ดึงประวัติการลาจาก API
 const fetchLeaveHistory = async () => {
   try {
-    const response = await $axios.get('/api/leaves/user')
+    const token = localStorage.getItem('token')
+    const response = await $axios.get('/api/leaves/user', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
     if (response.data && response.data.data) {
       leaveHistory.value = response.data.data
     } else {
@@ -144,11 +147,14 @@ const submitLeave = async () => {
   
   isLoading.value = true
   try {
+    const token = localStorage.getItem('token')
     // ส่งข้อมูลไปยัง backend API
     const response = await $axios.post('/api/leaves', {
       startDate: startDate.value,
       endDate: endDate.value,
       issue: reason.value // เปลี่ยนจาก reason เป็น issue ตาม leaveModel
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
     })
 
     if (response.data && response.data.data) {

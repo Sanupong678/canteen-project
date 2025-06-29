@@ -127,7 +127,7 @@
               <span
                 v-if="item.image || item.slip_image_url"
                 :class="{'yellow--text': !!item.image || !!item.slip_image_url}"
-                @click="(item.image || item.slip_image_url) && openImagePreview(item.image || item.slip_image_url)"
+                @click="(item.image || item.slip_image_url) && openImagePreview(item.image || item.slip_image_url, item)"
                 style="cursor: pointer; margin-left: 8px;"
               >
                 <v-icon small>mdi-image</v-icon>
@@ -138,7 +138,7 @@
               <span
                 v-if="item.image || item.slip_image_url"
                 :class="{'yellow--text': !!item.image || !!item.slip_image_url}"
-                @click="(item.image || item.slip_image_url) && openImagePreview(item.image || item.slip_image_url)"
+                @click="(item.image || item.slip_image_url) && openImagePreview(item.image || item.slip_image_url, item)"
                 style="cursor: pointer; margin-left: 8px;"
               >
                 <v-icon small>mdi-image</v-icon>
@@ -148,12 +148,9 @@
 
           <!-- Status -->
           <template v-slot:item.status="{ item }">
-            <v-chip :color="getStatusColor(item.status)" x-small>
+            <v-chip :color="item.image && item.status === 'รอดำเนินการ' ? 'warning' : getStatusColor(item.status)" x-small>
               {{ getStatusText(item.status) }}
             </v-chip>
-            <div style="font-size: 12px; color: #888;">
-              <v-icon small>mdi-calendar</v-icon> {{ formatDate(item.statusDate) }}
-            </div>
             <div class="mt-1">
               <v-btn
                 class="show-bill-btn"
@@ -162,7 +159,7 @@
                 :color="(item.image || item.slip || item.electricityImage || item.waterImage) ? 'primary' : 'grey'"
                 :style="(item.image || item.slip || item.electricityImage || item.waterImage) ? 'color:#1976d2' : 'color:#aaa'"
                 :disabled="!(item.image || item.slip || item.electricityImage || item.waterImage)"
-                @click="openImagePreview(item.image || item.slip || item.electricityImage || item.waterImage)"
+                @click="openImagePreview(item.image || item.slip || item.electricityImage || item.waterImage, item)"
               >
                 แสดงบิล
               </v-btn>
@@ -186,10 +183,22 @@
             หลักฐานการชำระเงิน
           </v-card-title>
           <v-card-text>
-            <img :src="previewImage" class="preview-image" />
+            <img
+              v-if="currentBill && (currentBill.imageData || currentBill.image)"
+              :src="`/api/bills/image/${currentBill._id}`"
+              class="preview-image"
+              style="max-width:100%;max-height:60vh;width:auto;height:auto;object-fit:unset;display:block;margin:1rem auto;background:#f8f8f8;border-radius:4px;"
+            />
+            <div v-if="currentBill && currentBill.updatedAt" style="font-size: 14px; color: #e6a800; margin-top: 12px;">
+              <v-icon small style="vertical-align: middle;">mdi-clock-outline</v-icon>
+              อัปโหลดเมื่อ {{ formatDate(currentBill.updatedAt) }}
+            </div>
           </v-card-text>
           <v-card-actions>
             <v-spacer></v-spacer>
+            <v-btn v-if="currentBill && (currentBill.imageData || currentBill.image)" color="error" text @click="cancelSlipImage">
+              ยกเลิกสลิป
+            </v-btn>
             <v-btn color="primary" text @click="showPreview = false">
               ปิด
             </v-btn>
@@ -223,6 +232,7 @@ export default {
     const selectedMonth = ref('')
     const showPreview = ref(false)
     const previewImage = ref('')
+    const currentBill = ref(null)
 
     // เพิ่มตัวแปรสำหรับเลือกประเภทบิล (ค่าไฟ/ค่าน้ำ)
     const selectedBillType = ref('electricity') // 'electricity' หรือ 'water'
@@ -313,6 +323,11 @@ export default {
     const formatDate = (date) => {
       if (!date) return '-'
       return format(new Date(date), 'dd MMMM yyyy', { locale: th })
+    }
+
+    const formatDateTime = (date) => {
+      if (!date) return '-'
+      return format(new Date(date), 'dd/MM/yyyy HH:mm:ss')
     }
 
     const formatAmount = (amount) => {
@@ -444,8 +459,9 @@ export default {
       }
     }
 
-    const openImagePreview = (imageUrl) => {
+    const openImagePreview = (imageUrl, bill) => {
       previewImage.value = imageUrl
+      currentBill.value = bill
       showPreview.value = true
     }
 
@@ -478,6 +494,30 @@ export default {
       fileName.value = ""
     }
 
+    const getImageUrl = (path) => {
+      if (!path) return ''
+      let url = path.replace(/\\/g, '/').replace(/\\/g, '/').replace(/\//g, '/')
+      if (!url.startsWith('/')) url = '/' + url
+      return url
+    }
+
+    const cancelSlipImage = async () => {
+      if (!currentBill.value) return
+      if (!confirm('คุณต้องการลบรูปภาพสลิปนี้หรือไม่?')) return
+      loading.value = true
+      try {
+        await $axios.put(`/api/bills/admin/cancel-image/${currentBill.value._id}`)
+        await fetchBills()
+        showPreview.value = false
+        alert('ลบรูปภาพสลิปเรียบร้อยแล้ว')
+      } catch (error) {
+        console.error('Error cancelling slip image:', error)
+        alert('ไม่สามารถลบรูปภาพสลิปได้')
+      } finally {
+        loading.value = false
+      }
+    }
+
     return {
       bills,
       loading,
@@ -508,7 +548,11 @@ export default {
       fileName,
       fileInput,
       onFileChange,
-      uploadFile
+      uploadFile,
+      currentBill,
+      formatDateTime,
+      getImageUrl,
+      cancelSlipImage
     }
   }
 }
@@ -626,10 +670,14 @@ export default {
 
 .preview-image {
   max-width: 100%;
-  max-height: 70vh;
+  max-height: 60vh;
+  width: auto;
+  height: auto;
   display: block;
   margin: 1rem auto;
   border-radius: 4px;
+  object-fit: contain;
+  background: #f8f8f8;
 }
 
 /* Dialog styles */

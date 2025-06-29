@@ -61,28 +61,13 @@ export default {
         })
         
         if (response.data.success) {
-          // เก็บข้อมูลใน localStorage
-          localStorage.setItem('userRole', response.data.role)
-          localStorage.setItem('displayName', response.data.displayName)
-          localStorage.setItem('isAuthenticated', 'true')
-          
-          // เก็บข้อมูลเพิ่มเติมสำหรับร้านค้า
-          if (response.data.role === 'user' && response.data.userData) {
-            localStorage.setItem('userId', response.data.userData.id)
-            localStorage.setItem('shopData', JSON.stringify({
-              name: response.data.userData.name,
-              type: response.data.userData.type,
-              description: response.data.userData.description,
-              location: response.data.userData.location,
-              image: response.data.userData.image,
-              contractStartDate: response.data.userData.contractStartDate,
-              contractEndDate: response.data.userData.contractEndDate
-            }))
-          }
-          
+          // เก็บ token และ displayName ใน localStorage
+          localStorage.setItem('token', response.data.token)
+          localStorage.setItem('displayName', response.data.displayName || (response.data.userData && response.data.userData.name) || '')
+          localStorage.setItem('isAuthenticated', 'true');
+          localStorage.setItem('userRole', response.data.role);
           // ตั้งค่า axios
           axios.defaults.withCredentials = true
-          
           // Redirect ตาม role
           if (response.data.role === 'admin') {
             await this.$router.push('/admin')

@@ -141,12 +141,16 @@ export const login = async (req, res) => {
       console.log('Cookie set successfully');
       console.log('==========================');
 
-      return res.json({
+      // ส่ง token ใน response body ด้วย
+      const responseBody = {
         success: true,
         role: 'admin',
         displayName: 'Administrator',
-        userData: adminData
-      });
+        userData: adminData,
+        token
+      };
+      console.log('RESPONSE BODY:', responseBody);
+      return res.json(responseBody);
     }
 
     // ถ้าไม่ใช่ admin จึงค่อยตรวจสอบ shop
@@ -238,7 +242,8 @@ export const login = async (req, res) => {
         contractStartDate: shop.contractStartDate,
         contractEndDate: shop.contractEndDate,
         image: shop.image
-      }
+      },
+      token
     });
 
   } catch (error) {

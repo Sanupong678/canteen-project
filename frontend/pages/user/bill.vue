@@ -45,11 +45,31 @@
                       <p>เลขบัญชี: {{ bill.accountNumber }}</p>
                       <p>ชื่อบัญชี: {{ bill.accountName }}</p>
                     </div>
-                    <input type="file" :ref="'fileInput_' + bill.id" accept="image/*" class="hidden-file-input"
-                      @change="handleFileUpload($event, bill)" />
-                    <button v-if="!bill.paymentDate && !isExpired(bill)" class="pay-button"
-                      @click="triggerFileInput(bill.id)">
+                    <input
+                      type="file"
+                      :id="'fileInput_' + bill.id"
+                      :ref="'fileInput_' + bill.id"
+                      accept="image/*"
+                      class="hidden-file-input"
+                      @change="handleFileChange($event, bill)"
+                    />
+                    <button
+                      v-if="!bill.paymentDate && !isExpired(bill)"
+                      class="pay-button"
+                      :style="bill.image ? 'background: #bdbdbd; cursor: not-allowed;' : ''"
+                      :disabled="!!bill.image"
+                      @click="triggerFileInput(bill.id)"
+                    >
                       อัปโหลดสลิป
+                    </button>
+                    <!-- ปุ่มยืนยันอัปโหลด -->
+                    <button
+                      v-if="selectedFiles[bill.id]"
+                      class="pay-button"
+                      style="margin-top: 8px; background: #27ae60;"
+                      @click="confirmUpload(bill)"
+                    >
+                      ยืนยันอัปโหลด
                     </button>
                   </div>
                 </div>
@@ -66,6 +86,7 @@
 import { ref, computed } from 'vue'
 import { format } from 'date-fns'
 import { th } from 'date-fns/locale'
+import axios from 'axios'
 
 export default {
   name: 'BillPage',
@@ -73,6 +94,8 @@ export default {
     const selectedType = ref('water')
     const bills = ref([])
     const uploading = ref(false)
+    // เพิ่ม state สำหรับไฟล์ที่เลือกต่อ bill
+    const selectedFiles = ref({})
 
     const filteredBills = computed(() => {
       return bills.value.filter(bill => bill.type === selectedType.value)
@@ -97,16 +120,16 @@ export default {
       return type === 'water' ? 'ค่าน้ำ' : 'ค่าไฟ'
     }
 
-    const getStatusClass = (bill) => {
-      if (bill.paymentDate) return 'status-paid'
-      if (isExpired(bill)) return 'status-expired'
-      return 'status-pending'
+    const getStatusText = (bill) => {
+      if (bill.status) return bill.status
+      return 'รอชำระเงิน'
     }
 
-    const getStatusText = (bill) => {
-      if (bill.paymentDate) return 'ชำระแล้ว'
-      if (isExpired(bill)) return 'เลยกำหนดชำระ'
-      return 'รอชำระเงิน'
+    const getStatusClass = (bill) => {
+      if (bill.status === 'สมบูรณ์') return 'status-paid'
+      if (bill.status === 'ไม่สมบูรณ์') return 'status-expired'
+      if (bill.status === 'รอดำเนินการ') return 'status-pending'
+      return 'status-pending'
     }
 
     const isExpired = (bill) => {
@@ -120,21 +143,32 @@ export default {
       }
     }
 
-    const handleFileUpload = async (event, bill) => {
+    // เปลี่ยน handleFileUpload ให้แค่เก็บไฟล์ ไม่อัปโหลดทันที
+    const handleFileChange = (event, bill) => {
       const file = event.target.files[0]
       if (!file) return
+      selectedFiles.value[bill.id] = file
+    }
 
+    // ฟังก์ชันสำหรับอัปโหลดเมื่อกดยืนยัน
+    const confirmUpload = async (bill) => {
+      const file = selectedFiles.value[bill.id]
+      if (!file) return
       uploading.value = true
       try {
         const formData = new FormData()
         formData.append('slip', file)
         formData.append('billId', bill.id)
         formData.append('transferDate', new Date().toISOString())
-
-        // TODO: Implement API call
-        // await axios.post('/api/bills/upload-slip', formData)
-
+        const token = localStorage.getItem('token')
+        await axios.post('/api/bills/upload', formData, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+          }
+        })
         await fetchBills()
+        selectedFiles.value[bill.id] = null
       } catch (error) {
         alert('เกิดข้อผิดพลาดในการอัปโหลดสลิป')
       } finally {
@@ -144,33 +178,34 @@ export default {
 
     const fetchBills = async () => {
       try {
-        // TODO: Replace with real API
-        bills.value = [
-          {
-            id: 1,
-            type: 'water',
-            amount: 1571.21,
-            billMonth: new Date(),
-            createdAt: new Date(),
-            dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-            accountNumber: 'XXX-X-XXXXX-X',
-            accountName: 'มหาวิทยาลัย',
-            paymentDate: null
-          },
-          {
-            id: 2,
-            type: 'electricity',
-            amount: 942.75,
-            billMonth: new Date(),
-            createdAt: new Date(),
-            dueDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
-            accountNumber: 'YYY-Y-YYYYY-Y',
-            accountName: 'มหาวิทยาลัย',
-            paymentDate: null
-          }
-        ]
+        const token = localStorage.getItem('token')
+        if (!token) {
+          bills.value = []
+          return
+        }
+        // เรียก API backend พร้อมแนบ token
+        const response = await axios.get(`/api/bills/history`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (response.data && response.data.success && Array.isArray(response.data.data)) {
+          // แปลงข้อมูลให้เหมาะกับการแสดงผล
+          bills.value = response.data.data.map(bill => ({
+            id: bill._id,
+            type: bill.billType,
+            amount: bill.amount,
+            billMonth: new Date(bill.year, bill.month ? bill.month-1 : 0),
+            createdAt: bill.createdAt,
+            dueDate: bill.dueDate || bill.contractEndDate,
+            accountNumber: 'XXX-X-XXXXX-X', // ปรับตามจริงถ้ามีใน backend
+            accountName: bill.shopName || localStorage.getItem('displayName') || 'มหาวิทยาลัย',
+            paymentDate: bill.payment_date || null
+          }))
+        } else {
+          bills.value = []
+        }
       } catch (error) {
         console.error('Error fetching bills:', error)
+        bills.value = []
       }
     }
 
@@ -188,7 +223,9 @@ export default {
       getStatusText,
       isExpired,
       triggerFileInput,
-      handleFileUpload
+      handleFileChange,
+      confirmUpload,
+      selectedFiles
     }
   }
 }
@@ -352,6 +389,11 @@ export default {
 .status-expired {
   background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%);
   color: #991B1B;
+}
+
+.status-review {
+  background: linear-gradient(135deg, #BEE3F8 0%, #90CDF4 100%);
+  color: #2B6CB0;
 }
 
 .payment-info {

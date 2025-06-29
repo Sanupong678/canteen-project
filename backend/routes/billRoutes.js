@@ -6,7 +6,10 @@ import {
   getBillHistory,
   verifyBill,
   getAllBills,
-  importBillExcel
+  importBillExcel,
+  getBillImage,
+  cancelBillImage,
+  deleteBill
 } from '../controllers/billController.js';
 import { isAdmin, verifyToken } from '../middleware/authMiddleware.js';
 
@@ -53,10 +56,9 @@ const excelUpload = multer({
   }
 });
 
-// Protect all routes
-router.use(verifyToken);
-
 // User routes
+router.get('/image/:billId', getBillImage);
+router.use(verifyToken);
 router.post('/upload', upload.single('slip'), uploadBill);
 router.get('/history', getBillHistory);
 
@@ -64,5 +66,7 @@ router.get('/history', getBillHistory);
 router.get('/admin', isAdmin, getAllBills);
 router.put('/admin/verify/:id', isAdmin, verifyBill);
 router.post('/admin/import-excel', isAdmin, excelUpload.single('file'), importBillExcel);
+router.put('/admin/cancel-image/:id', isAdmin, cancelBillImage);
+router.delete('/admin/:id', isAdmin, deleteBill);
 
 export default router; 

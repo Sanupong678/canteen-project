@@ -12,20 +12,29 @@ const __dirname = path.dirname(__filename);
 // Upload bill slip
 export const uploadBill = async (req, res) => {
   try {
-    const { billType, amount } = req.body;
-    const slip_image_url = req.file.path;
-
-    const bill = new Bill({
-      shopId: req.user.shopId,
-      billType,
-      amount,
-      slip_image_url,
-      payment_date: new Date(req.body.payment_date)
-    });
-
+    console.log('UPLOAD BILL DEBUG: req.body =', req.body);
+    console.log('UPLOAD BILL DEBUG: req.file =', req.file);
+    const { billId, transferDate } = req.body;
+    if (!billId) {
+      console.log('UPLOAD BILL DEBUG: billId missing');
+      return res.status(400).json({ success: false, error: 'billId is required' });
+    }
+    const bill = await Bill.findById(billId);
+    if (!bill) {
+      console.log('UPLOAD BILL DEBUG: Bill not found for billId', billId);
+      return res.status(404).json({ success: false, error: 'Bill not found' });
+    }
+    if (!req.file) {
+      console.log('UPLOAD BILL DEBUG: No file uploaded');
+      return res.status(400).json({ success: false, error: 'No file uploaded' });
+    }
+    bill.image = path.basename(req.file.path);
+    bill.payment_date = transferDate ? new Date(transferDate) : new Date();
     await bill.save();
-    res.status(201).json({ success: true, data: bill });
+    console.log('UPLOAD BILL DEBUG: Bill updated successfully', bill);
+    res.status(200).json({ success: true, data: bill });
   } catch (error) {
+    console.log('UPLOAD BILL DEBUG: error', error);
     res.status(400).json({ success: false, error: error.message });
   }
 };
@@ -258,5 +267,74 @@ export const importBillExcel = async (req, res) => {
   } catch (err) {
     console.error('importBillExcel error:', err);
     res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ดึงรูปภาพ base64 จาก MongoDB
+export const getBillImage = async (req, res) => {
+  try {
+    const bill = await Bill.findById(req.params.billId);
+    if (!bill) {
+      console.log('Bill not found:', req.params.billId);
+      return res.status(404).send('Not found');
+    }
+    if (bill.image) {
+      const fullPath = path.join(__dirname, '../uploads/bills/', bill.image);
+      console.log('Looking for image at:', fullPath);
+      if (fs.existsSync(fullPath)) {
+        console.log('Image found, sending:', fullPath);
+        res.set('Content-Type', 'image/jpeg');
+        return fs.createReadStream(fullPath).pipe(res);
+      } else {
+        console.log('Image file does NOT exist:', fullPath);
+      }
+    } else {
+      console.log('Bill has no image field:', bill);
+    }
+    return res.status(404).send('Not found');
+  } catch (error) {
+    console.log('Error in getBillImage:', error);
+    res.status(500).send('Error loading image');
+  }
+};
+
+// Cancel bill slip image (admin)
+export const cancelBillImage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const bill = await Bill.findById(id);
+    if (!bill) {
+      return res.status(404).json({ success: false, error: 'Bill not found' });
+    }
+    // ลบไฟล์ภาพถ้ามี
+    if (bill.image) {
+      const imagePath = path.join(__dirname, '../uploads/bills/', bill.image);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
+      bill.image = null;
+      await bill.save();
+    }
+    res.status(200).json({ success: true, data: bill });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+};
+
+export const deleteBill = async (req, res) => {
+  try {
+    const bill = await Bill.findById(req.params.id);
+    if (!bill) return res.status(404).json({ error: 'Bill not found' });
+    // ลบไฟล์ภาพถ้ามี
+    if (bill.image) {
+      const imagePath = path.join(__dirname, '../uploads/bills/', bill.image);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
+    }
+    await bill.deleteOne();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 }; 

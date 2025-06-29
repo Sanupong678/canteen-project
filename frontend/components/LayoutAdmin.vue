@@ -63,8 +63,6 @@ export default {
       this.showUserMenu = !this.showUserMenu
     },
     handleLogout() {
-      localStorage.removeItem('userRole')
-      localStorage.removeItem('isAuthenticated')
       localStorage.removeItem('displayName')
       this.$router.push('/')
     },

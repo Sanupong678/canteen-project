@@ -1,4 +1,7 @@
 // nuxt.config.ts
+import { defineNuxtConfig } from 'nuxt/config'
+import { createProxyMiddleware } from 'http-proxy-middleware'
+
 export default defineNuxtConfig({
   css: ['vuetify/styles'],
 
@@ -13,4 +16,14 @@ export default defineNuxtConfig({
   },
 
   compatibilityDate: '2025-04-27',
+
+  nitro: {
+    devProxy: {
+      '/api': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+        prependPath: false
+      }
+    }
+  }
 })
