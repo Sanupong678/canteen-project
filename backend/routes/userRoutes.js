@@ -1,5 +1,5 @@
 import express from 'express';
-import { verifyToken } from '../middleware/authMiddleware.js';
+import { protect } from '../middleware/auth.js';
 import { 
   getUsers, 
   createUser, 
@@ -10,7 +10,7 @@ import {
 const router = express.Router();
 
 // ใช้ middleware กับทุก routes
-router.use(verifyToken);
+router.use(protect);
 
 // Routes ที่ต้องการป้องกัน
 router.get('/', getUsers);

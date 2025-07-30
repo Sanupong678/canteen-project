@@ -12,7 +12,7 @@ const newBackground = ref({
 // Fetch backgrounds from API
 const loadBackgrounds = async () => {
   try {
-    const response = await axios.get('http://localhost:5000/api/backgrounds')
+    const response = await axios.get('/background-api/api/backgrounds')
     backgrounds.value = response.data
   } catch (error) {
     console.error('Error loading backgrounds:', error)
@@ -31,7 +31,7 @@ const addBackground = async () => {
     formData.append('name', newBackground.value.name)
     formData.append('image', newBackground.value.image)
 
-    const response = await axios.post('http://localhost:5000/api/backgrounds', formData, {
+    const response = await axios.post('/background-api/api/backgrounds', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
@@ -53,7 +53,7 @@ const addBackground = async () => {
 const deleteBackground = async (backgroundId) => {
   if (confirm('คุณต้องการลบพื้นหลังนี้ใช่หรือไม่?')) {
     try {
-      await axios.delete(`http://localhost:5000/api/backgrounds/${backgroundId}`)
+      await axios.delete(`/background-api/api/backgrounds/${backgroundId}`)
       backgrounds.value = backgrounds.value.filter(bg => bg._id !== backgroundId)
       alert('ลบพื้นหลังสำเร็จ')
     } catch (error) {

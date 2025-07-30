@@ -1,9 +1,34 @@
 import express from 'express';
-import { getBackgrounds, createBackground, deleteBackground } from '../controllers/backgroundController.js';
+import { verifyToken, isAdmin } from '../middleware/authMiddleware.js';
+import { 
+  getBackgrounds, 
+  createBackground, 
+  updateBackground, 
+  deleteBackground, 
+  toggleBackgroundStatus,
+  getBackgroundImage
+} from '../controllers/backgroundController.js';
+import { uploadBannerImage } from '../middleware/uploadMiddleware.js';
+
 const router = express.Router();
 
+// Get all active backgrounds (for users)
 router.get('/', getBackgrounds);
-router.post('/', createBackground);
-router.delete('/:id', deleteBackground);
+
+// Get background image
+router.get('/:backgroundId/image', getBackgroundImage);
+
+// Admin routes
+// Create background (admin only)
+router.post('/', verifyToken, isAdmin, uploadBannerImage.single('image'), createBackground);
+
+// Update background (admin only)
+router.put('/:id', verifyToken, isAdmin, uploadBannerImage.single('image'), updateBackground);
+
+// Delete background (admin only)
+router.delete('/:id', verifyToken, isAdmin, deleteBackground);
+
+// Toggle background status (admin only)
+router.patch('/:id/toggle', verifyToken, isAdmin, toggleBackgroundStatus);
 
 export default router; 

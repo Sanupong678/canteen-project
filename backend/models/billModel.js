@@ -27,6 +27,14 @@ const billSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  dueDate: {
+    type: Date,
+    required: false,
+    default: function() {
+      // ใช้ contractEndDate เป็น default หรือสร้างวันที่ในอนาคต
+      return this.contractEndDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 วันจากวันนี้
+    }
+  },
   payment_date: {
     type: Date,
     default: null
@@ -35,10 +43,30 @@ const billSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  imagePath: {
+    type: String,
+    default: null
+  },
+  slip_image_url: {
+    type: String,
+    default: null
+  },
+  imageUploadDate: {
+    type: Date,
+    default: null
+  },
+  imageExpiryDate: {
+    type: Date,
+    default: null
+  },
   status: {
     type: String,
-    enum: ['รอดำเนินการ', 'สมบูรณ์', 'ไม่สมบูรณ์', null],
+    enum: ['รอดำเนินการ', 'รอตรวจสอบ', 'เสร็จสิ้น', 'เลยกำหนด'],
     default: 'รอดำเนินการ'
+  },
+  admin_comment: {
+    type: String,
+    default: null
   },
   notificationDates: [{
     date: Date,

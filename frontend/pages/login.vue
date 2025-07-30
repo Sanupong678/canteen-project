@@ -50,7 +50,9 @@ export default {
     async handleLogin() {
       this.error = ''
       try {
-        const response = await axios.post('http://localhost:4000/api/auth/login', {
+        console.log('🔐 Attempting login with:', this.username)
+        
+        const response = await axios.post('/api/auth/login', {
           username: this.username,
           password: this.password
         }, {
@@ -60,25 +62,39 @@ export default {
           }
         })
         
+        console.log('✅ Login response:', response.data)
+        
         if (response.data.success) {
           // เก็บ token และ displayName ใน localStorage
           localStorage.setItem('token', response.data.token)
           localStorage.setItem('displayName', response.data.displayName || (response.data.userData && response.data.userData.name) || '')
           localStorage.setItem('isAuthenticated', 'true');
           localStorage.setItem('userRole', response.data.role);
+          
+          console.log('💾 Stored in localStorage:', {
+            token: response.data.token ? 'exists' : 'missing',
+            displayName: response.data.displayName,
+            isAuthenticated: 'true',
+            userRole: response.data.role
+          })
+          
           // ตั้งค่า axios
           axios.defaults.withCredentials = true
+          
           // Redirect ตาม role
           if (response.data.role === 'admin') {
+            console.log('🔄 Redirecting to admin page')
             await this.$router.push('/admin')
           } else if (response.data.role === 'user') {
+            console.log('🔄 Redirecting to user page')
             await this.$router.push('/user')
           } else {
+            console.log('🔄 Redirecting to home page')
             await this.$router.push('/')
           }
         }
       } catch (error) {
-        console.error('Login error:', error)
+        console.error('❌ Login error:', error.response?.data || error.message)
         this.error = error.response?.data?.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'
       }
     }

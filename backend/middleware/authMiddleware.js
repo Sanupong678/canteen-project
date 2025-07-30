@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import Session from '../models/sessionModel.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-2024';
 
 export const generateToken = (user) => {
   console.log('Generating token for user:', user);

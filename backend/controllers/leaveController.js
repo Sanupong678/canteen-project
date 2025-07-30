@@ -1,6 +1,8 @@
 import Leave from '../models/leaveModel.js';
 import Shop from '../models/Shop.js';
 import User from '../models/userModel.js';
+import { createLeaveNotification } from './notificationController.js';
+import { createAdminLeaveNotification } from './adminNotificationController.js';
 
 // Get all leaves (admin)
 export const getLeaves = async (req, res) => {
@@ -113,6 +115,14 @@ export const createLeave = async (req, res) => {
       success: true,
       data: leaveWithDetails
     });
+    
+    // สร้าง notification สำหรับ admin
+    try {
+      await createAdminLeaveNotification(savedLeave, req.user);
+      console.log('✅ Admin leave notification created');
+    } catch (notificationError) {
+      console.error('❌ Error creating admin leave notification:', notificationError);
+    }
   } catch (error) {
     console.error('Error creating leave:', error);
     res.status(400).json({
@@ -128,13 +138,38 @@ export const updateLeaveStatus = async (req, res) => {
   const { status } = req.body;
   
   try {
+    console.log('🔍 Update leave status request:', { id, status, body: req.body });
+    
     const leave = await Leave.findById(id);
     if (!leave) {
+      console.log('❌ Leave not found:', id);
       return res.status(404).json({ message: 'ไม่พบรายการลานี้' });
     }
 
+    console.log('📋 Leave before update:', {
+      id: leave._id,
+      shopId: leave.shopId,
+      status: leave.status,
+      issue: leave.issue
+    });
+
     leave.status = status;
     await leave.save();
+
+    console.log('✅ Leave updated successfully:', {
+      id: leave._id,
+      shopId: leave.shopId,
+      status: leave.status,
+      issue: leave.issue
+    });
+
+    // สร้าง notification สำหรับ user
+    try {
+      await createLeaveNotification(leave, status);
+      console.log('✅ Leave notification created');
+    } catch (notificationError) {
+      console.error('❌ Error creating leave notification:', notificationError);
+    }
 
     // ดึงข้อมูลร้านค้าเพิ่มเติม
     const shop = await Shop.findById(leave.shopId);
@@ -146,7 +181,7 @@ export const updateLeaveStatus = async (req, res) => {
     
     res.json(leaveWithDetails);
   } catch (error) {
-    console.error('Error updating leave status:', error);
+    console.error('❌ Error updating leave status:', error);
     res.status(400).json({ message: error.message });
   }
 };

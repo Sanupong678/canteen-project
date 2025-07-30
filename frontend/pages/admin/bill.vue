@@ -168,9 +168,9 @@
 
           <!-- Actions -->
           <template v-slot:item.actions="{ item }">
-            <template v-if="item.status === 'รอตรวจสอบ' || item.status === 'pending' || item.status === 'waiting' || item.image || item.slip || item.electricityImage || item.waterImage">
-              <v-btn color="success" small @click="updateStatus(item._id, 'confirmed')" :disabled="item.status === 'ยืนยันแล้ว'">Approve</v-btn>
-              <v-btn color="error" small @click="updateStatus(item._id, 'rejected')" :disabled="item.status === 'เลยกำหนดชำระ'">Cancel</v-btn>
+            <template v-if="item.image && item.status !== 'เสร็จสิ้น'">
+              <v-btn color="success" small @click="updateStatus(item._id, 'confirmed')">Approve</v-btn>
+              <v-btn color="error" small @click="cancelSlipImage(item._id)">ยกเลิกสลิป</v-btn>
             </template>
           </template>
         </v-data-table>
@@ -185,10 +185,17 @@
           <v-card-text>
             <img
               v-if="currentBill && (currentBill.imageData || currentBill.image)"
-              :src="`/api/bills/image/${currentBill._id}`"
+              :src="getImageUrl(currentBill._id)"
               class="preview-image"
               style="max-width:100%;max-height:60vh;width:auto;height:auto;object-fit:unset;display:block;margin:1rem auto;background:#f8f8f8;border-radius:4px;"
+              @error="handleImageError"
+              crossorigin="anonymous"
             />
+            <div v-if="imageError" style="text-align: center; padding: 2rem; color: #666;">
+              <v-icon large color="grey">mdi-image-off</v-icon>
+              <p>ไม่สามารถโหลดรูปภาพได้</p>
+              <p style="font-size: 0.9rem; color: #999;">รูปภาพอาจถูกลบหรือไม่พบ</p>
+            </div>
             <div v-if="currentBill && currentBill.updatedAt" style="font-size: 14px; color: #e6a800; margin-top: 12px;">
               <v-icon small style="vertical-align: middle;">mdi-clock-outline</v-icon>
               อัปโหลดเมื่อ {{ formatDate(currentBill.updatedAt) }}
@@ -196,7 +203,7 @@
           </v-card-text>
           <v-card-actions>
             <v-spacer></v-spacer>
-            <v-btn v-if="currentBill && (currentBill.imageData || currentBill.image)" color="error" text @click="cancelSlipImage">
+            <v-btn v-if="currentBill && (currentBill.imageData || currentBill.image)" color="error" text @click="cancelSlipImage(currentBill._id)">
               ยกเลิกสลิป
             </v-btn>
             <v-btn color="primary" text @click="showPreview = false">
@@ -233,6 +240,7 @@ export default {
     const showPreview = ref(false)
     const previewImage = ref('')
     const currentBill = ref(null)
+    const imageError = ref(false)
 
     // เพิ่มตัวแปรสำหรับเลือกประเภทบิล (ค่าไฟ/ค่าน้ำ)
     const selectedBillType = ref('electricity') // 'electricity' หรือ 'water'
@@ -351,20 +359,22 @@ export default {
     }
 
     const getStatusText = (status) => {
+      if (!status) return 'รอดำเนินการ'
       const statusMap = {
-        pending: 'รอตรวจสอบ',
-        confirmed: 'ยืนยันแล้ว',
-        rejected: 'เลยกำหนดชำระ'
+        'รอดำเนินการ': 'รอดำเนินการ',
+        'รอตรวจสอบ': 'รอตรวจสอบ',
+        'เสร็จสิ้น': 'เสร็จสิ้น',
+        'เลยกำหนด': 'เลยกำหนด'
       }
       return statusMap[status] || status
     }
 
     const getStatusColor = (status) => {
       const colors = {
-        'รอดำเนินการ': 'grey',
-        'รอตรวจสอบ': 'warning',
-        'ยืนยันแล้ว': 'success',
-        'เลยกำหนดชำระ': 'error'
+        'รอดำเนินการ': 'warning',    // สีเหลือง
+        'รอตรวจสอบ': 'info',         // สีฟ้า
+        'เสร็จสิ้น': 'success',       // สีเขียว
+        'เลยกำหนด': 'error'          // สีแดง
       }
       return colors[status] || 'grey'
     }
@@ -440,20 +450,22 @@ export default {
     })
 
     const updateStatus = async (billId, newStatus) => {
-      if (!confirm(`คุณต้องการ${newStatus === 'confirmed' ? 'ยืนยัน' : 'ปฏิเสธ'}บิลนี้ใช่หรือไม่?`)) {
+      if (!confirm(`คุณต้องการยืนยันบิลนี้ใช่หรือไม่?`)) {
         return
       }
 
       loading.value = true
       try {
         await $axios.put(`/api/bills/admin/verify/${billId}`, {
-          status: newStatus
+          status: 'เสร็จสิ้น'
         })
         await fetchBills()
         alert('อัพเดทสถานะเรียบร้อยแล้ว')
       } catch (error) {
         console.error('Error updating bill status:', error)
-        alert('ไม่สามารถอัพเดทสถานะได้')
+        console.error('Error response:', error.response?.data)
+        console.error('Error status:', error.response?.status)
+        alert(`ไม่สามารถอัพเดทสถานะได้: ${error.response?.data?.message || error.message}`)
       } finally {
         loading.value = false
       }
@@ -463,6 +475,12 @@ export default {
       previewImage.value = imageUrl
       currentBill.value = bill
       showPreview.value = true
+      imageError.value = false
+    }
+
+    const handleImageError = (event) => {
+      console.error('Image load error:', event)
+      imageError.value = true
     }
 
     // filter ข้อมูลตามประเภทที่เลือก
@@ -494,25 +512,44 @@ export default {
       fileName.value = ""
     }
 
-    const getImageUrl = (path) => {
-      if (!path) return ''
-      let url = path.replace(/\\/g, '/').replace(/\\/g, '/').replace(/\//g, '/')
-      if (!url.startsWith('/')) url = '/' + url
-      return url
+    const getImageUrl = (billId) => {
+      // ใช้ static file URL แทน API endpoint
+      const backendUrl = process.env.NODE_ENV === 'production' 
+        ? 'https://your-production-domain.com' 
+        : ''
+      
+      // หา bill เพื่อดึง image path
+      const bill = bills.value.find(b => b._id === billId)
+      if (bill && bill.image) {
+        // ใช้ static file URL - ใช้ imagePath ที่มี full path
+        if (bill.imagePath) {
+          // แปลง path ให้เป็น URL ที่ถูกต้อง
+          const imagePath = bill.imagePath.replace(/\\/g, '/')
+          // ลบ uploads/ ออกจาก path เพราะ static route มี /uploads อยู่แล้ว
+          const relativePath = imagePath.replace(/^uploads\//, '')
+          console.log('Image URL:', `${backendUrl}/uploads/${relativePath}`)
+          return `${backendUrl}/uploads/${relativePath}`
+        }
+        // fallback ไปใช้ API endpoint
+        console.log('Using API endpoint:', `${backendUrl}/api/bills/image/${billId}`)
+        return `${backendUrl}/api/bills/image/${billId}`
+      }
+      
+      // fallback ไปใช้ API endpoint
+      console.log('No image found, using API endpoint:', `${backendUrl}/api/bills/image/${billId}`)
+      return `${backendUrl}/api/bills/image/${billId}`
     }
 
-    const cancelSlipImage = async () => {
-      if (!currentBill.value) return
+    const cancelSlipImage = async (billId) => {
       if (!confirm('คุณต้องการลบรูปภาพสลิปนี้หรือไม่?')) return
       loading.value = true
       try {
-        await $axios.put(`/api/bills/admin/cancel-image/${currentBill.value._id}`)
+        await $axios.put(`/api/bills/admin/cancel-image/${billId}`)
         await fetchBills()
-        showPreview.value = false
-        alert('ลบรูปภาพสลิปเรียบร้อยแล้ว')
+        alert('ยกเลิกสลิปเรียบร้อยแล้ว')
       } catch (error) {
         console.error('Error cancelling slip image:', error)
-        alert('ไม่สามารถลบรูปภาพสลิปได้')
+        alert('ไม่สามารถยกเลิกสลิปได้')
       } finally {
         loading.value = false
       }
@@ -537,6 +574,7 @@ export default {
       canteenMap,
       formatDate,
       formatAmount,
+      handleImageError,
       getBillTypeText,
       getBillTypeColor,
       getStatusText,
@@ -552,7 +590,10 @@ export default {
       currentBill,
       formatDateTime,
       getImageUrl,
-      cancelSlipImage
+      cancelSlipImage,
+      imageError,
+      showPreview,
+      previewImage
     }
   }
 }

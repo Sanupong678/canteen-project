@@ -135,16 +135,32 @@
             {{ formatDate(item.report_date) }}
           </template>
 
+          <!-- Images Column -->
+          <template v-slot:item.images="{ item }">
+            <div class="d-flex align-center">
+              <v-btn
+                v-if="item.imagePaths && item.imagePaths.length > 0"
+                color="primary"
+                small
+                text
+                @click="showImages(item.imagePaths, item._id)"
+              >
+                ดูรูปภาพ ({{ item.imagePaths.length }})
+              </v-btn>
+              <span v-else class="text-grey">ไม่มีรูปภาพ</span>
+            </div>
+          </template>
+
           <!-- Actions Column -->
           <template v-slot:item.actions="{ item }">
             <div class="action-buttons">
               <v-btn
-                v-if="item.images && item.images.length"
+                v-if="item.imagePaths && item.imagePaths.length > 0"
                 small
-                @click="viewImages(item.images)"
+                @click="showImages(item.imagePaths, item._id)"
                 class="action-btn image-btn"
               >
-                รูปภาพ
+                รูปภาพ ({{ item.imagePaths.length }})
               </v-btn>
               <v-btn
                 small
@@ -175,6 +191,8 @@
                 :key="i"
                 :src="image"
                 contain
+                @error="handleImageError"
+                crossorigin="anonymous"
               ></v-carousel-item>
             </v-carousel>
           </v-card-text>
@@ -224,9 +242,12 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useNuxtApp } from '#app'
 import LayoutAdmin from '@/components/LayoutAdmin.vue'
-import axios from 'axios'
 import { format } from 'date-fns'
+
+// Get $axios from Nuxt
+const { $axios } = useNuxtApp()
 
 // Data
 const loading = ref(false)
@@ -318,7 +339,7 @@ const filteredRepairs = computed(() => {
 const fetchRepairs = async () => {
   loading.value = true
   try {
-    const response = await axios.get('/api/repairs/admin')
+    const response = await $axios.get('/api/repairs/admin')
     console.log('API Response:', response.data)
 
     if (response.data && Array.isArray(response.data)) {
@@ -332,7 +353,8 @@ const fetchRepairs = async () => {
         status: repair.status,
         images: repair.images || [],
         report_date: repair.report_date,
-        note: repair.note || ''
+        note: repair.note || '',
+        imagePaths: repair.imagePaths || [] // ใช้ imagePaths จาก backend
       }))
     } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
       repairs.value = response.data.data.map(repair => ({
@@ -345,7 +367,8 @@ const fetchRepairs = async () => {
         status: repair.status,
         images: repair.images || [],
         report_date: repair.report_date,
-        note: repair.note || ''
+        note: repair.note || '',
+        imagePaths: repair.imagePaths || [] // ใช้ imagePaths จาก backend
       }))
     } else {
       repairs.value = []
@@ -395,6 +418,21 @@ const viewImages = (images) => {
   imageDialog.value = true
 }
 
+const showImages = (imagePaths, repairId) => {
+  // สร้าง URL สำหรับรูปภาพ
+  const imageUrls = imagePaths.map((_, index) => {
+    return `${$axios.defaults.baseURL}/api/repairs/${repairId}/image/${index}`
+  })
+  selectedImages.value = imageUrls
+  imageDialog.value = true
+}
+
+// เพิ่มฟังก์ชันสำหรับจัดการ error ของรูปภาพ
+const handleImageError = (event) => {
+  console.log('Image failed to load:', event.target.src)
+  event.target.src = `${$axios.defaults.baseURL}/images/default-repair.png` // รูปภาพ default
+}
+
 const openStatusDialog = (item) => {
   selectedRepair.value = item
   selectedStatus.value = item.status
@@ -418,7 +456,7 @@ const updateStatus = async () => {
       data: updateData
     })
 
-    const response = await axios.put(`/api/repairs/${selectedRepair.value._id}/status`, updateData)
+    const response = await $axios.put(`/api/repairs/${selectedRepair.value._id}/status`, updateData)
     
     if (response.data) {
       const index = repairs.value.findIndex(repair => repair._id === selectedRepair.value._id)
@@ -441,7 +479,9 @@ const updateStatus = async () => {
     }
   } catch (error) {
     console.error('Error updating status:', error)
-    alert('เกิดข้อผิดพลาดในการอัปเดตสถานะ กรุณาลองใหม่อีกครั้ง')
+    console.error('Error response:', error.response?.data)
+    console.error('Error status:', error.response?.status)
+    alert(`เกิดข้อผิดพลาดในการอัปเดตสถานะ: ${error.response?.data?.message || error.message}`)
   } finally {
     updating.value = false
   }

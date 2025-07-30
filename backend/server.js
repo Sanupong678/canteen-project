@@ -21,6 +21,9 @@
   import authRoutes from './routes/authRoutes.js';
   import shopRoutes from './routes/shopRoutes.js';
   import billRoutes from './routes/billRoutes.js';
+  import uploadRoutes from './routes/uploadRoutes.js';
+  import notificationRoutes from './routes/notificationRoutes.js';
+  import adminNotificationRoutes from './routes/adminNotificationRoutes.js';
 
   dotenv.config();
   const app = express();
@@ -28,6 +31,9 @@
   // Get current directory
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
+
+  // Trust proxy for rate limiting
+  app.set('trust proxy', 1);
 
   // Security middleware
   app.use(helmet());
@@ -45,11 +51,31 @@
 
   // CORS configuration
   app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001'],
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+    preflightContinue: false,
+    optionsSuccessStatus: 200
   }));
+
+  // Handle preflight requests globally
+  app.options('*', cors());
+
+  // Additional CORS headers for all routes
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      res.status(200).end();
+      return;
+    }
+    next();
+  });
 
   // Cookie parser middleware
   app.use(cookieParser());
@@ -58,8 +84,30 @@
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-  // Static files
-  app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+  // Static files with CORS for all uploads subdirectories
+  app.use('/uploads', (req, res, next) => {
+    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.header('Cross-Origin-Embedder-Policy', 'unsafe-none');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      res.status(200).end();
+      return;
+    }
+    next();
+  }, express.static(path.join(__dirname, 'uploads')));
+
+  // Static files for images with CORS
+  app.use('/images', (req, res, next) => {
+    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+    res.header('Access-Control-Allow-Methods', 'GET');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    next();
+  }, express.static(path.join(__dirname, 'images')));
 
   // Routes
   app.use('/api/users', userRoutes);
@@ -71,6 +119,26 @@
   app.use('/api/auth', authRoutes);
   app.use('/api/shops', shopRoutes);
   app.use('/api/bills', billRoutes);
+  app.use('/api/upload', uploadRoutes);
+  app.use('/api/notifications', notificationRoutes);
+  app.use('/api/admin-notifications', adminNotificationRoutes);
+
+  // Add CORS headers for all API routes
+  app.use('/api', (req, res, next) => {
+    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.header('Cross-Origin-Embedder-Policy', 'unsafe-none');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      res.status(200).end();
+      return;
+    }
+    next();
+  });
 
   // MongoDB Connection
   const connectDB = async () => {

@@ -7,10 +7,7 @@
           <img src="/images/Logo.jpg" alt="Logo">
         </div>
         <div class="user-actions">
-          <div class="notification">
-            <span class="notification-icon">🔔</span>
-            <span class="notification-count">3</span>
-          </div>
+          <NotificationDropdown />
           <div class="user-profile" @click="toggleUserMenu">
             <span class="username">{{ displayName }}</span>
             <div class="user-menu" v-if="showUserMenu">
@@ -50,14 +47,49 @@
 </template>
 
 <script>
+import NotificationDropdown from './NotificationDropdown.vue'
+
 export default {
   name: 'LayoutUser',
+  components: {
+    NotificationDropdown
+  },
   data() {
     return {
       showUserMenu: false,
       displayName: localStorage.getItem('displayName') || 'User Name',
       shopData: JSON.parse(localStorage.getItem('shopData') || '{}'),
       userId: localStorage.getItem('userId')
+    }
+  },
+  async mounted() {
+    // ตรวจสอบ authentication
+    const isAuthenticated = localStorage.getItem('isAuthenticated')
+    const token = localStorage.getItem('token')
+    
+    if (!isAuthenticated || !token) {
+      console.log('❌ User not authenticated, redirecting to login')
+      this.$router.push('/login')
+      return
+    }
+    
+    // ตรวจสอบ role
+    const userRole = localStorage.getItem('userRole')
+    if (userRole !== 'user') {
+      console.log('❌ User role is not user, redirecting to login')
+      this.$router.push('/login')
+      return
+    }
+    
+    console.log('✅ User authenticated successfully')
+    
+    // Initialize notifications ทันที
+    try {
+      console.log('🔄 Initializing notifications in LayoutUser...')
+      await this.$initializeNotifications()
+      console.log('✅ Notifications initialized successfully')
+    } catch (error) {
+      console.error('❌ Error initializing notifications:', error)
     }
   },
   methods: {

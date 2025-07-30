@@ -21,9 +21,15 @@ const repairSchema = new mongoose.Schema({
     type: String,
     required: true,
     default: 'pending',
-    enum: ['pending', 'in_progress', 'completed', 'cancelled']
+    enum: ['pending', 'in_progress', 'completed', 'cancelled', 'รอดำเนินการ', 'กำลังดำเนินการ', 'ซ่อมแล้ว']
   },
+  // เก็บ Base64 (สำหรับ backward compatibility)
   images: {
+    type: [String],
+    default: []
+  },
+  // เก็บ path ของรูปภาพ (ใหม่)
+  imagePaths: {
     type: [String],
     default: []
   },
@@ -35,6 +41,8 @@ const repairSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
+}, {
+  timestamps: true
 });
 
 // ก่อนบันทึก ให้ตรวจสอบว่ามีข้อมูลที่จำเป็นครบถ้วน

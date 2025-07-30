@@ -9,7 +9,8 @@
     "dev": "set NODE_NO_WARNINGS=1 && nodemon server.js",
     "remove-email-index": "node scripts/removeEmailIndex.js",
     "create-bills": "node scripts/createBillsForExistingShops.js",
-    "reset-bills": "node scripts/resetBills.js"
+    "reset-bills": "node scripts/resetBills.js",
+    "seed-canteens": "node scripts/seedCanteens.js"
   },
   "keywords": [],
   "engines": {

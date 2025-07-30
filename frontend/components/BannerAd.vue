@@ -43,6 +43,8 @@
 </template>
 
 <script>
+import axios from 'axios'
+
 export default {
   name: 'BannerAd',
   props: {
@@ -55,14 +57,15 @@ export default {
     return {
       currentImage: null,
       isAdmin: false,
-      showDeleteModal: false
+      showDeleteModal: false,
+      backgrounds: []
     }
   },
   methods: {
     triggerFileInput() {
       this.$refs.fileInput.click()
     },
-    handleFileUpload(event) {
+    async handleFileUpload(event) {
       const file = event.target.files[0]
       if (file) {
         // Check file size (max 5MB)
@@ -71,15 +74,30 @@ export default {
           return
         }
         
-        const reader = new FileReader()
-        reader.onload = (e) => {
-          this.currentImage = e.target.result
-          // Save to localStorage with a specific key
-          localStorage.setItem('bannerImageData', e.target.result)
-          // Also save the last update timestamp
-          localStorage.setItem('bannerImageLastUpdate', new Date().toISOString())
+        try {
+          const token = localStorage.getItem('token')
+          const backendUrl = this.getBackendUrl()
+          const formData = new FormData()
+          formData.append('image', file)
+          formData.append('title', 'Banner')
+          formData.append('description', 'Banner advertisement')
+
+          const response = await axios.post(`${backendUrl}/api/backgrounds`, formData, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'multipart/form-data'
+            }
+          })
+
+          if (response.data.success) {
+            this.currentImage = `${backendUrl}/api/backgrounds/${response.data.data._id}/image`
+            this.loadBackgrounds() // Reload backgrounds
+            alert('อัปโหลดรูปภาพสำเร็จ')
+          }
+        } catch (error) {
+          console.error('Error uploading banner:', error)
+          alert('เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ')
         }
-        reader.readAsDataURL(file)
       }
     },
     showDeleteConfirmation() {
@@ -88,28 +106,91 @@ export default {
     closeModal() {
       this.showDeleteModal = false
     },
-    removeImage() {
-      this.currentImage = null
-      // Remove both the image data and timestamp
-      localStorage.removeItem('bannerImageData')
-      localStorage.removeItem('bannerImageLastUpdate')
-      this.closeModal()
+    async removeImage() {
+      try {
+        const backendUrl = this.getBackendUrl()
+        console.log('🔍 Debugging removeImage:')
+        console.log('- Backend URL:', backendUrl)
+        console.log('- Backgrounds:', this.backgrounds)
+        console.log('- Current Image:', this.currentImage)
+        
+        // Find the active background to delete
+        const activeBackground = this.backgrounds.find(bg => bg.isActive)
+        console.log('- Active Background:', activeBackground)
+        
+        if (activeBackground) {
+          const token = localStorage.getItem('token')
+          console.log('- Token exists:', !!token)
+          
+          if (!token) {
+            alert('กรุณาเข้าสู่ระบบใหม่')
+            return
+          }
+          
+          console.log('- Deleting background ID:', activeBackground._id)
+          const response = await axios.delete(`${backendUrl}/api/backgrounds/${activeBackground._id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+          
+          console.log('- Delete response:', response.data)
+          
+          this.currentImage = null
+          this.loadBackgrounds() // Reload backgrounds
+          this.closeModal()
+          alert('ลบรูปภาพสำเร็จ')
+        } else {
+          console.log('- No active background found')
+          alert('ไม่พบรูปภาพที่ต้องการลบ')
+        }
+      } catch (error) {
+        console.error('❌ Error removing banner:', error)
+        console.error('- Error response:', error.response?.data)
+        console.error('- Error status:', error.response?.status)
+        
+        if (error.response?.status === 401) {
+          alert('กรุณาเข้าสู่ระบบใหม่')
+        } else if (error.response?.status === 404) {
+          alert('ไม่พบรูปภาพที่ต้องการลบ')
+        } else {
+          alert(`เกิดข้อผิดพลาดในการลบรูปภาพ: ${error.response?.data?.error || error.message}`)
+        }
+      }
     },
     checkUserRole() {
       const userRole = localStorage.getItem('userRole')
       this.isAdmin = userRole === 'admin'
+      console.log('🔍 User Role Debug:')
+      console.log('- User Role:', userRole)
+      console.log('- Is Admin:', this.isAdmin)
+      console.log('- Read Only:', this.readOnly)
+      console.log('- Current Image:', this.currentImage)
     },
-    loadSavedImage() {
-      // Try to load the image from localStorage
-      const savedImage = localStorage.getItem('bannerImageData')
-      if (savedImage) {
-        this.currentImage = savedImage
+    // กำหนด backend URL
+    getBackendUrl() {
+      return process.env.NODE_ENV === 'production' 
+        ? 'https://your-production-domain.com' 
+        : 'http://localhost:4000'
+    },
+    async loadBackgrounds() {
+      try {
+        const backendUrl = this.getBackendUrl()
+        const response = await axios.get(`${backendUrl}/api/backgrounds`)
+        if (response.data.success) {
+          this.backgrounds = response.data.data
+          // Set the first active background as current image
+          const activeBackground = this.backgrounds.find(bg => bg.isActive)
+          if (activeBackground) {
+            this.currentImage = `${backendUrl}/api/backgrounds/${activeBackground._id}/image`
+          }
+        }
+      } catch (error) {
+        console.error('Error loading backgrounds:', error)
       }
     }
   },
-  mounted() {
+  async mounted() {
     this.checkUserRole()
-    this.loadSavedImage()
+    await this.loadBackgrounds()
   }
 }
 </script>

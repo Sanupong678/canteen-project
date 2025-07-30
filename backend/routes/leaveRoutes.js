@@ -1,5 +1,6 @@
 import express from 'express';
-import { verifyToken, isAdmin } from '../middleware/authMiddleware.js';
+import { protect } from '../middleware/auth.js';
+import { isAdmin } from '../middleware/authMiddleware.js';
 import {
   getLeaves,
   getUserLeaves,
@@ -12,7 +13,7 @@ import {
 const router = express.Router();
 
 // ใช้ middleware กับทุก routes
-router.use(verifyToken);
+router.use(protect);
 
 // Admin routes
 router.get('/admin', isAdmin, getLeaves);

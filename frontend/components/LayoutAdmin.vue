@@ -7,10 +7,7 @@
           <img src="/images/Logo.jpg" alt="Logo">
         </div>
         <div class="user-actions">
-          <div class="notification">
-            <span class="notification-icon">🔔</span>
-            <span class="notification-count">5</span>
-          </div>
+          <AdminNotificationDropdown />
           <div class="user-profile" @click="toggleUserMenu">
             <span class="username">{{ displayName }}</span>
             <div class="user-menu" v-if="showUserMenu">
@@ -50,8 +47,13 @@
 </template>
 
 <script>
+import AdminNotificationDropdown from './AdminNotificationDropdown.vue'
+
 export default {
   name: 'LayoutAdmin',
+  components: {
+    AdminNotificationDropdown
+  },
   data() {
     return {
       showUserMenu: false,

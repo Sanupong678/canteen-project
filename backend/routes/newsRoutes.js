@@ -1,24 +1,42 @@
 import express from 'express';
-import multer from 'multer';
-import path from 'path';
-import { getNews, createNews, deleteNews } from '../controllers/newsController.js';
+import { verifyToken, isAdmin } from '../middleware/authMiddleware.js';
+import { 
+  getAllNews, 
+  getNewsById, 
+  createNews, 
+  updateNews, 
+  deleteNews, 
+  getAllNewsForAdmin,
+  toggleNewsStatus,
+  getNewsImage
+} from '../controllers/newsController.js';
+import { uploadNewsImage } from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
 
-// ตั้งค่า multer เก็บไฟล์ในโฟลเดอร์ uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/');  // โฟลเดอร์เก็บไฟล์
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + path.extname(file.originalname)); // ตั้งชื่อไฟล์ใหม่
-  }
-});
-const upload = multer({ storage: storage });
+// Get all active news (for users)
+router.get('/', getAllNews);
 
-router.get('/', getNews);
-// ใส่ upload.single('image') เป็น middleware เพื่อรับไฟล์ image จากฟอร์ม
-router.post('/', upload.single('image'), createNews);
-router.delete('/:id', deleteNews);
+// Get single news by ID (for users)
+router.get('/:id', getNewsById);
+
+// Get news image
+router.get('/:newsId/image', getNewsImage);
+
+// Admin routes
+// Get all news for admin (including inactive)
+router.get('/admin/all', verifyToken, isAdmin, getAllNewsForAdmin);
+
+// Create news (admin only)
+router.post('/', verifyToken, isAdmin, uploadNewsImage.single('image'), createNews);
+
+// Update news (admin only)
+router.put('/:id', verifyToken, isAdmin, uploadNewsImage.single('image'), updateNews);
+
+// Delete news (admin only)
+router.delete('/:id', verifyToken, isAdmin, deleteNews);
+
+// Toggle news status (admin only)
+router.patch('/:id/toggle', verifyToken, isAdmin, toggleNewsStatus);
 
 export default router;

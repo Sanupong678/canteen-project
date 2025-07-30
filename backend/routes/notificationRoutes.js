@@ -1,23 +1,20 @@
 import express from 'express';
+import { verifyToken } from '../middleware/authMiddleware.js';
 import {
   getUserNotifications,
-  markAsRead,
-  markAllAsRead
+  markNotificationAsRead,
+  markAllNotificationsAsRead
 } from '../controllers/notificationController.js';
-import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Protect all routes
-router.use(protect);
-
 // Get user notifications
-router.get('/', getUserNotifications);
+router.get('/user', verifyToken, getUserNotifications);
 
 // Mark notification as read
-router.put('/:notificationId/read', markAsRead);
+router.put('/:id/read', verifyToken, markNotificationAsRead);
 
 // Mark all notifications as read
-router.put('/read-all', markAllAsRead);
+router.put('/mark-all-read', verifyToken, markAllNotificationsAsRead);
 
 export default router; 

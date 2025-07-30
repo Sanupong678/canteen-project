@@ -6,6 +6,16 @@ const notificationSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  shopId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Shop',
+    required: true
+  },
+  type: {
+    type: String,
+    enum: ['bill', 'leave', 'repair'],
+    required: true
+  },
   title: {
     type: String,
     required: true
@@ -14,22 +24,22 @@ const notificationSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  type: {
+  status: {
     type: String,
-    enum: ['contract', 'bill', 'system'],
-    default: 'system'
+    required: true
   },
   isRead: {
     type: Boolean,
     default: false
   },
-  relatedShop: {
+  relatedId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Shop'
+    required: true
   },
-  relatedBill: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Bill'
+  billType: {
+    type: String,
+    enum: ['electricity', 'water'],
+    default: null
   }
 }, {
   timestamps: true

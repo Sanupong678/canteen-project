@@ -198,26 +198,25 @@ const handleSubmit = async () => {
   loading.value = true
 
   try {
-    let base64Images = []
+    // สร้าง FormData สำหรับส่งไฟล์
+    const formData = new FormData()
+    formData.append('category', selectedCategory.value)
+    formData.append('issue', issue.value)
+    
+    // เพิ่มรูปภาพเข้า FormData
     if (images.value.length > 0) {
-      const imagePromises = images.value.map(file => {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = e => resolve(e.target.result)
-          reader.onerror = e => reject(e)
-          reader.readAsDataURL(file)
-        })
+      images.value.forEach((file, index) => {
+        formData.append('images', file)
       })
-      base64Images = await Promise.all(imagePromises)
     }
 
-    const payload = {
-      category: selectedCategory.value,
-      issue: issue.value,
-      images: base64Images
-    }
-
-    const response = await axios.post('http://localhost:4000/api/repairs', payload)
+    const token = localStorage.getItem('token')
+    const response = await axios.post('/api/repairs', formData, {
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data'  // สำคัญสำหรับไฟล์
+      }
+    })
 
     if (response.data.success) {
       if (form.value) {
@@ -249,7 +248,7 @@ const fetchRepairHistory = async () => {
   try {
     loading.value = true
     const token = localStorage.getItem('token')
-    const response = await axios.get('http://localhost:4000/api/repairs/user', {
+    const response = await axios.get('/api/repairs/user', {
       headers: { Authorization: `Bearer ${token}` }
     })
     console.log('API Response:', response.data)

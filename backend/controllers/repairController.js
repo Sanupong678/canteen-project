@@ -4,6 +4,8 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import mongoose from 'mongoose';
+import { createRepairNotification } from './notificationController.js';
+import { createAdminRepairNotification } from './adminNotificationController.js';
 
 // สร้างโฟลเดอร์ uploads/repairs ถ้ายังไม่มี
 const uploadDir = path.join(process.cwd(), 'uploads', 'repairs');
@@ -114,7 +116,12 @@ export const getUserRepairs = async (req, res) => {
 // Create new repair
 export const createRepair = async (req, res) => {
   try {
+    console.log('=== REPAIR CREATE DEBUG ===');
     console.log('Token data:', req.user);
+    console.log('Request body:', req.body);
+    console.log('Request files:', req.files);
+    console.log('Request headers:', req.headers);
+    console.log('==========================');
     
     // ดึงข้อมูลจาก token
     const userId = req.user.userId;
@@ -129,7 +136,28 @@ export const createRepair = async (req, res) => {
     }
 
     // ดึงข้อมูลที่ user กรอก
-    const { category, issue, images = [] } = req.body;
+    const category = req.body.category;
+    const issue = req.body.issue;
+
+    console.log('Extracted data:', { category, issue });
+
+    // ตรวจสอบข้อมูลที่จำเป็น
+    if (!category || !issue) {
+      return res.status(400).json({
+        success: false,
+        message: 'กรุณากรอกหมวดหมู่และรายละเอียดปัญหา'
+      });
+    }
+
+    // จัดการรูปภาพที่อัปโหลด
+    const imagePaths = [];
+    if (req.files && req.files.length > 0) {
+      req.files.forEach(file => {
+        imagePaths.push(file.path);
+      });
+    }
+
+    console.log('Image paths:', imagePaths);
 
     const newRepair = new Repair({
       userId,
@@ -138,7 +166,7 @@ export const createRepair = async (req, res) => {
       issue,
       status: 'pending',
       report_date: new Date(),
-      images: Array.isArray(images) ? images : []
+      imagePaths: imagePaths // เก็บ path แทน Base64
     });
 
     console.log('Attempting to save repair:', newRepair);
@@ -159,6 +187,14 @@ export const createRepair = async (req, res) => {
       success: true,
       data: repairWithDetails
     });
+    
+    // สร้าง notification สำหรับ admin
+    try {
+      await createAdminRepairNotification(savedRepair, req.user);
+      console.log('✅ Admin repair notification created');
+    } catch (notificationError) {
+      console.error('❌ Error creating admin repair notification:', notificationError);
+    }
   } catch (error) {
     console.error('Detailed error:', {
       message: error.message,
@@ -178,16 +214,41 @@ export const updateRepairStatus = async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   
+  console.log('🔍 Update repair status request:', { id, status, body: req.body });
+  
   try {
     // ตรวจสอบว่ามี repair นี้อยู่หรือไม่
     const repair = await Repair.findById(id);
     if (!repair) {
+      console.log('❌ Repair not found:', id);
       return res.status(404).json({ message: 'ไม่พบรายการแจ้งซ่อมนี้' });
     }
+
+    console.log('📋 Repair before update:', {
+      id: repair._id,
+      shopId: repair.shopId,
+      status: repair.status,
+      category: repair.category
+    });
 
     // อัพเดทสถานะ
     repair.status = status;
     await repair.save();
+
+    console.log('✅ Repair updated successfully:', {
+      id: repair._id,
+      shopId: repair.shopId,
+      status: repair.status,
+      category: repair.category
+    });
+
+    // สร้าง notification สำหรับ user
+    try {
+      await createRepairNotification(repair, status);
+      console.log('✅ Repair notification created');
+    } catch (notificationError) {
+      console.error('❌ Error creating repair notification:', notificationError);
+    }
 
     // ดึงข้อมูลร้านค้าเพิ่มเติม
     const shop = await Shop.findById(repair.shopId);
@@ -199,7 +260,7 @@ export const updateRepairStatus = async (req, res) => {
     
     res.json(repairWithDetails);
   } catch (error) {
-    console.error('Error updating repair status:', error);
+    console.error('❌ Error updating repair status:', error);
     res.status(400).json({ message: error.message });
   }
 };
@@ -215,5 +276,42 @@ export const deleteRepair = async (req, res) => {
     res.json({ message: 'Repair deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+}; 
+
+// Get repair image
+export const getRepairImage = async (req, res) => {
+  try {
+    const { repairId, imageIndex } = req.params;
+    
+    const repair = await Repair.findById(repairId);
+    if (!repair) {
+      return res.status(404).send('Repair not found');
+    }
+
+    // ไม่ต้องตรวจสอบสิทธิ์เพื่อให้เข้าถึงได้ง่าย
+    // (ในอนาคตอาจเพิ่มการตรวจสอบเพิ่มเติม)
+
+    const imagePaths = repair.imagePaths || [];
+    const imageIndexNum = parseInt(imageIndex);
+    
+    if (imageIndexNum < 0 || imageIndexNum >= imagePaths.length) {
+      return res.status(404).send('Image not found');
+    }
+
+    const imagePath = imagePaths[imageIndexNum];
+    
+    if (!fs.existsSync(imagePath)) {
+      console.log('Image file not found:', imagePath);
+      return res.status(404).send('Image file not found');
+    }
+
+    // ส่งรูปภาพ
+    res.set('Content-Type', 'image/jpeg');
+    fs.createReadStream(imagePath).pipe(res);
+    
+  } catch (error) {
+    console.error('Error getting repair image:', error);
+    res.status(500).send('Error loading image');
   }
 }; 

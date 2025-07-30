@@ -54,7 +54,7 @@
                       @change="handleFileChange($event, bill)"
                     />
                     <button
-                      v-if="!bill.paymentDate && !isExpired(bill)"
+                      v-if="canUploadSlip(bill)"
                       class="pay-button"
                       :style="bill.image ? 'background: #bdbdbd; cursor: not-allowed;' : ''"
                       :disabled="!!bill.image"
@@ -121,19 +121,63 @@ export default {
     }
 
     const getStatusText = (bill) => {
-      if (bill.status) return bill.status
-      return 'รอชำระเงิน'
+      console.log('🔍 getStatusText called with bill:', bill)
+      console.log('📊 Bill status:', bill.status)
+      
+      if (!bill.status) return 'รอดำเนินการ'
+      
+      const statusMap = {
+        'รอดำเนินการ': 'รอดำเนินการ',
+        'รอตรวจสอบ': 'รอตรวจสอบ',
+        'เสร็จสิ้น': 'เสร็จสิ้น',
+        'เลยกำหนด': 'เลยกำหนด'
+      }
+      
+      const result = statusMap[bill.status] || bill.status
+      console.log('📝 Status text result:', result)
+      return result
     }
 
     const getStatusClass = (bill) => {
-      if (bill.status === 'สมบูรณ์') return 'status-paid'
-      if (bill.status === 'ไม่สมบูรณ์') return 'status-expired'
-      if (bill.status === 'รอดำเนินการ') return 'status-pending'
-      return 'status-pending'
+      console.log('🔍 getStatusClass called with bill:', bill)
+      console.log('📊 Bill status:', bill.status)
+      
+      if (!bill.status) return 'status-pending'
+      
+      const statusClassMap = {
+        'รอดำเนินการ': 'status-pending',    // สีเหลือง
+        'รอตรวจสอบ': 'status-review',        // สีฟ้า
+        'เสร็จสิ้น': 'status-paid',          // สีเขียว
+        'เลยกำหนด': 'status-expired'         // สีแดง
+      }
+      
+      const result = statusClassMap[bill.status] || 'status-pending'
+      console.log('🎨 Status class result:', result)
+      return result
     }
 
     const isExpired = (bill) => {
       return new Date(bill.dueDate) < new Date() && !bill.paymentDate
+    }
+
+    // ฟังก์ชันตรวจสอบว่าสามารถอัปโหลดสลิปได้หรือไม่
+    const canUploadSlip = (bill) => {
+      // แสดงปุ่มเมื่อ status เป็น 'รอดำเนินการ' หรือ 'เลยกำหนด'
+      if (bill.status === 'รอดำเนินการ' || bill.status === 'เลยกำหนด') {
+        return true
+      }
+      
+      // ซ่อนปุ่มเมื่อ status เป็น 'รอตรวจสอบ' หรือ 'เสร็จสิ้น'
+      if (bill.status === 'รอตรวจสอบ' || bill.status === 'เสร็จสิ้น') {
+        return false
+      }
+      
+      // กรณีไม่มี status ให้แสดงปุ่ม
+      if (!bill.status) {
+        return true
+      }
+      
+      return false
     }
 
     const triggerFileInput = (billId) => {
@@ -153,24 +197,78 @@ export default {
     // ฟังก์ชันสำหรับอัปโหลดเมื่อกดยืนยัน
     const confirmUpload = async (bill) => {
       const file = selectedFiles.value[bill.id]
-      if (!file) return
+      if (!file) {
+        alert('กรุณาเลือกไฟล์ก่อน')
+        return
+      }
+      
       uploading.value = true
+      
       try {
+        console.log('\n=== FRONTEND UPLOAD DEBUG ===')
+        console.log('File details:', {
+          name: file.name,
+          size: file.size,
+          type: file.type
+        })
+        console.log('Bill details:', {
+          id: bill.id,
+          type: bill.type,
+          amount: bill.amount
+        })
+        
         const formData = new FormData()
         formData.append('slip', file)
         formData.append('billId', bill.id)
         formData.append('transferDate', new Date().toISOString())
+        
         const token = localStorage.getItem('token')
-        await axios.post('/api/bills/upload', formData, {
+        console.log('Token status:', token ? 'Present' : 'Missing')
+        
+        // ตรวจสอบ token
+        if (!token) {
+          throw new Error('ไม่พบ token กรุณาเข้าสู่ระบบใหม่')
+        }
+        
+        // แสดง FormData contents
+        console.log('FormData contents:')
+        for (let [key, value] of formData.entries()) {
+          console.log(key, value)
+        }
+        
+        const response = await axios.post('/api/bills/upload', formData, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'multipart/form-data'
-          }
+          },
+          timeout: 30000 // 30 วินาที timeout
         })
+        
+        console.log('✅ Upload successful:', response.data)
         await fetchBills()
         selectedFiles.value[bill.id] = null
+        alert('อัปโหลดสลิปสำเร็จ')
+        
       } catch (error) {
-        alert('เกิดข้อผิดพลาดในการอัปโหลดสลิป')
+        console.error('❌ Upload error:', error)
+        console.error('Error response:', error.response?.data)
+        console.error('Error status:', error.response?.status)
+        
+        let errorMessage = 'เกิดข้อผิดพลาดในการอัปโหลดสลิป'
+        
+        if (error.response?.data?.error) {
+          errorMessage = error.response.data.error
+        } else if (error.response?.status === 401) {
+          errorMessage = 'Token หมดอายุ กรุณาเข้าสู่ระบบใหม่'
+        } else if (error.response?.status === 403) {
+          errorMessage = 'ไม่มีสิทธิ์เข้าถึงบิลนี้'
+        } else if (error.response?.status === 404) {
+          errorMessage = 'ไม่พบบิลที่ระบุ'
+        } else if (error.message) {
+          errorMessage = error.message
+        }
+        
+        alert(errorMessage)
       } finally {
         uploading.value = false
       }
@@ -188,8 +286,11 @@ export default {
           headers: { Authorization: `Bearer ${token}` }
         })
         if (response.data && response.data.success && Array.isArray(response.data.data)) {
+          console.log('📊 API Response:', response.data.data)
           // แปลงข้อมูลให้เหมาะกับการแสดงผล
-          bills.value = response.data.data.map(bill => ({
+          bills.value = response.data.data.map(bill => {
+            console.log('🔍 Processing bill:', bill)
+            return {
             id: bill._id,
             type: bill.billType,
             amount: bill.amount,
@@ -198,8 +299,12 @@ export default {
             dueDate: bill.dueDate || bill.contractEndDate,
             accountNumber: 'XXX-X-XXXXX-X', // ปรับตามจริงถ้ามีใน backend
             accountName: bill.shopName || localStorage.getItem('displayName') || 'มหาวิทยาลัย',
-            paymentDate: bill.payment_date || null
-          }))
+              paymentDate: bill.payment_date || null,
+              status: bill.status || 'รอดำเนินการ', // เพิ่ม status
+              image: bill.image || null // เพิ่ม image
+            }
+          })
+          console.log('✅ Processed bills:', bills.value)
         } else {
           bills.value = []
         }
@@ -222,6 +327,7 @@ export default {
       getStatusClass,
       getStatusText,
       isExpired,
+      canUploadSlip,
       triggerFileInput,
       handleFileChange,
       confirmUpload,

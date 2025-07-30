@@ -282,7 +282,7 @@ export const logoutAll = async (req, res) => {
   try {
     // อัพเดททุก session ของผู้ใช้
     await Session.updateMany(
-      { userId: req.user._id },
+      { userId: req.user.userId },
       { 
         status: 'logged_out',
         logoutTime: new Date()

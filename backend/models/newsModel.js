@@ -3,20 +3,35 @@ import mongoose from 'mongoose';
 const newsSchema = new mongoose.Schema({
   title: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   content: {
     type: String,
     required: true
   },
-  imagePath: {
-    type: String, 
-    default: ''
+  imageFilename: {
+    type: String,
+    required: true
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
+  author: {
+    type: String,
+    default: 'Admin'
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  views: {
+    type: Number,
+    default: 0
   }
+}, {
+  timestamps: true
 });
 
-export default mongoose.model('News', newsSchema);
+// สร้าง index เพื่อให้ค้นหาเร็วขึ้น
+newsSchema.index({ createdAt: -1 });
+newsSchema.index({ isActive: 1 });
+
+export default mongoose.model('News', newsSchema, 'news');
