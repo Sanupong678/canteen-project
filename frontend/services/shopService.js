@@ -95,6 +95,17 @@ export const shopService = {
       throw error;
     }
   },
+
+  // Get all shops for canteen management (including expired)
+  async getCanteenShops(canteenId) {
+    try {
+      const response = await axios.get(`${API_URL}/shops/canteen/${canteenId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching canteen ${canteenId} shops:`, error);
+      throw error;
+    }
+  },
   // Create new shop
   async createShop(shopData) {
     try {

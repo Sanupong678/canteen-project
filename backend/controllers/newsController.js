@@ -9,7 +9,7 @@ export const getAllNews = async (req, res) => {
     
     const news = await News.find({ isActive: true })
       .sort({ createdAt: -1 })
-      .select('title content imageFilename createdAt views');
+      .select('title content imageFilename createdAt views author');
     
     console.log(`✅ Found ${news.length} news articles`);
     
@@ -90,7 +90,8 @@ export const createNews = async (req, res) => {
       title,
       content,
       imageFilename,
-      author: req.user?.displayName || 'Admin'
+      author: req.user?.displayName || 'Admin',
+      isActive: true
     });
     
     await news.save();
@@ -115,61 +116,6 @@ export const createNews = async (req, res) => {
   }
 };
 
-// Update news (admin only)
-export const updateNews = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { title, content } = req.body;
-    
-    console.log(`📰 Updating news with ID: ${id}`);
-    console.log('📋 Update data:', { title, content });
-    console.log('📁 Uploaded file:', req.file);
-    
-    const news = await News.findById(id);
-    
-    if (!news) {
-      return res.status(404).json({
-        success: false,
-        error: 'News not found'
-      });
-    }
-    
-    // อัปเดตข้อมูล
-    news.title = title || news.title;
-    news.content = content || news.content;
-    
-    // ถ้ามีไฟล์ใหม่
-    if (req.file) {
-      // ลบไฟล์เก่า
-      const oldImagePath = path.join(process.cwd(), 'uploads', 'news', news.imageFilename);
-      if (fs.existsSync(oldImagePath)) {
-        fs.unlinkSync(oldImagePath);
-        console.log('🗑️ Deleted old image:', news.imageFilename);
-      }
-      
-      // อัปเดตชื่อไฟล์ใหม่
-      news.imageFilename = req.file.filename;
-      console.log('📁 Updated image filename:', news.imageFilename);
-    }
-    
-    await news.save();
-    
-    console.log('✅ News updated successfully');
-    
-    res.status(200).json({
-      success: true,
-      message: 'News updated successfully',
-      data: news
-    });
-  } catch (error) {
-    console.error('❌ Error updating news:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to update news'
-    });
-  }
-};
-
 // Delete news (admin only)
 export const deleteNews = async (req, res) => {
   try {
@@ -186,10 +132,12 @@ export const deleteNews = async (req, res) => {
     }
     
     // ลบไฟล์รูปภาพ
-    const imagePath = path.join(process.cwd(), 'uploads', 'news', news.imageFilename);
-    if (fs.existsSync(imagePath)) {
-      fs.unlinkSync(imagePath);
-      console.log('🗑️ Deleted image file:', news.imageFilename);
+    if (news.imageFilename) {
+      const imagePath = path.join(process.cwd(), 'uploads', 'news', news.imageFilename);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+        console.log('🗑️ Deleted image file:', news.imageFilename);
+      }
     }
     
     await News.findByIdAndDelete(id);
@@ -208,63 +156,6 @@ export const deleteNews = async (req, res) => {
     });
   }
 };
-
-// Get all news for admin (including inactive)
-export const getAllNewsForAdmin = async (req, res) => {
-  try {
-    console.log('📰 Fetching all news for admin...');
-    
-    const news = await News.find()
-      .sort({ createdAt: -1 });
-    
-    console.log(`✅ Found ${news.length} news articles`);
-    
-    res.status(200).json({
-      success: true,
-      data: news
-    });
-  } catch (error) {
-    console.error('❌ Error fetching news:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch news'
-    });
-  }
-};
-
-// Toggle news active status (admin only)
-export const toggleNewsStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    console.log(`📰 Toggling news status for ID: ${id}`);
-    
-    const news = await News.findById(id);
-    
-    if (!news) {
-      return res.status(404).json({
-        success: false,
-        error: 'News not found'
-      });
-    }
-    
-    news.isActive = !news.isActive;
-    await news.save();
-    
-    console.log(`✅ News status toggled to: ${news.isActive ? 'active' : 'inactive'}`);
-    
-    res.status(200).json({
-      success: true,
-      message: `News ${news.isActive ? 'activated' : 'deactivated'} successfully`,
-      data: news
-    });
-  } catch (error) {
-    console.error('❌ Error toggling news status:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to toggle news status'
-    });
-  }
-}; 
 
 // Get news image
 export const getNewsImage = async (req, res) => {

@@ -1,9 +1,11 @@
 import mongoose from 'mongoose';
 import Notification from '../models/notificationModel.js';
+import { AdminToUserNotification } from '../models/adminNotificationModel.js';
 import Bill from '../models/billModel.js';
 import Leave from '../models/leaveModel.js';
 import Repair from '../models/repairModel.js';
-import UserReadStatus from '../models/userReadStatusModel.js'; // เพิ่ม model ใหม่
+import UserReadStatus from '../models/userReadStatusModel.js';
+import Evaluation from '../models/Evaluation.js';
 
 // Get user notifications
 export const getUserNotifications = async (req, res) => {
@@ -188,6 +190,77 @@ export const getUserNotifications = async (req, res) => {
       }
     }
 
+    // ดึงข้อมูล Ranking Evaluation notifications ล่าสุด
+    console.log('🔍 Searching for ranking evaluation notifications with shopId:', shopId);
+    const rankingEvaluationQuery = (shopId && shopId !== 'admin') ? { shopId, type: 'ranking_evaluation' } : { type: 'ranking_evaluation' };
+    const latestRankingEvaluationNotifications = await Notification.find(rankingEvaluationQuery)
+      .sort({ createdAt: -1 })
+      .limit(5);
+    
+    console.log('📋 Found ranking evaluation notifications:', latestRankingEvaluationNotifications.length);
+    for (const rankingEvaluationNotification of latestRankingEvaluationNotifications) {
+      console.log('📋 Ranking evaluation notification:', {
+        id: rankingEvaluationNotification._id,
+        message: rankingEvaluationNotification.message,
+        createdAt: rankingEvaluationNotification.createdAt,
+        isRead: rankingEvaluationNotification.isRead
+      });
+      
+      notifications.push({
+        _id: `ranking_evaluation_${rankingEvaluationNotification._id}`,
+        type: 'ranking_evaluation',
+        title: rankingEvaluationNotification.title,
+        message: rankingEvaluationNotification.message,
+        status: rankingEvaluationNotification.status,
+        createdAt: rankingEvaluationNotification.createdAt,
+        isRead: rankingEvaluationNotification.isRead,
+        details: {
+          rankingEvaluationData: rankingEvaluationNotification.rankingEvaluationData
+        }
+      });
+    }
+
+    // ดึง admin notifications สำหรับร้านค้านี้ (ไม่แสดงให้ admin เอง)
+    if (req.user.role !== 'admin') {
+      console.log('🔍 Fetching admin notifications for shopId:', shopId);
+      const adminNotifications = await AdminToUserNotification.find({
+        $or: [
+          { recipients: 'all' },
+          { recipients: 'active' },
+          { recipients: 'expired' },
+          { recipientShopId: shopId }
+        ]
+      }).sort({ createdAt: -1 });
+
+      console.log('📋 Found admin notifications:', adminNotifications.length);
+
+      // เพิ่ม admin notifications เข้าไปในรายการ
+      for (const adminNotification of adminNotifications) {
+        notifications.push({
+          _id: `admin_${adminNotification._id}`,
+          type: 'admin_notification',
+          title: adminNotification.title,
+          message: adminNotification.message,
+          status: 'new',
+          createdAt: adminNotification.createdAt,
+          isRead: adminNotification.isRead || false, // ใช้ค่า isRead จาก database
+          priority: adminNotification.priority, // เพิ่ม priority ตรงนี้
+          sentBy: adminNotification.sentBy,
+          details: {
+            priority: adminNotification.priority,
+            sentBy: adminNotification.sentBy,
+            adminNotificationData: {
+              priority: adminNotification.priority,
+              sentBy: adminNotification.sentBy,
+              sentAt: adminNotification.sentAt
+            }
+          }
+        });
+      }
+    } else {
+      console.log('🔍 Admin user - skipping admin notifications');
+    }
+
     // เรียงลำดับตามวันที่อัปเดตล่าสุด (ใหม่สุดอยู่บน)
     notifications.sort((a, b) => {
       const dateA = new Date(a.createdAt)
@@ -195,7 +268,7 @@ export const getUserNotifications = async (req, res) => {
       return dateB - dateA // เรียงจากใหม่ไปเก่า
     });
 
-    console.log('📋 Total notifications found:', notifications.length);
+    console.log('📋 Total notifications found (including admin):', notifications.length);
     console.log('📋 Notifications (sorted by date, newest first):', notifications.map(n => ({ 
       type: n.type, 
       status: n.status, 
@@ -250,29 +323,54 @@ export const markNotificationAsRead = async (req, res) => {
   try {
     const { id } = req.params;
     
-    const notification = await Notification.findById(id);
-    if (!notification) {
-      return res.status(404).json({
-        success: false,
-        error: 'Notification not found'
+    // ตรวจสอบว่าเป็น admin notification หรือไม่
+    if (id.startsWith('admin_')) {
+      const adminNotificationId = id.replace('admin_', '');
+      const { AdminToUserNotification } = await import('../models/adminNotificationModel.js');
+      
+      const adminNotification = await AdminToUserNotification.findById(adminNotificationId);
+      if (!adminNotification) {
+        return res.status(404).json({
+          success: false,
+          error: 'Admin notification not found'
+        });
+      }
+
+      adminNotification.isRead = true;
+      await adminNotification.save();
+
+      console.log('✅ Admin notification marked as read:', adminNotificationId);
+
+      res.status(200).json({
+        success: true,
+        data: adminNotification
+      });
+    } else {
+      // สำหรับ notification ปกติ
+      const notification = await Notification.findById(id);
+      if (!notification) {
+        return res.status(404).json({
+          success: false,
+          error: 'Notification not found'
+        });
+      }
+
+      // Check if user owns this notification
+      if (notification.userId.toString() !== req.user.shopId.toString()) {
+        return res.status(403).json({
+          success: false,
+          error: 'Unauthorized'
+        });
+      }
+
+      notification.isRead = true;
+      await notification.save();
+
+      res.status(200).json({
+        success: true,
+        data: notification
       });
     }
-
-    // Check if user owns this notification
-    if (notification.userId.toString() !== req.user.shopId.toString()) {
-      return res.status(403).json({
-        success: false,
-        error: 'Unauthorized'
-      });
-    }
-
-    notification.isRead = true;
-    await notification.save();
-
-    res.status(200).json({
-      success: true,
-      data: notification
-    });
   } catch (error) {
     console.error('Error marking notification as read:', error);
     res.status(500).json({
@@ -337,6 +435,23 @@ export const markAllNotificationsAsRead = async (req, res) => {
     userReadStatus.lastReadAt = new Date();
     
     await userReadStatus.save();
+
+    // อัปเดต admin notifications ให้เป็น isRead = true
+    if (shopId) {
+      const { AdminToUserNotification } = await import('../models/adminNotificationModel.js');
+      await AdminToUserNotification.updateMany(
+        {
+          $or: [
+            { recipients: 'all' },
+            { recipients: 'active' },
+            { recipients: 'expired' },
+            { recipientShopId: shopId }
+          ]
+        },
+        { $set: { isRead: true } }
+      );
+      console.log('✅ Admin notifications marked as read for shopId:', shopId);
+    }
 
     console.log('✅ All notifications marked as read');
     console.log('📊 Read status updated:', {
@@ -447,6 +562,51 @@ export const createRepairNotification = async (repair, status) => {
     );
   } catch (error) {
     console.error('Error creating repair notification:', error);
+  }
+};
+
+// Create ranking evaluation notification
+export const createRankingEvaluationNotification = async (evaluation, evaluatorName) => {
+  try {
+    const title = 'แจ้งเตือนผลการประเมิน Ranking';
+    const message = `คะแนน ranking ในเดือน ${evaluation.evaluationMonth}/${evaluation.evaluationYear} ของคุณถูกประเมินแล้ว\nคะแนน: ${evaluation.totalScore}/100\nสถานะ: ${evaluation.finalStatus}\nตรวจสอบรายละเอียดในระบบได้เลยค่ะ`;
+    
+    // คำนวณลำดับในโรงอาหารเดียวกัน
+    const allEvaluations = await Evaluation.find({
+      canteenName: evaluation.canteenName,
+      evaluationMonth: evaluation.evaluationMonth,
+      evaluationYear: evaluation.evaluationYear,
+      isActive: true
+    }).sort({ totalScore: -1 });
+    
+    const rank = allEvaluations.findIndex(evalItem => evalItem.shopId.toString() === evaluation.shopId.toString()) + 1;
+    
+    const notification = new Notification({
+      userId: evaluation.shopId, // ใช้ shopId เป็น userId
+      shopId: evaluation.shopId,
+      type: 'ranking_evaluation',
+      title: title,
+      message: message,
+      status: 'ประเมินแล้ว',
+      relatedId: evaluation._id,
+      rankingEvaluationData: {
+        revenue: evaluation.revenue || 0,
+        score: evaluation.totalScore || 0,
+        rank: rank,
+        canteenName: evaluation.canteenName,
+        evaluationMonth: evaluation.evaluationMonth,
+        evaluationYear: evaluation.evaluationYear,
+        evaluatedBy: evaluatorName || 'Admin',
+        evaluatedAt: evaluation.evaluatedAt || new Date()
+      }
+    });
+
+    await notification.save();
+    console.log(`✅ Ranking evaluation notification created for shop ${evaluation.shopName}: Score ${evaluation.totalScore}, Rank ${rank}`);
+    return notification;
+  } catch (error) {
+    console.error('Error creating ranking evaluation notification:', error);
+    throw error;
   }
 };
 

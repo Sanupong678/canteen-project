@@ -23,7 +23,6 @@
       <div class="navbar-container">
         <ul class="nav-list">
           <li><router-link to="/user">หน้าแรก</router-link></li>
-          <li><router-link to="/user/recommend">คำแนะนำ</router-link></li>
           <li><router-link to="/user/ranking">จัดอันดับ</router-link></li>
           <li><router-link to="/user/repair">แจ้งซ่อม</router-link></li>
           <li><router-link to="/user/leave">แจ้งลา</router-link></li>
@@ -57,39 +56,47 @@ export default {
   data() {
     return {
       showUserMenu: false,
-      displayName: localStorage.getItem('displayName') || 'User Name',
-      shopData: JSON.parse(localStorage.getItem('shopData') || '{}'),
-      userId: localStorage.getItem('userId')
+      displayName: 'User Name',
+      shopData: {},
+      userId: null
     }
   },
   async mounted() {
-    // ตรวจสอบ authentication
-    const isAuthenticated = localStorage.getItem('isAuthenticated')
-    const token = localStorage.getItem('token')
-    
-    if (!isAuthenticated || !token) {
-      console.log('❌ User not authenticated, redirecting to login')
-      this.$router.push('/login')
-      return
-    }
-    
-    // ตรวจสอบ role
-    const userRole = localStorage.getItem('userRole')
-    if (userRole !== 'user') {
-      console.log('❌ User role is not user, redirecting to login')
-      this.$router.push('/login')
-      return
-    }
-    
-    console.log('✅ User authenticated successfully')
-    
-    // Initialize notifications ทันที
-    try {
-      console.log('🔄 Initializing notifications in LayoutUser...')
-      await this.$initializeNotifications()
-      console.log('✅ Notifications initialized successfully')
-    } catch (error) {
-      console.error('❌ Error initializing notifications:', error)
+    // Check if we're on the client side
+    if (process.client) {
+      // Set data from localStorage only on client side
+      this.displayName = localStorage.getItem('displayName') || 'User Name'
+      this.shopData = JSON.parse(localStorage.getItem('shopData') || '{}')
+      this.userId = localStorage.getItem('userId')
+      
+      // ตรวจสอบ authentication
+      const isAuthenticated = localStorage.getItem('isAuthenticated')
+      const token = localStorage.getItem('token')
+      
+      if (!isAuthenticated || !token) {
+        console.log('❌ User not authenticated, redirecting to login')
+        this.$router.push('/login')
+        return
+      }
+      
+      // ตรวจสอบ role
+      const userRole = localStorage.getItem('userRole')
+      if (userRole !== 'user') {
+        console.log('❌ User role is not user, redirecting to login')
+        this.$router.push('/login')
+        return
+      }
+      
+      console.log('✅ User authenticated successfully')
+      
+      // Initialize notifications ทันที
+      try {
+        console.log('🔄 Initializing notifications in LayoutUser...')
+        await this.$initializeNotifications()
+        console.log('✅ Notifications initialized successfully')
+      } catch (error) {
+        console.error('❌ Error initializing notifications:', error)
+      }
     }
   },
   methods: {
@@ -97,11 +104,13 @@ export default {
       this.showUserMenu = !this.showUserMenu
     },
     handleLogout() {
-      localStorage.removeItem('userRole')
-      localStorage.removeItem('isAuthenticated')
-      localStorage.removeItem('displayName')
-      localStorage.removeItem('userId')
-      localStorage.removeItem('shopData')
+      if (process.client) {
+        localStorage.removeItem('userRole')
+        localStorage.removeItem('isAuthenticated')
+        localStorage.removeItem('displayName')
+        localStorage.removeItem('userId')
+        localStorage.removeItem('shopData')
+      }
       this.$router.push('/')
     }
   },

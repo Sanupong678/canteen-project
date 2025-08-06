@@ -59,6 +59,17 @@ export const getAllShops = async (req, res) => {
       .populate('credentials.userId', 'username email')
       .sort({ createdAt: -1 });
 
+    // Debug: ตรวจสอบข้อมูลการประเมิน
+    console.log('=== DEBUG: Shop Evaluation Data ===');
+    shops.forEach(shop => {
+      console.log(`Shop: ${shop.name}`);
+      console.log(`  - evaluationCompleted: ${shop.evaluationCompleted}`);
+      console.log(`  - evaluationDate: ${shop.evaluationDate}`);
+      console.log(`  - score: ${shop.score}`);
+      console.log(`  - evaluationStatus: ${shop.evaluationStatus}`);
+      console.log('---');
+    });
+
     // Get bills with notification status
     const bills = await Bill.find({
       shopId: { $in: shops.map(shop => shop._id) }
@@ -119,6 +130,10 @@ export const getShopById = async (req, res) => {
 // Update shop
 export const updateShop = async (req, res) => {
   try {
+    console.log('=== DEBUG: Updating Shop ===');
+    console.log('Shop ID:', req.params.id);
+    console.log('Update data:', req.body);
+    
     const shop = await Shop.findByIdAndUpdate(
       req.params.id,
       { 
@@ -134,6 +149,14 @@ export const updateShop = async (req, res) => {
         message: 'ไม่พบร้านค้า'
       });
     }
+    
+    console.log('Updated shop data:', {
+      name: shop.name,
+      evaluationCompleted: shop.evaluationCompleted,
+      evaluationDate: shop.evaluationDate,
+      score: shop.score,
+      evaluationStatus: shop.evaluationStatus
+    });
 
     // Update associated bill
     const bill = await Bill.findOne({ shopId: shop._id });
@@ -183,6 +206,37 @@ export const deleteShop = async (req, res) => {
       message: 'ลบร้านค้าและบิลที่เกี่ยวข้องเรียบร้อยแล้ว'
     });
   } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+}; 
+
+// Debug: Check evaluation data
+export const checkEvaluationData = async (req, res) => {
+  try {
+    console.log('=== DEBUG: Checking Evaluation Data ===');
+    
+    const shops = await Shop.find().select('name evaluationCompleted evaluationDate score evaluationStatus');
+    
+    console.log('All shops evaluation data:');
+    shops.forEach(shop => {
+      console.log(`Shop: ${shop.name}`);
+      console.log(`  - evaluationCompleted: ${shop.evaluationCompleted}`);
+      console.log(`  - evaluationDate: ${shop.evaluationDate}`);
+      console.log(`  - score: ${shop.score}`);
+      console.log(`  - evaluationStatus: ${shop.evaluationStatus}`);
+      console.log('---');
+    });
+    
+    res.json({
+      success: true,
+      data: shops,
+      message: 'Evaluation data checked successfully'
+    });
+  } catch (error) {
+    console.error('Error checking evaluation data:', error);
     res.status(500).json({
       success: false,
       message: error.message

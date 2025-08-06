@@ -19,6 +19,8 @@ import AdminLeave from "~/pages/admin/leave.vue";
 import UserRepair from "~/pages/user/repair.vue";
 import AdminRepair from "~/pages/admin/repair.vue";
 import BillAdmin from "~/pages/admin/bill.vue";
+import Evaluation from '../pages/admin/evaluation.vue'
+import UserRanking from "~/pages/user/ranking.vue";
 
 const routes = [
   // หน้า Login
@@ -107,6 +109,12 @@ const routes = [
         name: "epark",
         component: Epark,
         meta: { requiresAuth: true, role: 'admin' }
+      },
+      {
+        path: '/admin/evaluation',
+        name: 'Evaluation',
+        component: Evaluation,
+        meta: { requiresAuth: true, role: 'admin' }
       }
     ]
   },
@@ -137,6 +145,18 @@ const routes = [
         path: "bill",
         name: "bill",
         component: () => import('~/pages/user/bill.vue')
+      },
+      {
+        path: "ranking",
+        name: "userRanking",
+        component: UserRanking,
+        meta: { requiresAuth: true, role: 'user' }
+      },
+      {
+        path: "money-history",
+        name: "userMoneyHistory",
+        component: () => import('~/pages/user/money-history.vue'),
+        meta: { requiresAuth: true, role: 'user' }
       }
     ]
   }

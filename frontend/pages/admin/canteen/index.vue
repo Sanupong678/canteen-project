@@ -32,55 +32,55 @@ export default {
         {
           id: 1,
           name: 'โรงอาหาร C5',
-          image: '/images/C5.jpg',
+          image: '/images/c5.png',
           path: '/admin/canteen/c5'
         },
         {
           id: 2,
           name: 'โรงอาหาร D1',
-          image: '/images/D1.jpg',
+          image: '/images/d1.png',
           path: '/admin/canteen/d1'
         },
         {
           id: 3,
           name: 'โรงอาหาร Dormity',
-          image: '/images/Dormity.jpg',
+          image: '/images/dorm.png',
           path: '/admin/canteen/dormity'
         },
         {
           id: 4,
           name: 'โรงอาหาร E1',
-          image: '/images/E1.jpg',
+          image: '/images/e1.png',
           path: '/admin/canteen/e1'
         },
         {
           id: 5,
           name: 'โรงอาหาร E2',
-          image: '/images/E2.jpg',
+          image: '/images/e2.png',
           path: '/admin/canteen/e2'
         },
         {
           id: 6,
           name: 'โรงอาหาร Epark',
-          image: '/images/Epark.jpg',
+          image: '/images/epark.png',
           path: '/admin/canteen/epark'
         },
         {
           id: 7,
           name: 'โรงอาหาร Msquare',
-          image: '/images/Msquare.jpg',
+          image: '/images/msquare.png',
           path: '/admin/canteen/msquare'
         },
         {
           id: 8,
           name: 'โรงอาหาร RuemRim',
-          image: '/images/RuemRim.jpg',
+          image: '/images/ruem.png',
           path: '/admin/canteen/ruemrim'
         },
         {
           id: 9,
           name: 'โรงอาหาร S2',
-          image: '/images/S2.jpg',
+          image: '/images/s2.png',
           path: '/admin/canteen/s2'
         }
       ]

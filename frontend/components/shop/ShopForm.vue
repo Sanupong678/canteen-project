@@ -86,6 +86,27 @@
               </div>
 
               <div class="form-group">
+                <label for="canteenId">โรงอาหาร</label>
+                <select
+                  id="canteenId"
+                  v-model="shop.canteenId"
+                  required
+                  class="form-input"
+                >
+                  <option value="">เลือกโรงอาหาร</option>
+                  <option value="1">โรงอาหาร C5</option>
+                  <option value="2">โรงอาหาร D1</option>
+                  <option value="3">โรงอาหาร Dormity</option>
+                  <option value="4">โรงอาหาร E1</option>
+                  <option value="5">โรงอาหาร E2</option>
+                  <option value="6">โรงอาหาร Epark</option>
+                  <option value="7">โรงอาหาร Msquare</option>
+                  <option value="8">โรงอาหาร RuemRim</option>
+                  <option value="9">โรงอาหาร S2</option>
+                </select>
+              </div>
+
+              <div class="form-group">
                 <label for="contractStartDate">วันที่เริ่มสัญญา</label>
                 <input
                   type="date"
@@ -204,6 +225,10 @@ const props = defineProps({
   shopToEdit: {
     type: Object,
     default: null
+  },
+  canteenId: {
+    type: [Number, String],
+    required: true
   }
 })
 
@@ -225,7 +250,8 @@ const shop = ref({
     username: '',
     password: ''
   },
-  confirmPassword: ''
+  confirmPassword: '',
+  canteenId: props.canteenId
 })
 
 const updateInterval = ref(null)
@@ -265,8 +291,12 @@ onMounted(() => {
         username: '',
         password: ''
       },
-      confirmPassword: ''
+      confirmPassword: '',
+      canteenId: props.shopToEdit.canteenId || props.canteenId
     }
+  } else {
+    // สำหรับร้านค้าใหม่ ให้ใช้ canteenId จาก props
+    shop.value.canteenId = props.canteenId
   }
   startUpdateInterval()
 })
@@ -381,7 +411,8 @@ const handleSubmit = () => {
       username: '',
       password: ''
     },
-    confirmPassword: ''
+    confirmPassword: '',
+    canteenId: ''
   }
   
   currentStep.value = 1

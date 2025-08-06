@@ -7,48 +7,78 @@
       <div 
         class="news-item" 
         v-for="(news, index) in newsList" 
-        :key="index"
-        @click="readOnly && showImagePreview(news.image)"
+        :key="news._id || index"
+        @click="readOnly && showImagePreview(news.imageFilename ? `${backendUrl}/api/news/${news._id}/image` : null)"
       >
         <div class="news-image-container">
-          <img :src="news.image" :alt="news.title" class="news-image">
+          <img 
+            v-if="news.imageFilename" 
+            :src="`${backendUrl}/api/news/${news._id}/image`" 
+            :alt="news.title" 
+            class="news-image"
+            @error="handleImageError"
+          >
+          <div v-else class="news-placeholder">
+            <span>📰</span>
+          </div>
           <button 
             v-if="!readOnly" 
             class="delete-btn" 
-            @click.stop="showDeleteConfirmation(index)"
+            @click.stop="showDeleteConfirmation(news._id)"
           >
             <i class="fas fa-times"></i>
           </button>
         </div>
-        <div class="news-text">{{ news.text }}</div>
+        <div class="news-text">
+          <h3>{{ news.title }}</h3>
+          <p>{{ news.content }}</p>
+          <div class="news-meta">
+            <span v-if="news.author">👤 {{ news.author }}</span>
+            <span v-if="news.views">👁️ {{ news.views }} ครั้ง</span>
+          </div>
+        </div>
       </div>
 
       <!-- Add News Form -->
       <div class="add-news-form" v-if="showForm && !readOnly">
         <div class="form-group">
-          <label for="newsImage">รูปภาพ</label>
+          <label for="newsTitle">หัวข้อข่าว *</label>
+          <input
+            type="text"
+            id="newsTitle"
+            v-model="newNews.title"
+            placeholder="กรอกหัวข้อข่าว"
+            required
+          >
+        </div>
+        <div class="form-group">
+          <label for="newsContent">เนื้อหาข่าว *</label>
+          <textarea
+            id="newsContent"
+            v-model="newNews.content"
+            placeholder="กรอกเนื้อหาข่าว"
+            rows="4"
+            required
+          ></textarea>
+        </div>
+        <div class="form-group">
+          <label for="newsImage">รูปภาพ *</label>
           <input
             type="file"
             id="newsImage"
             ref="imageInput"
             @change="handleImageUpload"
             accept="image/*"
+            required
           >
-          <div class="image-preview" v-if="newNews.image">
-            <img :src="newNews.image" alt="Preview">
+          <div class="image-preview" v-if="newNews.imagePreview">
+            <img :src="newNews.imagePreview" alt="Preview">
           </div>
         </div>
-        <div class="form-group">
-          <label for="newsText">ข้อความ</label>
-          <textarea
-            id="newsText"
-            v-model="newNews.text"
-            placeholder="กรอกข้อความประชาสัมพันธ์"
-            rows="3"
-          ></textarea>
-        </div>
         <div class="form-buttons">
-          <button @click="addNews" class="confirm-btn">ยืนยัน</button>
+          <button @click="addNews" class="confirm-btn" :disabled="isSubmitting">
+            {{ isSubmitting ? 'กำลังเพิ่ม...' : 'ยืนยัน' }}
+          </button>
           <button @click="cancelAdd" class="cancel-btn">ยกเลิก</button>
         </div>
       </div>
@@ -70,7 +100,9 @@
         <h3>ยืนยันการลบข่าวสาร</h3>
         <p>คุณแน่ใจหรือไม่ที่จะลบข่าวสารนี้?</p>
         <div class="modal-buttons">
-          <button @click="deleteNews" class="confirm-btn">ยืนยัน</button>
+          <button @click="deleteNews" class="confirm-btn" :disabled="isDeleting">
+            {{ isDeleting ? 'กำลังลบ...' : 'ยืนยัน' }}
+          </button>
           <button @click="closeModal" class="cancel-btn">ยกเลิก</button>
         </div>
       </div>
@@ -89,6 +121,8 @@
 </template>
 
 <script>
+import axios from 'axios'
+
 export default {
   name: 'NewsSection',
   props: {
@@ -105,20 +139,42 @@ export default {
       showImageModal: false,
       previewImage: null,
       newNews: {
+        title: '',
+        content: '',
         image: null,
-        text: ''
+        imagePreview: null
       },
-      deleteIndex: null
+      deleteId: null,
+      isSubmitting: false,
+      isDeleting: false,
+      backendUrl: process.env.NODE_ENV === 'production' 
+        ? 'https://your-production-domain.com' 
+        : 'http://localhost:4000'
     }
   },
   methods: {
+    async loadNews() {
+      try {
+        console.log('🔄 Loading news from API...')
+        const response = await axios.get(`${this.backendUrl}/api/news`)
+        if (response.data.success) {
+          this.newsList = response.data.data
+          console.log('✅ Loaded news:', this.newsList.length)
+        }
+      } catch (error) {
+        console.error('❌ Error loading news:', error)
+      }
+    },
+    
     showAddForm() {
       this.showForm = true
     },
+    
     cancelAdd() {
       this.showForm = false
-      this.newNews = { image: null, text: '' }
+      this.newNews = { title: '', content: '', image: null, imagePreview: null }
     },
+    
     handleImageUpload(event) {
       const file = event.target.files[0]
       if (file) {
@@ -127,51 +183,108 @@ export default {
           return
         }
         
+        this.newNews.image = file
+        
         const reader = new FileReader()
         reader.onload = (e) => {
-          this.newNews.image = e.target.result
+          this.newNews.imagePreview = e.target.result
         }
         reader.readAsDataURL(file)
       }
     },
-    addNews() {
-      if (!this.newNews.image || !this.newNews.text.trim()) {
+    
+    async addNews() {
+      if (!this.newNews.title || !this.newNews.content || !this.newNews.image) {
         alert('กรุณากรอกข้อมูลให้ครบถ้วน')
         return
       }
 
-      this.newsList.push({...this.newNews})
-      this.saveNews()
-      this.cancelAdd()
+      try {
+        this.isSubmitting = true
+        console.log('🔄 Adding news...')
+        
+        const token = localStorage.getItem('token')
+        const formData = new FormData()
+        formData.append('title', this.newNews.title)
+        formData.append('content', this.newNews.content)
+        formData.append('image', this.newNews.image)
+
+        const response = await axios.post(`${this.backendUrl}/api/news`, formData, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+          }
+        })
+
+        if (response.data.success) {
+          this.newsList.unshift(response.data.data)
+          this.cancelAdd()
+          alert('เพิ่มข่าวสารสำเร็จ')
+          console.log('✅ News added successfully')
+        } else {
+          alert('เกิดข้อผิดพลาดในการเพิ่มข่าวสาร')
+        }
+      } catch (error) {
+        console.error('❌ Error adding news:', error)
+        alert('เกิดข้อผิดพลาดในการเพิ่มข่าวสาร: ' + (error.response?.data?.error || error.message))
+      } finally {
+        this.isSubmitting = false
+      }
     },
-    showDeleteConfirmation(index) {
-      this.deleteIndex = index
+    
+    showDeleteConfirmation(newsId) {
+      this.deleteId = newsId
       this.showDeleteModal = true
     },
-    deleteNews() {
-      this.newsList.splice(this.deleteIndex, 1)
-      this.saveNews()
-      this.closeModal()
+    
+    async deleteNews() {
+      try {
+        this.isDeleting = true
+        console.log('🔄 Deleting news...')
+        
+        const token = localStorage.getItem('token')
+        const response = await axios.delete(`${this.backendUrl}/api/news/${this.deleteId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        
+        if (response.data.success) {
+          this.newsList = this.newsList.filter(news => news._id !== this.deleteId)
+          this.closeModal()
+          alert('ลบข่าวสารสำเร็จ')
+          console.log('✅ News deleted successfully')
+        } else {
+          alert('เกิดข้อผิดพลาดในการลบข่าวสาร')
+        }
+      } catch (error) {
+        console.error('❌ Error deleting news:', error)
+        alert('เกิดข้อผิดพลาดในการลบข่าวสาร: ' + (error.response?.data?.error || error.message))
+      } finally {
+        this.isDeleting = false
+      }
     },
+    
     closeModal() {
       this.showDeleteModal = false
-      this.deleteIndex = null
+      this.deleteId = null
     },
-    showImagePreview(image) {
-      this.previewImage = image
-      this.showImageModal = true
+    
+    showImagePreview(imageUrl) {
+      if (imageUrl) {
+        this.previewImage = imageUrl
+        this.showImageModal = true
+      }
     },
+    
     closeImageModal() {
       this.showImageModal = false
       this.previewImage = null
     },
-    saveNews() {
-      localStorage.setItem('newsList', JSON.stringify(this.newsList))
-    },
-    loadNews() {
-      const savedNews = localStorage.getItem('newsList')
-      if (savedNews) {
-        this.newsList = JSON.parse(savedNews)
+    
+    handleImageError(event) {
+      event.target.style.display = 'none'
+      const placeholder = event.target.parentElement.querySelector('.news-placeholder')
+      if (placeholder) {
+        placeholder.style.display = 'flex'
       }
     }
   },
@@ -231,10 +344,40 @@ h1 {
   object-fit: cover;
 }
 
+.news-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  color: #ccc;
+  background: #f5f5f5;
+}
+
 .news-text {
   padding: 15px;
   color: #333;
-  font-size: 16px;
+}
+
+.news-text h3 {
+  margin: 0 0 10px 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.news-text p {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #666;
+}
+
+.news-meta {
+  display: flex;
+  gap: 15px;
+  font-size: 12px;
+  color: #888;
 }
 
 .delete-btn {
@@ -307,11 +450,13 @@ h1 {
   font-weight: 500;
 }
 
+.form-group input[type="text"],
 .form-group input[type="file"] {
   width: 100%;
   padding: 8px;
   border: 1px solid #ddd;
   border-radius: 4px;
+  box-sizing: border-box;
 }
 
 .form-group textarea {
@@ -320,6 +465,7 @@ h1 {
   border: 1px solid #ddd;
   border-radius: 4px;
   resize: vertical;
+  box-sizing: border-box;
 }
 
 .image-preview {
@@ -354,8 +500,13 @@ h1 {
   color: white;
 }
 
-.confirm-btn:hover {
+.confirm-btn:hover:not(:disabled) {
   background-color: #218838;
+}
+
+.confirm-btn:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
 }
 
 .cancel-btn {

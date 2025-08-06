@@ -48,6 +48,9 @@
           <div class="notification-content">
             <div class="notification-title">
               {{ getNotificationTitle(notification) }}
+              <span v-if="notification.type === 'admin_notification' && notification.priority" class="priority-badge" :class="`priority-${notification.priority}`">
+                {{ getPriorityText(notification.priority) }}
+              </span>
               <span v-if="isNewNotification(notification.createdAt)" class="new-badge">ใหม่</span>
             </div>
             <div class="notification-message">
@@ -105,8 +108,8 @@ export default {
         console.log('📊 Current unread count:', unreadCount.value)
         await notificationStore.fetchNotifications()
         console.log('✅ Fresh notifications loaded')
-        console.log('📊 New notifications count:', notifications.value.length)
-        console.log('📊 New unread count:', unreadCount.value)
+        console.log('📊 Final notifications count:', notifications.value.length)
+        console.log('📊 Final unread count:', unreadCount.value)
       }
     }
 
@@ -125,7 +128,8 @@ export default {
       const icons = {
         'bill': '🧾',
         'leave': '🗓️',
-        'repair': '🛠️'
+        'repair': '🛠️',
+        'admin_notification': '📢'
       }
       return icons[type] || '🔔'
     }
@@ -135,7 +139,8 @@ export default {
       const colors = {
         'bill': '#e74c3c',
         'leave': '#3498db',
-        'repair': '#f39c12'
+        'repair': '#f39c12',
+        'admin_notification': '#9b59b6'
       }
       return colors[type] || '#95a5a6'
     }
@@ -143,6 +148,16 @@ export default {
     // Get notification title
     const getNotificationTitle = (notification) => {
       return notification.title || 'การแจ้งเตือน'
+    }
+
+    // Get priority text
+    const getPriorityText = (priority) => {
+      const priorityMap = {
+        'low': 'ต่ำ',
+        'medium': 'ปานกลาง',
+        'high': 'สูง'
+      }
+      return priorityMap[priority] || priority
     }
 
     // Get notification message
@@ -258,6 +273,7 @@ export default {
       getNotificationIcon,
       getNotificationIconColor,
       getNotificationTitle,
+      getPriorityText,
       getNotificationMessage,
       getStatusText,
       getStatusColor,
@@ -447,6 +463,28 @@ export default {
   font-weight: bold;
   margin-left: 8px;
   white-space: nowrap;
+}
+
+.priority-badge {
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: bold;
+  margin-left: 6px;
+  white-space: nowrap;
+  color: white;
+}
+
+.priority-low {
+  background-color: #10b981;
+}
+
+.priority-medium {
+  background-color: #f59e0b;
+}
+
+.priority-high {
+  background-color: #ef4444;
 }
 
 .notification-message {

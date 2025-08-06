@@ -49,6 +49,9 @@
               <span class="news-views">
                 👁️ {{ item.views || 0 }} ครั้ง
               </span>
+              <span v-if="item.author" class="news-author">
+                👤 {{ item.author }}
+              </span>
             </div>
           </div>
           
@@ -87,6 +90,9 @@
               <span class="detail-views">
                 👁️ {{ selectedNews.views || 0 }} ครั้ง
               </span>
+              <span v-if="selectedNews.author" class="detail-author">
+                👤 {{ selectedNews.author }}
+              </span>
             </div>
           </div>
         </div>
@@ -114,7 +120,9 @@ const loadNews = async () => {
   try {
     loading.value = true
     const response = await axios.get(`${backendUrl}/api/news`)
-    news.value = response.data.data
+    if (response.data.success) {
+      news.value = response.data.data
+    }
   } catch (error) {
     console.error('Error loading news:', error)
   } finally {
@@ -127,12 +135,14 @@ const viewNewsDetail = async (item) => {
   try {
     // Fetch full news detail to increment views
     const response = await axios.get(`${backendUrl}/api/news/${item._id}`)
-    selectedNews.value = response.data.data
-    
-    // Update the news item in the list with updated data
-    const index = news.value.findIndex(n => n._id === item._id)
-    if (index !== -1) {
-      news.value[index] = response.data.data
+    if (response.data.success) {
+      selectedNews.value = response.data.data
+      
+      // Update the news item in the list with updated data
+      const index = news.value.findIndex(n => n._id === item._id)
+      if (index !== -1) {
+        news.value[index] = response.data.data
+      }
     }
   } catch (error) {
     console.error('Error fetching news detail:', error)
@@ -316,6 +326,7 @@ onMounted(() => {
   gap: 15px;
   font-size: 0.9rem;
   color: #888;
+  flex-wrap: wrap;
 }
 
 .news-arrow {
@@ -420,6 +431,7 @@ onMounted(() => {
   color: #888;
   padding-top: 20px;
   border-top: 1px solid #e0e0e0;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 768px) {

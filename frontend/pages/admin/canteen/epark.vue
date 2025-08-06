@@ -147,6 +147,7 @@
         </div>
         <ShopForm
           :shop-to-edit="shopToEdit"
+          :canteen-id="6"
           @close="closeShopForm"
           @add-shop="handleAddShop"
         />

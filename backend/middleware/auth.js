@@ -6,18 +6,25 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-2024';
 // Protect routes
 export const protect = async (req, res, next) => {
   try {
+    console.log('\n🔍 === DEBUG: protect middleware ===');
+    console.log('📋 Request headers:', req.headers);
+    console.log('🍪 Request cookies:', req.cookies);
+    
     let token;
 
     // Check for token in headers
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
+      console.log('✅ Found token in Authorization header:', token.substring(0, 20) + '...');
     }
     // Check for token in cookies
     else if (req.cookies.token) {
       token = req.cookies.token;
+      console.log('✅ Found token in cookies:', token.substring(0, 20) + '...');
     }
 
     if (!token) {
+      console.log('❌ No token found in request');
       return res.status(401).json({
         success: false,
         error: 'Not authorized to access this route'
@@ -27,6 +34,8 @@ export const protect = async (req, res, next) => {
     try {
       // Verify token
       const decoded = jwt.verify(token, JWT_SECRET);
+      console.log('✅ Token verified successfully');
+      console.log('🔍 Decoded token:', decoded);
 
       // ถ้าเป็น admin ให้ใช้ข้อมูลจาก token โดยตรง
       if (decoded.role === 'admin') {
@@ -40,6 +49,8 @@ export const protect = async (req, res, next) => {
 
       // Get shop from database using shopId from token
       const shopId = decoded.shopId || decoded.userId;
+      console.log('🆔 shopId from token:', shopId);
+      
       const shop = await Shop.findById(shopId);
       
       if (!shop) {
@@ -82,7 +93,7 @@ export const protect = async (req, res, next) => {
         role: req.user.role,
         shopId: req.user.shopId,
         userId: req.user.userId
-        });
+      });
 
       next();
     } catch (error) {
@@ -93,6 +104,7 @@ export const protect = async (req, res, next) => {
       });
     }
   } catch (error) {
+    console.error('❌ Protect middleware error:', error);
     next(error);
   }
 };

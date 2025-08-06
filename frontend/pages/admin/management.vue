@@ -3,6 +3,35 @@
       <div class="canteen-management">
         <h1>จัดการโรงอาหาร</h1>
         
+        <!-- Search Box -->
+        <div class="search-container">
+          <div class="search-box">
+            <i class="fas fa-search search-icon"></i>
+            <input 
+              type="text" 
+              v-model="searchQuery" 
+              placeholder="ค้นหาโรงอาหาร..."
+              class="search-input"
+              @input="filterCanteens"
+            >
+            <button 
+              v-if="searchQuery" 
+              @click="clearSearch" 
+              class="clear-search-btn"
+            >
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="search-results">
+            <span v-if="searchQuery && filteredCanteens.length > 0">
+              พบ {{ filteredCanteens.length }} รายการ
+            </span>
+            <span v-else-if="searchQuery && filteredCanteens.length === 0">
+              ไม่พบโรงอาหารที่ค้นหา
+            </span>
+          </div>
+        </div>
+        
         <div v-if="isLoading" class="loading">
           <div class="loading-spinner"></div>
           <p>กำลังโหลดข้อมูลโรงอาหาร...</p>
@@ -10,7 +39,7 @@
         
         <div v-else class="canteen-grid">
           <div 
-            v-for="canteen in canteens" 
+            v-for="canteen in displayCanteens" 
             :key="canteen._id" 
             class="canteen-container"
           >
@@ -90,6 +119,8 @@
     data() {
       return {
         canteens: [],
+        filteredCanteens: [],
+        searchQuery: '',
         showEditModal: false,
         selectedCanteen: null,
         selectedFile: null,
@@ -98,12 +129,38 @@
         isLoading: true
       }
     },
+    computed: {
+      displayCanteens() {
+        return this.searchQuery ? this.filteredCanteens : this.canteens
+      }
+    },
     async mounted() {
       await this.loadCanteens()
     },
           methods: {
+        filterCanteens() {
+          if (!this.searchQuery.trim()) {
+            this.filteredCanteens = []
+            return
+          }
+          
+          const query = this.searchQuery.toLowerCase().trim()
+          this.filteredCanteens = this.canteens.filter(canteen => 
+            canteen.name.toLowerCase().includes(query)
+          )
+        },
+        
+        clearSearch() {
+          this.searchQuery = ''
+          this.filteredCanteens = []
+        },
+        
         getFullImageUrl(imagePath) {
-          if (!imagePath) return '/images/default-canteen.png'
+          if (!imagePath) {
+            // ใช้ backend URL สำหรับ default image จาก uploads/canteen
+            const backendUrl = 'http://localhost:4000'
+            return `${backendUrl}/uploads/canteen/canteen-c5.png`
+          }
           
           // ถ้าเป็น URL เต็มแล้ว ให้ใช้เลย
           if (imagePath.startsWith('http')) {
@@ -115,9 +172,10 @@
           return `${backendUrl}${imagePath}`
         },
         handleImageError(event) {
-          // เมื่อรูปภาพโหลดไม่ได้ ให้ใช้รูปภาพ default จาก backend
-          event.target.src = '/images/default-canteen.png'
-          console.log('🖼️ Image failed to load, using default image')
+          // เมื่อรูปภาพโหลดไม่ได้ ให้ใช้รูปภาพ default จาก uploads/canteen
+          const backendUrl = 'http://localhost:4000'
+          event.target.src = `${backendUrl}/uploads/canteen/canteen-c5.png`
+          console.log('🖼️ Image failed to load, using default image from uploads/canteen')
         },
         async loadCanteens() {
           try {
@@ -130,55 +188,55 @@
               {
                 _id: '1',
                 name: 'โรงอาหาร C5',
-                image: '/images/c5.png',
+                image: '/uploads/canteen/canteen-c5.png',
                 path: '/admin/canteen/c5',
               },
               {
                 _id: '2',
                 name: 'โรงอาหาร D1',
-                image: '/images/d1.png',
+                image: '/uploads/canteen/canteen-d1.png',
                 path: '/admin/canteen/d1',
               },
               {
                 _id: '3',
                 name: 'โรงอาหาร Dormity',
-                image: '/images/dorm.png',
+                image: '/uploads/canteen/canteen-dorm.png',
                 path: '/admin/canteen/dormity',
               },
               {
                 _id: '4',
                 name: 'โรงอาหาร Epark',
-                image: '/images/epark.png',
+                image: '/uploads/canteen/canteen-epark.png',
                 path: '/admin/canteen/epark',
               },
               {
                 _id: '5',
                 name: 'โรงอาหาร E1',
-                image: '/images/e1.png',
+                image: '/uploads/canteen/canteen-e1.png',
                 path: '/admin/canteen/e1',
               },
               {
                 _id: '6',
                 name: 'โรงอาหาร E2',
-                image: '/images/e2.png',
+                image: '/uploads/canteen/canteen-e2.png',
                 path: '/admin/canteen/e2',
               },
               {
                 _id: '7',
                 name: 'โรงอาหาร Msquare',
-                image: '/images/msquare.png',
+                image: '/uploads/canteen/canteen-msquare.png',
                 path: '/admin/canteen/msquare',
               },
               {
                 _id: '8',
                 name: 'โรงอาหาร RuemRim',
-                image: '/images/ruem.png',
+                image: '/uploads/canteen/canteen-ruem.png',
                 path: '/admin/canteen/ruemrim',
               },
               {
                 _id: '9',
                 name: 'โรงอาหาร S2',
-                image: '/images/s2.png',
+                image: '/uploads/canteen/canteen-s2.png',
                 path: '/admin/canteen/s2',
               }
             ]
@@ -225,24 +283,17 @@
           const formData = new FormData()
           formData.append('image', this.selectedFile)
 
-          // อัปโหลดรูปภาพไปยัง backend
-          const uploadResponse = await this.$axios.post('/api/upload/image', formData, {
+          // อัปโหลดรูปภาพไปยัง canteen API โดยตรง
+          const updateResponse = await this.$axios.patch(`/api/canteens/${this.selectedCanteen._id}`, formData, {
             headers: {
               'Content-Type': 'multipart/form-data'
             }
           })
 
-          const newImagePath = uploadResponse.data.imagePath
-
-          // อัปเดตข้อมูลโรงอาหารในฐานข้อมูล
-          const updateResponse = await this.$axios.patch(`/api/canteens/${this.selectedCanteen._id}`, {
-            image: newImagePath
-          })
-
           // อัปเดตรูปภาพในหน้าเว็บ
           const canteenIndex = this.canteens.findIndex(c => c._id === this.selectedCanteen._id)
           if (canteenIndex !== -1) {
-            this.canteens[canteenIndex].image = newImagePath
+            this.canteens[canteenIndex].image = updateResponse.data.image
           }
 
           // แสดงข้อความสำเร็จ
@@ -280,6 +331,67 @@
     color: #333;
     margin-bottom: 30px;
     font-size: 28px;
+  }
+  
+  /* Search Styles */
+  .search-container {
+    margin-bottom: 30px;
+  }
+  
+  .search-box {
+    position: relative;
+    max-width: 500px;
+    margin-bottom: 10px;
+  }
+  
+  .search-icon {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #666;
+    font-size: 16px;
+  }
+  
+  .search-input {
+    width: 100%;
+    padding: 12px 45px 12px 45px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: all 0.3s;
+    box-sizing: border-box;
+  }
+  
+  .search-input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+  }
+  
+  .clear-search-btn {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 50%;
+    transition: all 0.3s;
+  }
+  
+  .clear-search-btn:hover {
+    background: #f1f1f1;
+    color: #333;
+  }
+  
+  .search-results {
+    font-size: 14px;
+    color: #666;
+    margin-top: 5px;
   }
   
   .canteen-grid {

@@ -24,6 +24,11 @@
   import uploadRoutes from './routes/uploadRoutes.js';
   import notificationRoutes from './routes/notificationRoutes.js';
   import adminNotificationRoutes from './routes/adminNotificationRoutes.js';
+  import evaluationRoutes from './routes/evaluationRoutes.js';
+  import monthSettingsRoutes from './routes/monthSettingsRoutes.js';
+  import rankingRoutes from './routes/rankingRoutes.js';
+  import moneyHistoryRoutes from './routes/moneyHistoryRoutes.js';
+  import connectDB from './config/database.js';
 
   dotenv.config();
   const app = express();
@@ -122,6 +127,10 @@
   app.use('/api/upload', uploadRoutes);
   app.use('/api/notifications', notificationRoutes);
   app.use('/api/admin-notifications', adminNotificationRoutes);
+  app.use('/api/evaluations', evaluationRoutes);
+  app.use('/api/month-settings', monthSettingsRoutes);
+  app.use('/api/rankings', rankingRoutes);
+  app.use('/api/money-history', moneyHistoryRoutes);
 
   // Add CORS headers for all API routes
   app.use('/api', (req, res, next) => {
@@ -141,25 +150,25 @@
   });
 
   // MongoDB Connection
-  const connectDB = async () => {
-    try {
-      if (!process.env.MONGODB_URI) {
-        throw new Error('MONGODB_URI is not defined in environment variables');
-      }
+  // const connectDB = async () => {
+  //   try {
+  //     if (!process.env.MONGODB_URI) {
+  //       throw new Error('MONGODB_URI is not defined in environment variables');
+  //     }
 
-      const conn = await mongoose.connect(process.env.MONGODB_URI, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-        serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 45000,
-        family: 4
-      });
-      console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
-    } catch (error) {
-      console.error(`❌ MongoDB Connection Error: ${error.message}`);
-      process.exit(1); // Exit with failure
-    }
-  };
+  //     const conn = await mongoose.connect(process.env.MONGODB_URI, {
+  //       useNewUrlParser: true,
+  //       useUnifiedTopology: true,
+  //       serverSelectionTimeoutMS: 5000,
+  //       socketTimeoutMS: 45000,
+  //       family: 4
+  //     });
+  //     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+  //   } catch (error) {
+  //     console.error(`❌ MongoDB Connection Error: ${error.message}`);
+  //     process.exit(1); // Exit with failure
+  //   }
+  // };
 
   // File Upload Configuration
   const storage = multer.diskStorage({
@@ -220,10 +229,62 @@
   // Start Server
   const port = process.env.PORT || 4000;
 
-  // Connect to MongoDB and start server
-  connectDB().then(() => {
-    app.listen(port, () => {
-      console.log(`🚀 Server running on port ${port}`);
-      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  // เพิ่ม error handling สำหรับ server
+  const server = app.listen(port, () => {
+    console.log(`🚀 Server running on port ${port}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+
+  // เพิ่ม error handling สำหรับ server
+  server.on('error', (error) => {
+    console.error('❌ Server Error:', error);
+  });
+
+  // เพิ่ม graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('🛑 SIGTERM received, shutting down gracefully');
+    server.close(() => {
+      console.log('✅ Server closed');
+      mongoose.connection.close(() => {
+        console.log('✅ MongoDB connection closed');
+        process.exit(0);
+      });
     });
   });
+
+  process.on('SIGINT', () => {
+    console.log('🛑 SIGINT received, shutting down gracefully');
+    server.close(() => {
+      console.log('✅ Server closed');
+      mongoose.connection.close(() => {
+        console.log('✅ MongoDB connection closed');
+        process.exit(0);
+      });
+    });
+  });
+
+  // เพิ่ม uncaught exception handler
+  process.on('uncaughtException', (error) => {
+    console.error('❌ Uncaught Exception:', error);
+    server.close(() => {
+      console.log('✅ Server closed due to uncaught exception');
+      mongoose.connection.close(() => {
+        console.log('✅ MongoDB connection closed');
+        process.exit(1);
+      });
+    });
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+    server.close(() => {
+      console.log('✅ Server closed due to unhandled rejection');
+      mongoose.connection.close(() => {
+        console.log('✅ MongoDB connection closed');
+        process.exit(1);
+      });
+    });
+  });
+
+  // Connect to MongoDB and start server
+  connectDB();

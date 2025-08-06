@@ -1,97 +1,110 @@
 import mongoose from 'mongoose';
 
-const adminNotificationSchema = new mongoose.Schema({
-  // ข้อมูลผู้ส่ง
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: true,
-    ref: 'User'
-  },
-  shopId: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: true,
-    ref: 'Shop'
-  },
-  
-  // ข้อมูลการแจ้งเตือน
-  type: {
+// Schema สำหรับ admin ส่งการแจ้งเตือนไปยัง user
+const adminToUserNotificationSchema = new mongoose.Schema({
+  recipients: {
     type: String,
-    required: true,
-    enum: ['bill', 'leave', 'repair']
+    enum: ['all', 'active', 'expired'],
+    required: true
   },
-  
-  // ข้อมูลรายละเอียด
+  recipientShopId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Shop',
+    required: false
+  },
+  priority: {
+    type: String,
+    enum: ['low', 'medium', 'high'],
+    required: true
+  },
   title: {
     type: String,
     required: true
   },
-  
   message: {
     type: String,
     required: true
   },
-  
-  // ข้อมูลเพิ่มเติม
-  details: {
-    // ข้อมูล user
-    userName: String,
-    userDisplayName: String,
-    shopName: String,
-    canteenName: String,
-    
-    // ข้อมูลเฉพาะประเภท
-    billType: String,
-    amount: Number,
-    month: Number,
-    year: Number,
-    dueDate: Date,
-    
-    // ข้อมูลการลา
-    startDate: Date,
-    endDate: Date,
-    issue: String,
-    
-    // ข้อมูลการแจ้งซ่อม
-    category: String,
-    repairIssue: String,
-    reportDate: Date,
-    
-    // ข้อมูลรูปภาพ
-    images: [String],
-    imagePaths: [String]
-  },
-  
-  // สถานะ
-  status: {
+  sentBy: {
     type: String,
-    required: true,
-    default: 'pending'
+    required: false
   },
-  
-  // สถานะการอ่าน
+  sentAt: {
+    type: Date,
+    default: Date.now
+  },
+  // เก็บข้อมูลร้านค้าที่ได้รับ notification
+  deliveredTo: [{
+    shopId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Shop'
+    },
+    deliveredAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  // เพิ่ม field สำหรับเก็บสถานะการอ่าน
   isRead: {
     type: Boolean,
     default: false
-  },
-  
-  // เวลาที่สร้าง
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  
-  // เวลาที่อัปเดต
-  updatedAt: {
-    type: Date,
-    default: Date.now
   }
 }, {
   timestamps: true
 });
 
-// สร้าง index เพื่อให้ค้นหาเร็วขึ้น
-adminNotificationSchema.index({ type: 1, createdAt: -1 });
-adminNotificationSchema.index({ isRead: 1 });
-adminNotificationSchema.index({ shopId: 1 });
+// Schema สำหรับ user ส่งการแจ้งเตือนมาให้ admin
+const userToAdminNotificationSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  shopId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Shop',
+    required: true
+  },
+  type: {
+    type: String,
+    enum: ['bill', 'leave', 'repair'],
+    required: true
+  },
+  title: {
+    type: String,
+    required: true
+  },
+  message: {
+    type: String,
+    required: true
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected', 'completed'],
+    default: 'pending'
+  },
+  isRead: {
+    type: Boolean,
+    default: false
+  },
+  details: {
+    type: mongoose.Schema.Types.Mixed,
+    required: false
+  }
+}, {
+  timestamps: true
+});
 
-export default mongoose.model('AdminNotification', adminNotificationSchema, 'admin_notifications'); 
+// Indexes
+adminToUserNotificationSchema.index({ recipients: 1, sentAt: -1 });
+adminToUserNotificationSchema.index({ recipientShopId: 1, sentAt: -1 });
+
+userToAdminNotificationSchema.index({ userId: 1, createdAt: -1 });
+userToAdminNotificationSchema.index({ shopId: 1, createdAt: -1 });
+userToAdminNotificationSchema.index({ isRead: 1, createdAt: -1 });
+
+const AdminToUserNotification = mongoose.model('AdminToUserNotification', adminToUserNotificationSchema);
+const UserToAdminNotification = mongoose.model('UserToAdminNotification', userToAdminNotificationSchema);
+
+export { AdminToUserNotification, UserToAdminNotification };
+export default UserToAdminNotification; // ใช้เป็น default สำหรับ user-to-admin 

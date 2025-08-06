@@ -14,5 +14,32 @@ export default defineNuxtConfig({
     }
   },
 
-  compatibilityDate: '2025-04-27'
+  compatibilityDate: '2025-04-27',
+
+  // Add SSR configuration to improve hydration
+  ssr: true,
+
+  // Add experimental features configuration
+  experimental: {
+    // Disable Suspense warnings by not using experimental features
+    asyncContext: false,
+    asyncEntry: false
+  },
+
+  // Add app configuration
+  app: {
+    // Improve hydration by ensuring proper mounting
+    baseURL: '/',
+    buildAssetsDir: '/_nuxt/',
+    head: {
+      htmlAttrs: {
+        lang: 'th'
+      }
+    }
+  },
+
+  // Add nitro configuration for better SSR
+  nitro: {
+    preset: 'node-server'
+  }
 })

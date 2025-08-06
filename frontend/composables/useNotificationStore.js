@@ -7,6 +7,20 @@ const unreadCount = ref(0)
 const isInitialized = ref(false)
 const lastFetchTime = ref(null)
 
+// ฟังก์ชันสำหรับเข้าถึง localStorage อย่างปลอดภัย
+const getLocalStorage = (key, defaultValue = '0') => {
+  if (process.client) {
+    return localStorage.getItem(key) || defaultValue
+  }
+  return defaultValue
+}
+
+const setLocalStorage = (key, value) => {
+  if (process.client) {
+    localStorage.setItem(key, value)
+  }
+}
+
 // Event emitter สำหรับแจ้งเตือนการอัปเดต
 const notificationEvents = reactive({
   listeners: new Set()
@@ -33,8 +47,8 @@ export const useNotificationStore = () => {
   // Fetch notifications
   const fetchNotifications = async () => {
     try {
-      const token = localStorage.getItem('token')
-      const isAuthenticated = localStorage.getItem('isAuthenticated')
+      const token = getLocalStorage('token')
+      const isAuthenticated = getLocalStorage('isAuthenticated')
       
       if (!token || !isAuthenticated) {
         console.log('❌ No token or not authenticated')
@@ -60,8 +74,22 @@ export const useNotificationStore = () => {
         
         // อัปเดต global state
         notifications.value = sortedNotifications
-        unreadCount.value = notifications.value.filter(n => !n.isRead).length
         lastFetchTime.value = Date.now()
+        
+        // อัปเดต unread count จาก server response
+        const newUnreadCount = notifications.value.filter(n => !n.isRead).length
+        const savedUnreadCount = parseInt(getLocalStorage('userUnreadCount', '0'))
+        
+        // ถ้า localStorage เป็น 0 และ server ก็ไม่มี unread notifications
+        if (savedUnreadCount === 0 && newUnreadCount === 0) {
+          unreadCount.value = 0
+          console.log('📱 Using saved unread count (0) from localStorage')
+        } else {
+          // อัปเดตจาก server response
+          unreadCount.value = newUnreadCount
+          setLocalStorage('userUnreadCount', unreadCount.value.toString())
+          console.log('📊 Updated unread count from server:', unreadCount.value)
+        }
         
         console.log('✅ Notifications fetched:', notifications.value.length)
         console.log('📊 Unread count:', unreadCount.value)
@@ -87,7 +115,7 @@ export const useNotificationStore = () => {
   // Mark all as read
   const markAllAsRead = async () => {
     try {
-      const token = localStorage.getItem('token')
+      const token = getLocalStorage('token')
       const response = await axios.put('/api/notifications/mark-all-read', {}, {
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -98,6 +126,7 @@ export const useNotificationStore = () => {
         // อัปเดต local state
         notifications.value.forEach(n => n.isRead = true)
         unreadCount.value = 0
+        setLocalStorage('userUnreadCount', '0')
         
         // แจ้งเตือน components อื่นๆ
         emitEvent('allNotificationsRead', {
@@ -113,7 +142,7 @@ export const useNotificationStore = () => {
   // Mark single notification as read
   const markAsRead = async (notificationId) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = getLocalStorage('token')
       await axios.put(`/api/notifications/${notificationId}/read`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -123,6 +152,7 @@ export const useNotificationStore = () => {
       if (notification && !notification.isRead) {
         notification.isRead = true
         unreadCount.value--
+        setLocalStorage('userUnreadCount', unreadCount.value.toString())
         
         // แจ้งเตือน components อื่นๆ
         emitEvent('notificationRead', {
@@ -138,6 +168,14 @@ export const useNotificationStore = () => {
   // Initialize store
   const initialize = async () => {
     console.log('🚀 Initializing notification store...')
+    
+    // โหลด unread count จาก localStorage ก่อน
+    const savedUnreadCount = getLocalStorage('userUnreadCount')
+    if (savedUnreadCount !== null) {
+      unreadCount.value = parseInt(savedUnreadCount)
+      console.log('📱 Loaded unread count from localStorage:', unreadCount.value)
+    }
+    
     await fetchNotifications()
     isInitialized.value = true
     
@@ -148,6 +186,9 @@ export const useNotificationStore = () => {
         fetchNotifications()
       }
     }, 30000)
+    
+    // ตั้งค่า lastFetchTime เพื่อป้องกันการ fetch ซ้ำ
+    lastFetchTime.value = Date.now()
   }
 
   // Force refresh (สำหรับเมื่อ admin อัปเดตข้อมูล)

@@ -13,7 +13,7 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['bill', 'leave', 'repair'],
+    enum: ['bill', 'leave', 'repair', 'ranking_evaluation'],
     required: true
   },
   title: {
@@ -38,8 +38,18 @@ const notificationSchema = new mongoose.Schema({
   },
   billType: {
     type: String,
-    enum: ['electricity', 'water'],
-    default: null
+    required: false
+  },
+  // เพิ่มฟิลด์สำหรับ ranking evaluation notifications
+  rankingEvaluationData: {
+    revenue: Number,
+    score: Number,
+    rank: Number,
+    canteenName: String,
+    evaluationMonth: Number,
+    evaluationYear: Number,
+    evaluatedBy: String,
+    evaluatedAt: Date
   }
 }, {
   timestamps: true

@@ -55,7 +55,7 @@
                 <v-list-item-title class="font-weight-medium">
                   {{ notification.title }}
                 </v-list-item-title>
-                <v-list-item-subtitle>
+                <v-list-item-subtitle style="white-space: pre-line;">
                   {{ notification.message }}
                 </v-list-item-subtitle>
                 <v-list-item-subtitle class="text-caption">
@@ -103,11 +103,28 @@ export default {
   methods: {
     async fetchNotifications() {
       try {
-        const response = await this.$axios.get('/api/notifications');
-        this.notifications = response.data.data.notifications;
-        this.unreadCount = response.data.data.unreadCount;
+        console.log('🔄 Fetching notifications...');
+        const response = await this.$axios.get('/api/notifications/user');
+        console.log('📊 API Response:', response.data);
+        
+        this.notifications = response.data.data || [];
+        this.unreadCount = this.notifications.filter(n => !n.isRead).length;
+        
+        console.log('📋 Notifications loaded:', this.notifications.length);
+        console.log('📋 Unread count:', this.unreadCount);
+        console.log('📋 Notifications:', this.notifications.map(n => ({
+          id: n._id,
+          type: n.type,
+          title: n.title,
+          message: n.message,
+          isRead: n.isRead,
+          createdAt: n.createdAt
+        })));
       } catch (error) {
-        console.error('Error fetching notifications:', error);
+        console.error('❌ Error fetching notifications:', error);
+        if (error.response) {
+          console.error('Server error:', error.response.data);
+        }
       }
     },
 

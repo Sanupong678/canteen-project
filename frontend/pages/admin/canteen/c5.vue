@@ -147,6 +147,7 @@
         </div>
         <ShopForm
           :shop-to-edit="shopToEdit"
+          :canteen-id="1"
           @close="closeShopForm"
           @add-shop="handleAddShop"
         />
@@ -261,10 +262,10 @@ export default {
     },
     async loadC5Shops() {
       try {
-        const response = await shopService.getC5Shops()
+        const response = await shopService.getCanteenShops(1) // ใช้ API ใหม่
         if (response && Array.isArray(response)) {
           this.C5Shops = response
-          console.log('โหลดข้อมูลร้านค้าสำเร็จ:', this.C5Shops)
+          console.log('โหลดข้อมูลร้านค้าทั้งหมดสำเร็จ:', this.C5Shops)
         } else {
           console.error('Invalid response format:', response)
           this.C5Shops = []

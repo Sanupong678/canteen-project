@@ -101,6 +101,30 @@ export default {
     const notifications = ref([])
     const unreadCount = ref(0)
 
+    // ฟังก์ชันสำหรับเข้าถึง localStorage อย่างปลอดภัย
+    const getLocalStorage = (key, defaultValue = '0') => {
+      if (process.client) {
+        return localStorage.getItem(key) || defaultValue
+      }
+      return defaultValue
+    }
+
+    const setLocalStorage = (key, value) => {
+      if (process.client) {
+        localStorage.setItem(key, value)
+      }
+    }
+
+    // อัปเดต unread count เมื่อมี notifications ใหม่
+    const updateUnreadCount = () => {
+      const newUnreadCount = notifications.value.filter(n => !n.isRead).length
+      if (newUnreadCount !== unreadCount.value) {
+        unreadCount.value = newUnreadCount
+        setLocalStorage('adminUnreadCount', unreadCount.value.toString())
+        console.log('📊 Updated unread count:', unreadCount.value)
+      }
+    }
+
     // Fetch admin notifications
     const fetchNotifications = async () => {
       try {
@@ -125,10 +149,24 @@ export default {
           })
           
           notifications.value = sortedNotifications
-          unreadCount.value = notifications.value.filter(n => !n.isRead).length
+          
+          // อัปเดต unread count จาก server response
+          const newUnreadCount = notifications.value.filter(n => !n.isRead).length
+          const savedUnreadCount = parseInt(getLocalStorage('adminUnreadCount', '0'))
+          
+          // ถ้า localStorage เป็น 0 และ server ก็ไม่มี unread notifications
+          if (savedUnreadCount === 0 && newUnreadCount === 0) {
+            unreadCount.value = 0
+            console.log('📱 Using saved unread count (0) from localStorage')
+          } else {
+            // อัปเดตจาก server response
+            unreadCount.value = newUnreadCount
+            setLocalStorage('adminUnreadCount', unreadCount.value.toString())
+            console.log('📊 Updated unread count from server:', unreadCount.value)
+          }
           
           console.log('✅ Admin notifications fetched:', notifications.value.length)
-          console.log('📊 Unread count:', unreadCount.value)
+          console.log('📊 Current unread count from localStorage:', unreadCount.value)
         }
       } catch (error) {
         console.error('❌ Error fetching admin notifications:', error.response?.data || error.message)
@@ -147,35 +185,74 @@ export default {
     // Mark notification as read
     const markAsRead = async (notificationId) => {
       try {
+        console.log('🔄 Marking notification as read:', notificationId)
+        
         const token = localStorage.getItem('token')
-        await axios.put(`/api/admin-notifications/admin/${notificationId}/read`, {}, {
+        if (!token) {
+          console.error('❌ No token found')
+          return
+        }
+        
+        const response = await axios.put(`/api/admin-notifications/admin/${notificationId}/read`, {}, {
           headers: { Authorization: `Bearer ${token}` }
         })
+        
+        console.log('✅ Server response:', response.data)
         
         // Update local state
         const notification = notifications.value.find(n => n._id === notificationId)
         if (notification && !notification.isRead) {
           notification.isRead = true
           unreadCount.value--
+          setLocalStorage('adminUnreadCount', unreadCount.value.toString())
+          console.log('✅ Notification marked as read. New unread count:', unreadCount.value)
+        } else {
+          console.log('ℹ️ Notification already read or not found')
         }
+        
+        // ไม่ต้อง refresh เพราะเราได้อัปเดต local state แล้ว
+        
       } catch (error) {
-        console.error('Error marking admin notification as read:', error)
+        console.error('❌ Error marking admin notification as read:', error.response?.data || error.message)
       }
     }
 
     // Mark all as read
     const markAllAsRead = async () => {
       try {
+        console.log('🔄 Marking all admin notifications as read...')
+        console.log('📊 Current unread count:', unreadCount.value)
+        
         const token = localStorage.getItem('token')
-        await axios.put('/api/admin-notifications/admin/mark-all-read', {}, {
+        if (!token) {
+          console.error('❌ No token found')
+          return
+        }
+        
+        const response = await axios.put('/api/admin-notifications/admin/mark-all-read', {}, {
           headers: { Authorization: `Bearer ${token}` }
         })
         
+        console.log('✅ Server response:', response.data)
+        
         // Update local state
-        notifications.value.forEach(n => n.isRead = true)
+        notifications.value.forEach(n => {
+          if (!n.isRead) {
+            n.isRead = true
+            console.log('✅ Marked notification as read:', n._id)
+          }
+        })
+        
         unreadCount.value = 0
+        setLocalStorage('adminUnreadCount', '0')
+        console.log('✅ All notifications marked as read. New unread count:', unreadCount.value)
+        console.log('💾 Saved to localStorage:', getLocalStorage('adminUnreadCount'))
+        
+        // ไม่ต้อง refresh เพราะเราได้อัปเดต local state แล้ว
+        // และ backend ได้อัปเดต isRead = true แล้ว
+        
       } catch (error) {
-        console.error('Error marking all admin notifications as read:', error)
+        console.error('❌ Error marking all admin notifications as read:', error.response?.data || error.message)
       }
     }
 
@@ -271,7 +348,23 @@ export default {
 
     onMounted(() => {
       document.addEventListener('click', handleClickOutside)
+      
+      // โหลด unread count จาก localStorage ก่อน
+      const savedUnreadCount = getLocalStorage('adminUnreadCount')
+      if (savedUnreadCount !== null) {
+        unreadCount.value = parseInt(savedUnreadCount)
+        console.log('📱 Loaded unread count from localStorage:', unreadCount.value)
+      }
+      
       fetchNotifications()
+      
+      // Refresh notifications every 30 seconds
+      const refreshInterval = setInterval(fetchNotifications, 30000)
+      
+      // Cleanup interval on unmount
+      onUnmounted(() => {
+        clearInterval(refreshInterval)
+      })
     })
 
     onUnmounted(() => {
@@ -285,6 +378,7 @@ export default {
       toggleDropdown,
       markAsRead,
       markAllAsRead,
+      updateUnreadCount,
       getNotificationIcon,
       getNotificationIconColor,
       getStatusText,

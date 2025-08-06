@@ -72,7 +72,7 @@ export default {
   data() {
     return {
       formData: {
-        recipients: this.selectedShop ? this.selectedShop.id : 'all',
+        recipients: 'all', // ใช้ค่าเริ่มต้นเป็น 'all'
         priority: 'medium',
         title: '',
         message: ''
@@ -89,15 +89,29 @@ export default {
     async handleSubmit() {
       if (this.isFormValid) {
         try {
-          // ส่งการแจ้งเตือนไปยัง backend
-          const response = await this.$axios.post('/api/notifications', {
-            ...this.formData,
-            sendEmail: true // เพิ่มตัวเลือกการส่งอีเมล
-          });
+          console.log('📤 Form data being sent:', this.formData);
+          
+          const requestData = {
+            recipients: this.formData.recipients,
+            recipientShopId: this.formData.recipients !== 'all' && this.formData.recipients !== 'active' && this.formData.recipients !== 'expired' ? this.formData.recipients : null,
+            priority: this.formData.priority,
+            title: this.formData.title,
+            message: this.formData.message
+          };
+          
+          console.log('📤 Request data:', requestData);
+          
+          // ส่งการแจ้งเตือนไปยัง admin notification API
+          const response = await this.$axios.post('/api/admin-notifications/send', requestData);
 
           if (response.data.success) {
             this.$emit('submit', { ...this.formData });
             this.$emit('close');
+            
+            // แสดงข้อความสำเร็จ
+            this.$emit('success', {
+              message: `ส่งการแจ้งเตือนสำเร็จ (${response.data.data.deliveredTo} ร้านค้า)`
+            });
           } else {
             throw new Error(response.data.message || 'ไม่สามารถส่งการแจ้งเตือนได้');
           }
