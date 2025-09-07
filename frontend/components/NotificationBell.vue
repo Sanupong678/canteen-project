@@ -90,14 +90,31 @@ export default {
 
   created() {
     this.fetchNotifications();
-    // Poll for new notifications every minute
-    this.polling = setInterval(this.fetchNotifications, 60000);
+    // Realtime via socket plugin replaces polling
+    try {
+
+      const socket = this.$nuxt?.$socket || this.$nuxt?.$root?.$socket || (this.$nuxt?.$plugins?.socket || null)
+      if (socket) {
+        socket.on('user:notification:new', this.fetchNotifications)
+        socket.on('user:bill:updated', this.fetchNotifications)
+        socket.on('user:bill:imageCancelled', this.fetchNotifications)
+        socket.on('user:leave:updated', this.fetchNotifications)
+        socket.on('user:repair:updated', this.fetchNotifications)
+      }
+    } catch (e) { /* no-op */ }
   },
 
   beforeDestroy() {
-    if (this.polling) {
-      clearInterval(this.polling);
-    }
+    try {
+      const socket = this.$nuxt?.$socket || this.$nuxt?.$root?.$socket || (this.$nuxt?.$plugins?.socket || null)
+      if (socket) {
+        socket.off('user:notification:new', this.fetchNotifications)
+        socket.off('user:bill:updated', this.fetchNotifications)
+        socket.off('user:bill:imageCancelled', this.fetchNotifications)
+        socket.off('user:leave:updated', this.fetchNotifications)
+        socket.off('user:repair:updated', this.fetchNotifications)
+      }
+    } catch (e) { /* no-op */ }
   },
 
   methods: {

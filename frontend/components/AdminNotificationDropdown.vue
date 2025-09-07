@@ -92,6 +92,7 @@
 <script>
 import { ref, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
+import { useNuxtApp } from '#app'
 
 export default {
   name: 'AdminNotificationDropdown',
@@ -358,13 +359,22 @@ export default {
       
       fetchNotifications()
       
-      // Refresh notifications every 30 seconds
-      const refreshInterval = setInterval(fetchNotifications, 30000)
-      
-      // Cleanup interval on unmount
-      onUnmounted(() => {
-        clearInterval(refreshInterval)
-      })
+      // Realtime via socket plugin
+      try {
+        const { $socket } = useNuxtApp()
+        if ($socket) {
+          $socket.on('admin:bill:newUpload', fetchNotifications)
+          $socket.on('admin:leave:new', fetchNotifications)
+          $socket.on('admin:repair:new', fetchNotifications)
+        }
+        onUnmounted(() => {
+          if ($socket) {
+            $socket.off('admin:bill:newUpload', fetchNotifications)
+            $socket.off('admin:leave:new', fetchNotifications)
+            $socket.off('admin:repair:new', fetchNotifications)
+          }
+        })
+      } catch (e) { /* no-op */ }
     })
 
     onUnmounted(() => {

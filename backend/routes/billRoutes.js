@@ -1,6 +1,20 @@
 import express from 'express';
-import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
+import multer from 'multer';
+
+// ===== Controllers =====
+import { 
+  uploadRevenueExcel, 
+  getMoneyHistory, 
+  getCurrentMonthRevenue, 
+  getAllMoneyHistory,
+  getCombinedHistory,
+  upload as uploadMoney 
+} from '../controllers/moneyHistoryController.js';
+
+import * as monthSettingsController from '../controllers/monthSettingsController.js';
+
 import { 
   uploadBill,
   getBillHistory,
@@ -13,32 +27,63 @@ import {
   deleteBill,
   cleanupExpiredImages
 } from '../controllers/billController.js';
-import { isAdmin, verifyToken } from '../middleware/authMiddleware.js';
+
+// ===== Middleware =====
+import { verifyToken, isAdmin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-import fs from 'fs';
+/* ==========================
+   Money History Routes
+   ========================== */
+router.post('/money-history/upload-revenue', uploadMoney.single('file'), uploadRevenueExcel);
+router.get('/money-history/shop/:shopId', getMoneyHistory);
+router.get('/money-history/shop/:shopId/current', getCurrentMonthRevenue);
+router.get('/money-history/shop/:shopId/combined', getCombinedHistory);
+router.get('/money-history', getAllMoneyHistory);
 
-// Configure multer for file upload
-const storage = multer.diskStorage({
+/* ==========================
+   Month Settings Routes
+   ========================== */
+router.use('/month-settings', (req, res, next) => {
+  console.log('🔍 Month Settings API Request:', {
+    method: req.method,
+    url: req.url,
+    path: req.path,
+    params: req.params,
+    body: req.body
+  });
+  next();
+});
+
+router.use('/month-settings', verifyToken);
+
+router.get('/month-settings', monthSettingsController.getAllMonthSettings);
+router.get('/month-settings/current', monthSettingsController.getCurrentMonthStatus);
+router.get('/month-settings/:month', monthSettingsController.getMonthSetting);
+router.post('/month-settings', monthSettingsController.createMonthSetting);
+router.put('/month-settings/:id', monthSettingsController.updateMonthSetting);
+router.post('/month-settings/bulk', monthSettingsController.bulkUpdateMonthSettings);
+router.delete('/month-settings/:id', monthSettingsController.deleteMonthSetting);
+
+/* ==========================
+   Bill Routes
+   ========================== */
+
+// === Multer for bill slips ===
+const billStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     try {
-    // จัดเก็บตาม shopId/ปี/เดือน เช่น uploads/bills/shop123/2024/01/
-    const currentDate = new Date();
-    const year = currentDate.getFullYear();
-    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-      const shopId = req.user?.shopId || 'default'; // จาก token
-    const uploadPath = `uploads/bills/${shopId}/${year}/${month}/`;
-      
-      console.log('Upload path:', uploadPath);
-    
-    // สร้างโฟลเดอร์ถ้ายังไม่มี
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-        console.log('Created directory:', uploadPath);
-    }
-    
-    cb(null, uploadPath);
+      const currentDate = new Date();
+      const year = currentDate.getFullYear();
+      const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+      const shopId = req.user?.shopId || 'default';
+      const uploadPath = `uploads/bills/${shopId}/${year}/${month}/`;
+
+      if (!fs.existsSync(uploadPath)) {
+        fs.mkdirSync(uploadPath, { recursive: true });
+      }
+      cb(null, uploadPath);
     } catch (error) {
       console.error('Error creating upload directory:', error);
       cb(error);
@@ -47,32 +92,20 @@ const storage = multer.diskStorage({
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const filename = 'bill-' + uniqueSuffix + path.extname(file.originalname);
-    console.log('Generated filename:', filename);
     cb(null, filename);
   }
 });
 
-const upload = multer({ 
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
-  },
+const billUpload = multer({ 
+  storage: billStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: (req, file, cb) => {
-    console.log('File upload attempt:', {
-      originalname: file.originalname,
-      mimetype: file.mimetype,
-      size: file.size
-    });
-    
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Not an image! Please upload only images.'), false);
-    }
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Not an image! Please upload only images.'), false);
   }
 });
 
-// เพิ่ม config multer สำหรับ excel
+// === Multer for Excel import ===
 const excelUpload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'uploads/bills/'),
@@ -91,49 +124,28 @@ const excelUpload = multer({
   }
 });
 
-// User routes
+// === Public route (no token needed) ===
 router.get('/image/:billId', getBillImage);
+
+// === Protected routes ===
 router.use(verifyToken);
 
-// Upload route with better error handling
-router.post('/upload', (req, res, next) => {
-  console.log('=== UPLOAD ROUTE DEBUG ===');
-  console.log('Request headers:', req.headers);
-  console.log('Request body:', req.body);
-  console.log('User:', req.user);
-  next();
-}, upload.single('slip'), (err, req, res, next) => {
-  if (err instanceof multer.MulterError) {
-    console.error('Multer error:', err);
-    if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'File size too large. Maximum size is 5MB.' 
-      });
-    }
-    return res.status(400).json({ 
-      success: false, 
-      error: 'File upload error: ' + err.message 
-    });
-  } else if (err) {
-    console.error('Upload error:', err);
-    return res.status(400).json({ 
-      success: false, 
-      error: err.message 
-    });
-  }
-  next();
-}, uploadBill);
+// Upload bill slip
+router.post('/upload', 
+  billUpload.single('slip'), 
+  uploadBill
+);
 
+// Get user bill history
 router.get('/history', getBillHistory);
 router.get('/history/paginated', getBillHistoryWithPagination);
 
-// Admin routes
-router.get('/admin', isAdmin, getAllBills);
-router.put('/admin/verify/:id', isAdmin, verifyBill);
-router.post('/admin/import-excel', isAdmin, excelUpload.single('file'), importBillExcel);
-router.put('/admin/cancel-image/:id', isAdmin, cancelBillImage);
-router.delete('/admin/:id', isAdmin, deleteBill);
-router.post('/admin/cleanup', isAdmin, cleanupExpiredImages);
+// Admin bill routes (support legacy paths too)
+router.get(['/admin', '/bills/admin'], isAdmin, getAllBills);
+router.put(['/admin/verify/:id', '/bills/admin/verify/:id'], isAdmin, verifyBill);
+router.post(['/admin/import-excel', '/bills/admin/import-excel'], isAdmin, excelUpload.single('file'), importBillExcel);
+router.put(['/admin/cancel-image/:id', '/bills/admin/cancel-image/:id'], isAdmin, cancelBillImage);
+router.delete(['/admin/:id', '/bills/admin/:id'], isAdmin, deleteBill);
+router.post(['/admin/cleanup', '/bills/admin/cleanup'], isAdmin, cleanupExpiredImages);
 
-export default router; 
+export default router;

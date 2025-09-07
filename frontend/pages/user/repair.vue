@@ -7,75 +7,71 @@
         </div>
 
         <div class="form-content">
-          <v-card class="form-card">
-            <v-card-text>
-              <v-form ref="form" v-model="isFormValid">
-                <v-row>
-                  <v-col cols="12">
-                    <v-select
-                      v-model="selectedCategory"
-                      :items="categoryOptions"
-                      label="หมวดหมู่"
-                      :rules="categoryRules"
-                      outlined
-                      dense
-                      class="custom-select"
-                    ></v-select>
-                  </v-col>
-                  <v-col cols="12">
-                    <v-textarea
-                      v-model="issue"
-                      label="รายละเอียดปัญหา"
-                      :rules="issueRules"
-                      outlined
-                      rows="4"
-                      class="custom-textarea"
-                    ></v-textarea>
-                  </v-col>
-                  <v-col cols="12">
-                    <div class="form-group">
-                      <label>รูปภาพประกอบ</label>
-                      <input
-                        type="file"
-                        ref="fileInput"
-                        multiple
-                        accept="image/*"
-                        @change="handleImageChange"
-                        class="form-input"
+          <v-form ref="form" v-model="isFormValid">
+            <v-row>
+              <v-col cols="12">
+                <v-select
+                  v-model="selectedCategory"
+                  :items="categoryOptions"
+                  label="หมวดหมู่"
+                  :rules="categoryRules"
+                  outlined
+                  dense
+                  class="custom-select"
+                ></v-select>
+              </v-col>
+              <v-col cols="12">
+                <v-textarea
+                  v-model="issue"
+                  label="รายละเอียดปัญหา"
+                  :rules="issueRules"
+                  outlined
+                  rows="4"
+                  class="custom-textarea"
+                ></v-textarea>
+              </v-col>
+              <v-col cols="12">
+                <div class="form-group">
+                  <label>รูปภาพประกอบ</label>
+                  <input
+                    type="file"
+                    ref="fileInput"
+                    multiple
+                    accept="image/*"
+                    @change="handleImageChange"
+                    class="form-input"
+                  >
+                  <div v-if="imagePreview.length > 0" class="image-preview-container">
+                    <div v-for="(preview, index) in imagePreview" :key="index" class="image-preview">
+                      <img :src="preview" alt="Preview">
+                      <div class="image-name">{{ images[index].name }}</div>
+                      <v-btn
+                        icon
+                        small
+                        color="error"
+                        class="remove-image-btn"
+                        @click="removeImage(index)"
                       >
-                      <div v-if="imagePreview.length > 0" class="image-preview-container">
-                        <div v-for="(preview, index) in imagePreview" :key="index" class="image-preview">
-                          <img :src="preview" alt="Preview">
-                          <div class="image-name">{{ images[index].name }}</div>
-                          <v-btn
-                            icon
-                            small
-                            color="error"
-                            class="remove-image-btn"
-                            @click="removeImage(index)"
-                          >
-                            <v-icon>mdi-close</v-icon>
-                          </v-btn>
-                        </div>
-                      </div>
+                        <v-icon>mdi-close</v-icon>
+                      </v-btn>
                     </div>
-                  </v-col>
-                  <v-col cols="12">
-                    <v-btn
-                      color="primary"
-                      block
-                      :loading="loading"
-                      :disabled="!isFormValid || loading"
-                      @click="handleSubmit"
-                      class="submit-btn"
-                    >
-                      ส่งเรื่อง
-                    </v-btn>
-                  </v-col>
-                </v-row>
-              </v-form>
-            </v-card-text>
-          </v-card>
+                  </div>
+                </div>
+              </v-col>
+              <v-col cols="12">
+                <v-btn
+                  color="primary"
+                  block
+                  :loading="loading"
+                  :disabled="!isFormValid || loading"
+                  @click="handleSubmit"
+                  class="submit-btn"
+                >
+                  ส่งเรื่อง
+                </v-btn>
+              </v-col>
+            </v-row>
+          </v-form>
 
           <div class="history-link" @click="showHistory = !showHistory">
             ประวัติการแจ้งซ่อม
@@ -88,7 +84,7 @@
             </div>
             <div v-else class="space-y-3">
               <div
-                v-for="(repair, index) in repairHistory"
+                v-for="(repair, index) in paginatedRepairHistory"
                 :key="repair._id"
                 class="history-item"
               >
@@ -108,6 +104,27 @@
                   />
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- Pagination -->
+          <div v-if="showHistory && repairHistory.length > 0" class="pagination-section">
+            <div class="items-per-page">
+              <span class="label">Items per page:</span>
+              <span class="fixed-size">5</span>
+              <span class="range">{{ startIndexDisplay }}-{{ endIndexDisplay }} of {{ repairHistory.length }}</span>
+            </div>
+            <div class="pagination">
+              <template v-for="p in totalPages">
+                <button v-if="p <= 3 || p === totalPages || Math.abs(p - currentPage) <= 1"
+                        :key="`p-`+p"
+                        class="page-num"
+                        :class="{ active: p === currentPage }"
+                        @click="goToPage(p)">{{ p }}</button>
+                <span v-else-if="p === 4 && currentPage > 4" :key="'dots-left'">...</span>
+                <span v-else-if="p === totalPages - 1 && currentPage < totalPages - 3" :key="'dots-right'">...</span>
+              </template>
+              <button class="page-next" :disabled="currentPage === totalPages" @click="nextPage">next</button>
             </div>
           </div>
         </div>
@@ -132,7 +149,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import LayoutUser from '@/components/LayoutUser.vue'
 import axios from 'axios'
@@ -153,6 +170,8 @@ const imageDialog = ref(false)
 const selectedImages = ref([])
 const fileInput = ref(null)
 const showHistory = ref(false)
+const pageSize = 5
+const currentPage = ref(1)
 
 // Options
 const categoryOptions = [
@@ -319,6 +338,17 @@ const viewImages = (images) => {
 onMounted(async () => {
   await fetchRepairHistory()
 })
+
+// Pagination computed for history (5 per page)
+const totalPages = computed(() => Math.max(1, Math.ceil(repairHistory.value.length / pageSize)))
+const paginatedRepairHistory = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return repairHistory.value.slice(start, start + pageSize)
+})
+const goToPage = (p) => { if (p < 1 || p > totalPages.value) return; currentPage.value = p }
+const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++ }
+const startIndexDisplay = computed(() => (repairHistory.value.length ? (currentPage.value - 1) * pageSize + 1 : 0))
+const endIndexDisplay = computed(() => Math.min(currentPage.value * pageSize, repairHistory.value.length))
 </script>
 
 <style scoped>
@@ -528,6 +558,16 @@ onMounted(async () => {
   box-shadow: 0 4px 12px rgba(231, 76, 60, 0.1);
   border-left: 4px solid #e74c3c;
 }
+
+/* Pagination styles */
+.pagination-section { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; margin-top: 12px; }
+.items-per-page { display: flex; align-items: center; gap: 10px; color: #374151; font-size: 14px; }
+.items-per-page .fixed-size { padding: 6px 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; min-width: 48px; text-align: center; }
+.items-per-page .range { margin-left: 12px; color: #6b7280; }
+.pagination { display: flex; gap: 6px; align-items: center; }
+.page-num { min-width: 32px; height: 32px; border: 1px solid #e5e7eb; background: #fff; color: #7f1d1d; border-radius: 2px; cursor: pointer; }
+.page-num.active { background: #7f1d1d; color: #fff; border-color: #7f1d1d; }
+.page-next { border: 1px solid #e5e7eb; background: #fff; color: #7f1d1d; border-radius: 2px; padding: 0 10px; cursor: pointer; }
 
 .history-item {
   background: linear-gradient(135deg, #fdf2f2 0%, #fce8e8 100%);

@@ -1,18 +1,21 @@
 <template>
   <LayoutAdmin>
     <div class="banner-management">
-      <h1 class="text-2xl font-bold mb-6">จัดการแบนเนอร์</h1>
+      <div class="mb-6 text-center">
+        <h1 class="text-3xl font-extrabold text-gray-900">จัดการแบนเนอร์</h1>
+        <p class="text-gray-500 mt-1">อัปโหลดและจัดการภาพแบนเนอร์ที่จะแสดงในหน้าแรก</p>
+      </div>
       
       <!-- Add new banner form -->
       <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-        <h2 class="text-lg font-semibold mb-4">เพิ่มแบนเนอร์ใหม่</h2>
+        <h2 class="text-xl font-semibold mb-4">เพิ่มแบนเนอร์ใหม่</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium mb-2">ชื่อแบนเนอร์</label>
             <input 
               v-model="newBanner.title" 
               type="text" 
-              class="w-full p-2 border border-gray-300 rounded-md"
+              class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="ชื่อแบนเนอร์"
             />
           </div>
@@ -21,7 +24,7 @@
             <input 
               v-model="newBanner.link" 
               type="text" 
-              class="w-full p-2 border border-gray-300 rounded-md"
+              class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="https://example.com"
             />
           </div>
@@ -31,13 +34,13 @@
               @change="handleImageUpload" 
               type="file" 
               accept="image/*"
-              class="w-full p-2 border border-gray-300 rounded-md"
+              class="w-full p-2 border border-gray-300 rounded-md focus:outline-none"
             />
           </div>
         </div>
         <button 
           @click="addBanner"
-          class="mt-4 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+          class="mt-4 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
         >
           เพิ่มแบนเนอร์
         </button>
@@ -45,7 +48,7 @@
 
       <!-- Banners list -->
       <div class="bg-white p-6 rounded-lg shadow-md">
-        <h2 class="text-lg font-semibold mb-4">แบนเนอร์ทั้งหมด</h2>
+        <h2 class="text-xl font-semibold mb-4">แบนเนอร์ทั้งหมด</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div 
             v-for="banner in banners" 
@@ -55,7 +58,7 @@
             <div class="mb-3">
               <img 
                 v-if="banner.imageFilename"
-                :src="`/api/banner/${banner.imageFilename}`"
+                :src="getImageUrl(banner)"
                 :alt="banner.title"
                 class="w-full h-32 object-cover rounded-md"
               />
@@ -75,7 +78,7 @@
               <div class="flex gap-2">
                 <button 
                   @click="toggleBannerStatus(banner)"
-                  :class="banner.isActive ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'"
+                  :class="banner.isActive ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-600 hover:bg-green-700'"
                   class="text-white px-3 py-1 rounded-md text-sm"
                 >
                   {{ banner.isActive ? 'ปิด' : 'เปิด' }}
@@ -108,10 +111,18 @@ const newBanner = ref({
   active: true
 })
 
+const backendUrl = process.env.NODE_ENV === 'production' 
+  ? 'https://your-production-domain.com' 
+  : 'http://localhost:4000'
+
+const getImageUrl = (banner) => {
+  return `${backendUrl}/api/backgrounds/${banner._id}/image`
+}
+
 // Fetch banners from API
 const loadBanners = async () => {
   try {
-    const response = await axios.get('/api/backgrounds')
+    const response = await axios.get(`${backendUrl}/api/backgrounds`)
     if (response.data.success) {
       banners.value = response.data.data
     }
@@ -134,7 +145,7 @@ const addBanner = async () => {
     formData.append('image', newBanner.value.image)
     formData.append('description', newBanner.value.link || '')
 
-    const response = await axios.post('/api/backgrounds', formData, {
+    const response = await axios.post(`${backendUrl}/api/backgrounds`, formData, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'multipart/form-data'
@@ -162,7 +173,7 @@ const deleteBanner = async (bannerId) => {
   if (confirm('คุณต้องการลบแบนเนอร์นี้ใช่หรือไม่?')) {
     try {
       const token = localStorage.getItem('token')
-      await axios.delete(`/api/backgrounds/${bannerId}`, {
+      await axios.delete(`${backendUrl}/api/backgrounds/${bannerId}`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       banners.value = banners.value.filter(banner => banner._id !== bannerId)
@@ -178,7 +189,7 @@ const deleteBanner = async (bannerId) => {
 const toggleBannerStatus = async (banner) => {
   try {
     const token = localStorage.getItem('token')
-    const response = await axios.patch(`/api/backgrounds/${banner._id}/toggle`, {}, {
+    const response = await axios.patch(`${backendUrl}/api/backgrounds/${banner._id}/toggle`, {}, {
       headers: { Authorization: `Bearer ${token}` }
     })
     

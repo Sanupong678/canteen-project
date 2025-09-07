@@ -1,64 +1,92 @@
 <template>
   <LayoutUser>
     <div class="news-user-container">
-      <div class="header">
-        <h1>📰 ข่าวสารและประกาศ</h1>
-        <p class="subtitle">ติดตามข่าวสารและประกาศล่าสุดจากระบบ</p>
+      <div class="section-header">
+        <h2 class="section-title">ข่าวและกิจกรรมทั้งหมด</h2>
       </div>
 
-      <!-- News List -->
-      <div v-if="loading" class="loading">
-        <div class="spinner"></div>
-        <p>กำลังโหลดข่าวสาร...</p>
-      </div>
+      <div class="news-layout">
+        <div class="news-col">
+          <!-- News List -->
+          <div v-if="loading" class="loading">
+            <div class="spinner"></div>
+            <p>กำลังโหลดข่าวสาร...</p>
+          </div>
 
-      <div v-else-if="news.length === 0" class="no-news">
-        <span class="no-news-icon">📰</span>
-        <h3>ไม่มีข่าวสาร</h3>
-        <p>ยังไม่มีข่าวสารหรือประกาศใดๆ</p>
-      </div>
+          <div v-else-if="news.length === 0" class="no-news">
+            <span class="no-news-icon">📰</span>
+            <h3>ไม่มีข่าวสาร</h3>
+            <p>ยังไม่มีข่าวสารหรือประกาศใดๆ</p>
+          </div>
 
-      <div v-else class="news-list">
-        <div 
-          v-for="item in news" 
-          :key="item._id" 
-          class="news-item"
-          @click="viewNewsDetail(item)"
-        >
-          <div class="news-image-container">
-            <img 
-              v-if="item.imageFilename" 
-              :src="`${backendUrl}/api/news/${item._id}/image`" 
-              :alt="item.title"
-              class="news-image"
-              @error="handleImageError"
-            />
-            <div v-else class="news-placeholder">
-              <span>📰</span>
+          <div v-else class="news-list">
+            <div 
+              v-for="item in paginatedNews" 
+              :key="item._id" 
+              class="news-card"
+              @click="viewNewsDetail(item)"
+            >
+              <div class="card-image">
+                <img 
+                  v-if="item.imageFilename" 
+                  :src="`${backendUrl}/api/news/${item._id}/image`" 
+                  :alt="item.title"
+                  class="news-image"
+                  @error="handleImageError"
+                />
+                <div v-else class="news-placeholder">
+                  <span>📰</span>
+                </div>
+              </div>
+
+              <div class="card-body">
+                <div v-if="item.sdgs && item.sdgs.length" class="sdgs">
+                  <span class="sdgs-label">SDGs :</span>
+                  <span v-for="n in item.sdgs" :key="n" class="sdg-badge">{{ n }}</span>
+                </div>
+                <h3 class="card-title">{{ item.title }}</h3>
+                <p class="card-excerpt">{{ truncateContent(item.content, 120) }}</p>
+                <div class="card-meta">
+                  <span class="meta-item">{{ formatDate(item.createdAt) }}</span>
+                  <span v-if="item.author" class="meta-item">👤 {{ item.author }}</span>
+                </div>
+              </div>
             </div>
           </div>
-          
-          <div class="news-content">
-            <h3 class="news-title">{{ item.title }}</h3>
-            <p class="news-excerpt">{{ truncateContent(item.content, 150) }}</p>
-            
-            <div class="news-meta">
-              <span class="news-date">
-                📅 {{ formatDate(item.createdAt) }}
-              </span>
-              <span class="news-views">
-                👁️ {{ item.views || 0 }} ครั้ง
-              </span>
-              <span v-if="item.author" class="news-author">
-                👤 {{ item.author }}
-              </span>
-            </div>
-          </div>
-          
-          <div class="news-arrow">
-            <span>→</span>
+
+          <!-- Pagination -->
+          <div v-if="totalPages > 1" class="pagination">
+            <button class="page-btn" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">ก่อนหน้า</button>
+            <button 
+              v-for="p in totalPages" 
+              :key="p" 
+              class="page-num" 
+              :class="{ active: p === currentPage }" 
+              @click="goToPage(p)"
+            >{{ p }}</button>
+            <button class="page-btn" :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)">ถัดไป</button>
           </div>
         </div>
+
+        <aside class="years-col">
+          <h3 class="years-title">ข่าวย้อนหลัง</h3>
+          <div class="years-list">
+            <div v-for="year in years" :key="year" class="year-item">
+              <button class="year-header" @click="toggleYear(year)">
+                <span class="year-label">{{ year }}</span>
+                <span class="year-caret" :class="{ open: yearOpen[year] }">▾</span>
+              </button>
+              <ul v-if="yearOpen[year]" class="year-content">
+                <li v-for="m in monthsOfYear(year)" :key="m" class="year-month">
+                  <button class="month-btn" @click="filterByYearMonth(year, m)">
+                    <span class="month-label">{{ getMonthName(m) }}</span>
+                    <span class="month-count">{{ (yearMonthGroups[year]?.[m] || []).length }}</span>
+                  </button>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </aside>
       </div>
 
       <!-- News Detail Modal -->
@@ -102,13 +130,20 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import LayoutUser from '@/components/LayoutUser.vue'
 import axios from 'axios'
 
 const news = ref([])
 const loading = ref(true)
 const selectedNews = ref(null)
+const currentPage = ref(1)
+const itemsPerPage = 9
+const yearGroups = ref({})
+const yearMonthGroups = ref({})
+const years = ref([])
+const yearOpen = ref({})
+const filter = ref({ year: null, month: null })
 
 // กำหนด backend URL
 const backendUrl = process.env.NODE_ENV === 'production' 
@@ -121,7 +156,25 @@ const loadNews = async () => {
     loading.value = true
     const response = await axios.get(`${backendUrl}/api/news`)
     if (response.data.success) {
-      news.value = response.data.data
+      news.value = (response.data.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      // group by year for sidebar
+      const groups = {}
+      const ymGroups = {}
+      for (const n of news.value) {
+        const y = new Date(n.createdAt).getFullYear()
+        const m = new Date(n.createdAt).getMonth() + 1
+        if (!groups[y]) groups[y] = []
+        groups[y].push(n)
+        if (!ymGroups[y]) ymGroups[y] = {}
+        if (!ymGroups[y][m]) ymGroups[y][m] = []
+        ymGroups[y][m].push(n)
+      }
+      yearGroups.value = groups
+      yearMonthGroups.value = ymGroups
+      years.value = Object.keys(groups).map(y => parseInt(y)).sort((a,b) => b - a)
+      const openObj = {}
+      for (const y of years.value) openObj[y] = false
+      yearOpen.value = openObj
     }
   } catch (error) {
     console.error('Error loading news:', error)
@@ -171,22 +224,60 @@ const truncateContent = (content, maxLength) => {
   return content.substring(0, maxLength) + '...'
 }
 
-// Format date
+// Format date (DD/MM/YYYY)
 const formatDate = (dateString) => {
-  const options = { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
+  try {
+    const d = new Date(dateString)
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const yyyy = d.getFullYear()
+    return `${dd}/${mm}/${yyyy}`
+  } catch (e) {
+    return ''
   }
-  return new Date(dateString).toLocaleDateString('th-TH', options)
 }
 
 // Load news when component mounts
 onMounted(() => {
   loadNews()
 })
+
+// Pagination computed values
+const totalPages = computed(() => Math.max(1, Math.ceil(news.value.length / itemsPerPage)))
+const filteredNews = computed(() => {
+  if (!filter.value.year || !filter.value.month) return news.value
+  const ym = yearMonthGroups.value[filter.value.year]?.[filter.value.month] || []
+  return ym
+})
+
+const paginatedNews = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  return filteredNews.value.slice(start, start + itemsPerPage)
+})
+
+const goToPage = (p) => {
+  if (p < 1 || p > totalPages.value) return
+  currentPage.value = p
+}
+
+const toggleYear = (y) => {
+  yearOpen.value[y] = !yearOpen.value[y]
+}
+
+const monthsOfYear = (y) => {
+  const dict = yearMonthGroups.value[y] || {}
+  return Object.keys(dict).map(n => parseInt(n)).sort((a,b) => b - a)
+}
+
+const getMonthName = (m) => {
+  const names = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม']
+  return names[m-1]
+}
+
+const filterByYearMonth = (y, m) => {
+  filter.value = { year: y, month: m }
+  currentPage.value = 1
+}
 </script>
 
 <style scoped>
@@ -200,7 +291,7 @@ onMounted(() => {
   text-align: center;
   margin-bottom: 40px;
   padding: 30px 0;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
   color: white;
   border-radius: 12px;
 }
@@ -216,6 +307,10 @@ onMounted(() => {
   font-size: 1.1rem;
   opacity: 0.9;
 }
+
+/* Section header like reference style */
+.section-header { display: block; margin: 0 0 16px 0; }
+.section-title { font-size: 28px; font-weight: 800; color: #111827; margin: 0; line-height: 1; padding-bottom: 6px; border-bottom: 6px solid #dc2626; }
 
 .loading {
   text-align: center;
@@ -254,17 +349,15 @@ onMounted(() => {
   color: #333;
 }
 
-.news-list {
-  display: grid;
-  gap: 20px;
-}
+.news-layout { display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start; }
+.news-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
 
 .news-item {
   background: white;
   border-radius: 12px;
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  border: 1px solid #e0e0e0;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+  border: 1px solid #e5e7eb;
   cursor: pointer;
   transition: all 0.3s ease;
   display: flex;
@@ -274,16 +367,38 @@ onMounted(() => {
 
 .news-item:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.12);
 }
 
-.news-image-container {
-  flex-shrink: 0;
-  width: 120px;
-  height: 80px;
-  border-radius: 8px;
-  overflow: hidden;
+/* Card grid style like reference image */
+.news-card {
+  background: transparent;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.news-card:hover {
+  transform: none;
+}
+
+.card-image {
+  width: 100%;
+  height: 180px;
   background: #f5f5f5;
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  margin-bottom: 10px;
+}
+
+.news-card:hover .card-image {
+  box-shadow: 0 12px 28px rgba(0,0,0,0.14);
+  transform: translateY(-2px);
 }
 
 .news-image {
@@ -302,32 +417,21 @@ onMounted(() => {
   color: #ccc;
 }
 
-.news-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.news-title {
-  margin: 0 0 10px 0;
-  color: #333;
-  font-size: 1.2rem;
-  font-weight: 600;
-  line-height: 1.4;
-}
-
-.news-excerpt {
-  margin: 0 0 15px 0;
-  color: #666;
-  line-height: 1.6;
-}
-
-.news-meta {
+.card-body {
+  padding: 14px 16px 12px 16px;
   display: flex;
-  gap: 15px;
-  font-size: 0.9rem;
-  color: #888;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 8px;
 }
+
+.sdgs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: #64748b; }
+.sdgs-label { font-weight: 600; color: #334155; }
+.sdg-badge { background: #eef2ff; color: #3730a3; border: 1px solid #e0e7ff; padding: 2px 6px; border-radius: 6px; font-weight: 600; }
+
+.card-title { margin: 0; color: #0f172a; font-size: 1.05rem; font-weight: 700; line-height: 1.4; }
+.card-excerpt { margin: 0; color: #475569; line-height: 1.6; font-size: 0.95rem; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.card-meta { display: flex; gap: 12px; flex-wrap: wrap; color: #64748b; font-size: 0.85rem; margin-top: 4px; }
+.meta-item { display: inline-flex; align-items: center; gap: 4px; }
 
 .news-arrow {
   flex-shrink: 0;
@@ -338,6 +442,42 @@ onMounted(() => {
 
 .news-item:hover .news-arrow {
   color: #667eea;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.page-btn {
+  padding: 8px 12px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.page-num {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.page-num.active {
+  background: #0ea5e9;
+  color: #fff;
+  border-color: #0ea5e9;
 }
 
 /* Modal Styles */
@@ -434,31 +574,30 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
+/* Right column: year accordion */
+.years-col { position: sticky; top: 16px; }
+.years-title { margin: 0 0 12px 0; font-size: 24px; font-weight: 800; color: #111827; }
+.years-list { display: grid; gap: 8px; }
+.year-item { background: transparent; color: inherit; border-radius: 8px; }
+.year-header { width: 100%; background: #1f2937; border: none; color: #e5e7eb; display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; cursor: pointer; font-weight: 700;}
+.year-caret { transition: transform 0.2s ease; }
+.year-caret.open { transform: rotate(180deg); }
+.year-content { list-style: none; padding: 8px 2px 0 2px; margin: 0; display: grid; gap: 8px; background: transparent; }
+.year-month { display: flex; }
+.month-btn { width: 100%; background: #ffffff; color: #0f172a; border: 1px solid #e5e7eb; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+.month-btn:hover { background: #f8fafc; }
+.month-label { font-weight: 70; }
+.month-count { background: #ef4444; color: #fff; border-radius: 999px; min-width: 28px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; padding: 0 6px; }
+
+@media (max-width: 1024px) {
+  .news-list { grid-template-columns: repeat(2, 1fr); }
+}
+
 @media (max-width: 768px) {
-  .header h1 {
-    font-size: 2rem;
-  }
-  
-  .news-item {
-    flex-direction: column;
-    text-align: center;
-  }
-  
-  .news-image-container {
-    width: 100%;
-    height: 200px;
-  }
-  
-  .news-arrow {
-    display: none;
-  }
-  
-  .news-meta {
-    justify-content: center;
-  }
-  
-  .modal-content {
-    margin: 10px;
-  }
+  .news-layout { grid-template-columns: 1fr; }
+  .news-list { grid-template-columns: 1fr; }
+  .card-image { height: 200px; }
+  .card-meta { justify-content: center; }
+  .modal-content { margin: 10px; }
 }
 </style> 

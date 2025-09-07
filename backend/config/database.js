@@ -9,14 +9,14 @@ const connectDB = async () => {
     const options = {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: parseInt(process.env.DB_SERVER_SELECTION_TIMEOUT) || 30000,
-      socketTimeoutMS: parseInt(process.env.DB_SOCKET_TIMEOUT) || 60000,
-      connectTimeoutMS: parseInt(process.env.DB_CONNECT_TIMEOUT) || 30000,
-      maxPoolSize: parseInt(process.env.DB_MAX_POOL_SIZE) || 10,
+      serverSelectionTimeoutMS: parseInt(process.env.DB_SERVER_SELECTION_TIMEOUT) || 45000,
+      socketTimeoutMS: parseInt(process.env.DB_SOCKET_TIMEOUT) || 120000,
+      connectTimeoutMS: parseInt(process.env.DB_CONNECT_TIMEOUT) || 45000,
+      maxPoolSize: parseInt(process.env.DB_MAX_POOL_SIZE) || 20,
       minPoolSize: parseInt(process.env.DB_MIN_POOL_SIZE) || 2,
-      maxIdleTimeMS: parseInt(process.env.DB_MAX_IDLE_TIME) || 30000,
+      maxIdleTimeMS: parseInt(process.env.DB_MAX_IDLE_TIME) || 60000,
       family: 4,
-      keepAlive: process.env.KEEP_ALIVE === 'true' || true,
+      keepAlive: (process.env.KEEP_ALIVE || 'true') === 'true',
       keepAliveInitialDelay: parseInt(process.env.KEEP_ALIVE_INITIAL_DELAY) || 300000
     };
 
@@ -49,11 +49,12 @@ const connectDB = async () => {
     return conn;
   } catch (error) {
     console.error(`❌ MongoDB Connection Error: ${error.message}`);
-    // ไม่ exit ทันที ให้ลองใหม่
+    // ไม่ exit ทันที ให้ลองใหม่ พร้อมนับครั้งและแสดงสถานะ
+    const retryDelay = parseInt(process.env.DB_RETRY_DELAY_MS) || 5000;
     setTimeout(() => {
-      console.log('🔄 Retrying MongoDB connection...');
+      console.log(`🔄 Retrying MongoDB connection in ${retryDelay}ms...`);
       connectDB();
-    }, 5000);
+    }, retryDelay);
   }
 };
 

@@ -47,10 +47,7 @@ const billSchema = new mongoose.Schema({
     type: String,
     default: null
   },
-  slip_image_url: {
-    type: String,
-    default: null
-  },
+
   imageUploadDate: {
     type: Date,
     default: null

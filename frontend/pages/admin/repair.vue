@@ -51,15 +51,11 @@
         <!-- Data Table -->
         <v-data-table
           :headers="headers"
-          :items="filteredRepairs"
+          :items="pagedRepairs"
           :loading="loading"
           :search="search"
           class="elevation-1 custom-table"
-          :items-per-page="10"
-          :footer-props="{
-            'items-per-page-options': [10, 20, 50],
-            'items-per-page-text': 'รายการต่อหน้า'
-          }"
+          hide-default-footer
           :no-data-text="'ยังไม่มีรายการแจ้งซ่อม'"
           :no-results-text="'ไม่พบรายการที่ค้นหา'"
           :loading-text="'กำลังโหลดข้อมูล...'"
@@ -172,6 +168,25 @@
             </div>
           </template>
         </v-data-table>
+
+        <!-- Pagination (10 per page) -->
+        <div v-if="filteredRepairs.length > 0" class="pagination-section">
+          <div class="items-per-page">
+            <span class="label">Items per page:</span>
+            <span class="fixed-size">10</span>
+            <span class="range">{{ startIndexDisplay }}-{{ endIndexDisplay }} of {{ filteredRepairs.length }}</span>
+          </div>
+          <div class="pagination">
+            <button
+              v-for="p in totalPages"
+              :key="'pg-'+p"
+              class="page-num"
+              :class="{ active: p === currentPage }"
+              @click="goToPage(p)"
+            >{{ p }}</button>
+            <button class="page-next" :disabled="currentPage === totalPages" @click="nextPage">next</button>
+          </div>
+        </div>
       </div>
 
       <!-- Image Preview Dialog -->
@@ -334,6 +349,19 @@ const filteredRepairs = computed(() => {
     shopName: repair.shopName || 'ไม่ระบุร้านค้า'
   }))
 })
+
+// Client-side pagination (10 per page)
+const pageSize = 10
+const currentPage = ref(1)
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredRepairs.value.length / pageSize)))
+const pagedRepairs = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return filteredRepairs.value.slice(start, start + pageSize)
+})
+const goToPage = (p) => { if (p < 1 || p > totalPages.value) return; currentPage.value = p }
+const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++ }
+const startIndexDisplay = computed(() => (filteredRepairs.value.length ? (currentPage.value - 1) * pageSize + 1 : 0))
+const endIndexDisplay = computed(() => Math.min(currentPage.value * pageSize, filteredRepairs.value.length))
 
 // Methods
 const fetchRepairs = async () => {
@@ -499,13 +527,19 @@ const refreshData = async () => {
 // เพิ่มการเรียกใช้ refreshData ทุก 30 วินาที
 onMounted(() => {
   fetchRepairs()
-  // รีเฟรชข้อมูลทุก 30 วินาที
-  const refreshInterval = setInterval(refreshData, 30000)
-  
-  // ล้าง interval เมื่อ component ถูกทำลาย
-  onUnmounted(() => {
-    clearInterval(refreshInterval)
-  })
+  // Realtime via socket
+  try {
+    const { $socket } = useNuxtApp()
+    if ($socket) {
+      const refresh = () => refreshData()
+      $socket.on('admin:repair:new', refresh)
+      $socket.on('user:repair:updated', refresh)
+      onUnmounted(() => {
+        $socket.off('admin:repair:new', refresh)
+        $socket.off('user:repair:updated', refresh)
+      })
+    }
+  } catch (e) { /* no-op */ }
 })
 </script>
 
@@ -565,6 +599,16 @@ onMounted(() => {
   box-shadow: 0 4px 20px rgba(231, 76, 60, 0.1);
   overflow: hidden;
 }
+
+/* Pagination styles */
+.pagination-section { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; margin-top: 12px; }
+.items-per-page { display: flex; align-items: center; gap: 10px; color: #374151; font-size: 14px; }
+.items-per-page .fixed-size { padding: 6px 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; min-width: 48px; text-align: center; }
+.items-per-page .range { margin-left: 12px; color: #6b7280; }
+.pagination { display: flex; gap: 6px; }
+.page-num { min-width: 32px; height: 32px; border: 1px solid #e5e7eb; background: #fff; color: #7f1d1d; border-radius: 2px; cursor: pointer; }
+.page-num.active { background: #7f1d1d; color: #fff; border-color: #7f1d1d; }
+.page-next { border: 1px solid #e5e7eb; background: #fff; color: #7f1d1d; border-radius: 2px; padding: 0 10px; cursor: pointer; }
 
 .v-data-table :deep(.v-data-table__wrapper) {
   border-radius: 12px;

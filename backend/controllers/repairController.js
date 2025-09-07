@@ -6,6 +6,7 @@ import fs from 'fs';
 import mongoose from 'mongoose';
 import { createRepairNotification } from './notificationController.js';
 import { createAdminRepairNotification } from './adminNotificationController.js';
+import { emitToShop, emitToAdmin } from '../socket.js';
 
 // สร้างโฟลเดอร์ uploads/repairs ถ้ายังไม่มี
 const uploadDir = path.join(process.cwd(), 'uploads', 'repairs');
@@ -192,6 +193,7 @@ export const createRepair = async (req, res) => {
     try {
       await createAdminRepairNotification(savedRepair, req.user);
       console.log('✅ Admin repair notification created');
+      emitToAdmin('admin:repair:new', { repairId: savedRepair._id, shopId });
     } catch (notificationError) {
       console.error('❌ Error creating admin repair notification:', notificationError);
     }
@@ -246,6 +248,7 @@ export const updateRepairStatus = async (req, res) => {
     try {
       await createRepairNotification(repair, status);
       console.log('✅ Repair notification created');
+      emitToShop(repair.shopId, 'user:repair:updated', { repairId: repair._id, status: repair.status });
     } catch (notificationError) {
       console.error('❌ Error creating repair notification:', notificationError);
     }
@@ -306,9 +309,24 @@ export const getRepairImage = async (req, res) => {
       return res.status(404).send('Image file not found');
     }
 
-    // ส่งรูปภาพ
-    res.set('Content-Type', 'image/jpeg');
-    fs.createReadStream(imagePath).pipe(res);
+    // ส่งรูปภาพแบบปลอดภัยด้วยการดักจับ error ของ stream
+    const ext = path.extname(imagePath).toLowerCase();
+    let contentType = 'image/jpeg';
+    if (ext === '.png') contentType = 'image/png';
+    else if (ext === '.gif') contentType = 'image/gif';
+    else if (ext === '.webp') contentType = 'image/webp';
+    res.set('Content-Type', contentType);
+
+    const stream = fs.createReadStream(imagePath);
+    stream.on('error', (err) => {
+      console.error('❌ Stream error while sending repair image:', err);
+      if (!res.headersSent) {
+        res.status(500).send('Error streaming image');
+      } else {
+        try { res.end(); } catch (_) {}
+      }
+    });
+    stream.pipe(res);
     
   } catch (error) {
     console.error('Error getting repair image:', error);

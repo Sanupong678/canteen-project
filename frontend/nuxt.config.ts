@@ -2,7 +2,7 @@
 import { defineNuxtConfig } from 'nuxt/config'
 
 export default defineNuxtConfig({
-  css: ['vuetify/styles'],
+  css: ['vuetify/styles', 'cropperjs/dist/cropper.css'],
 
   build: {
     transpile: ['vuetify'],
@@ -41,5 +41,10 @@ export default defineNuxtConfig({
   // Add nitro configuration for better SSR
   nitro: {
     preset: 'node-server'
-  }
+  },
+
+  // Register plugins
+  plugins: [
+    { src: '~/plugins/socket.client.js', mode: 'client' }
+  ]
 })

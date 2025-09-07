@@ -9,23 +9,55 @@
     />
     <div 
       class="banner-display" 
-      :class="{ 'has-image': currentImage }"
-      @click="!readOnly && isAdmin && !currentImage && triggerFileInput()"
+      :class="{ 'has-image': slides.length }"
+      @mouseenter="pauseAutoplay"
+      @mouseleave="startAutoplay"
+      @click="!readOnly && isAdmin && !slides.length && triggerFileInput()"
     >
-      <div v-if="!readOnly && isAdmin && currentImage" class="delete-btn" @click.stop="showDeleteConfirmation">
+      <button 
+        v-if="!readOnly && isAdmin && slides.length" 
+        class="delete-btn" 
+        title="ลบรูปภาพ"
+        @click.stop="showDeleteConfirmation">
         <i class="fas fa-times"></i>
-      </div>
-      <img
-        v-if="currentImage"
-        :src="currentImage"
-        alt="Banner Advertisement"
-        class="banner-image"
+        <span class="btn-label">ลบรูปภาพ</span>
+      </button>
+      <button 
+        v-if="!readOnly && isAdmin" 
+        class="add-btn" 
+        title="เพิ่มรูปภาพ"
+        @click.stop="triggerFileInput">
+        <i class="fas fa-plus"></i>
+        <span class="btn-label">เพิ่มรูปภาพ</span>
+      </button>
+      <transition name="fade" mode="out-in" v-if="slides.length">
+        <img
+          :key="currentIndex"
+          :src="getImageUrl(slides[currentIndex])"
+          alt="Banner Advertisement"
+          class="banner-image"
+        />
+      </transition>
+      <transition name="fade" mode="out-in" v-else>
+        <div class="placeholder">
+          <i class="fas fa-image"></i>
+          <p class="placeholder-title">พื้นที่แสดงแบนเนอร์</p>
+          <p class="placeholder-desc" v-if="!readOnly && isAdmin">คลิกเพื่ออัปโหลดรูปภาพ (สูงสุด 5MB)</p>
+          <p class="placeholder-desc" v-else>ยังไม่มีรูปภาพ</p>
+        </div>
+      </transition>
+
+      
+    </div>
+
+    <!-- Indicators below the banner -->
+    <div v-if="slides.length > 1" class="indicators">
+      <button 
+        v-for="(s, i) in slides" 
+        :key="s._id || i" 
+        :class="['dot', { active: i === currentIndex }]" 
+        @click.stop="goTo(i)" type="button"
       />
-      <div v-else class="placeholder">
-        <i class="fas fa-image"></i>
-        <p v-if="!readOnly && isAdmin">คลิกเพื่ออัปโหลดรูปภาพ</p>
-        <p v-else>ยังไม่มีรูปภาพ</p>
-      </div>
     </div>
 
     <!-- Delete Confirmation Modal -->
@@ -55,10 +87,11 @@ export default {
   },
   data() {
     return {
-      currentImage: null,
+      currentIndex: 0,
       isAdmin: false,
       showDeleteModal: false,
-      backgrounds: []
+      backgrounds: [],
+      autoplayTimer: null
     }
   },
   methods: {
@@ -75,25 +108,91 @@ export default {
         }
         
         try {
-          const token = localStorage.getItem('token')
-          const backendUrl = this.getBackendUrl()
-          const formData = new FormData()
-          formData.append('image', file)
-          formData.append('title', 'Banner')
-          formData.append('description', 'Banner advertisement')
+          // Open a temporary cropper for 21:9 banner
+          const reader = new FileReader()
+          reader.onload = async (e) => {
+            // Create off-DOM image
+            const img = new Image()
+            img.src = e.target.result
+            await new Promise(r => { img.onload = r })
+            const Cropper = (await import('cropperjs')).default
+            const container = document.createElement('div')
+            container.style.position = 'fixed'
+            container.style.inset = '0'
+            container.style.background = 'rgba(0,0,0,0.7)'
+            container.style.display = 'flex'
+            container.style.alignItems = 'center'
+            container.style.justifyContent = 'center'
+            container.style.zIndex = '2000'
+            const box = document.createElement('div')
+            box.style.background = '#fff'
+            box.style.borderRadius = '12px'
+            box.style.padding = '12px'
+            box.style.width = 'min(1000px, 96vw)'
+            const imgEl = document.createElement('img')
+            imgEl.src = img.src
+            imgEl.style.maxWidth = '100%'
+            box.appendChild(imgEl)
+            const actions = document.createElement('div')
+            actions.style.display = 'flex'
+            actions.style.justifyContent = 'flex-end'
+            actions.style.gap = '8px'
+            actions.style.marginTop = '8px'
+            const cancelBtn = document.createElement('button')
+            cancelBtn.textContent = 'ยกเลิก'
+            cancelBtn.className = 'btn btn-secondary'
+            const okBtn = document.createElement('button')
+            okBtn.textContent = 'ยืนยัน'
+            okBtn.className = 'btn btn-primary'
+            actions.appendChild(cancelBtn)
+            actions.appendChild(okBtn)
+            box.appendChild(actions)
+            container.appendChild(box)
+            document.body.appendChild(container)
 
-          const response = await axios.post(`${backendUrl}/api/backgrounds`, formData, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'multipart/form-data'
+            const cropper = new Cropper(imgEl, {
+              viewMode: 1,
+              dragMode: 'move',
+              aspectRatio: 21 / 9, // locked for banner
+              autoCropArea: 1,
+              responsive: true,
+              background: false,
+              zoomOnWheel: true
+            })
+
+            const cleanup = () => { cropper.destroy(); document.body.removeChild(container) }
+            cancelBtn.onclick = cleanup
+            okBtn.onclick = async () => {
+              try {
+                const canvas = cropper.getCroppedCanvas()
+                const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.9))
+                if (!blob) { cleanup(); return }
+                const token = localStorage.getItem('token')
+                const backendUrl = this.getBackendUrl()
+                const formData = new FormData()
+                formData.append('image', new File([blob], 'banner.jpg', { type: 'image/jpeg' }))
+                formData.append('title', 'Banner')
+                formData.append('description', 'Banner advertisement')
+                const response = await axios.post(`${backendUrl}/api/backgrounds`, formData, {
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'multipart/form-data'
+                  }
+                })
+                if (response.data.success) {
+                  await this.loadBackgrounds()
+                  this.currentIndex = 0
+                  alert('อัปโหลดรูปภาพสำเร็จ')
+                }
+              } catch (err) {
+                console.error('Error uploading cropped banner:', err)
+                alert('เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ')
+              } finally {
+                cleanup()
+              }
             }
-          })
-
-          if (response.data.success) {
-            this.currentImage = `${backendUrl}/api/backgrounds/${response.data.data._id}/image`
-            this.loadBackgrounds() // Reload backgrounds
-            alert('อัปโหลดรูปภาพสำเร็จ')
           }
+          reader.readAsDataURL(file)
         } catch (error) {
           console.error('Error uploading banner:', error)
           alert('เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ')
@@ -112,13 +211,13 @@ export default {
         console.log('🔍 Debugging removeImage:')
         console.log('- Backend URL:', backendUrl)
         console.log('- Backgrounds:', this.backgrounds)
-        console.log('- Current Image:', this.currentImage)
+        console.log('- Current Index:', this.currentIndex)
         
-        // Find the active background to delete
-        const activeBackground = this.backgrounds.find(bg => bg.isActive)
-        console.log('- Active Background:', activeBackground)
+        const slides = this.slides
+        const current = slides[this.currentIndex]
+        console.log('- Current Background:', current)
         
-        if (activeBackground) {
+        if (current) {
           const token = localStorage.getItem('token')
           console.log('- Token exists:', !!token)
           
@@ -127,19 +226,18 @@ export default {
             return
           }
           
-          console.log('- Deleting background ID:', activeBackground._id)
-          const response = await axios.delete(`${backendUrl}/api/backgrounds/${activeBackground._id}`, {
+          console.log('- Deleting background ID:', current._id)
+          const response = await axios.delete(`${backendUrl}/api/backgrounds/${current._id}`, {
             headers: { Authorization: `Bearer ${token}` }
           })
           
           console.log('- Delete response:', response.data)
-          
-          this.currentImage = null
-          this.loadBackgrounds() // Reload backgrounds
+          await this.loadBackgrounds()
+          this.currentIndex = 0
           this.closeModal()
           alert('ลบรูปภาพสำเร็จ')
         } else {
-          console.log('- No active background found')
+          console.log('- No current background found')
           alert('ไม่พบรูปภาพที่ต้องการลบ')
         }
       } catch (error) {
@@ -177,20 +275,56 @@ export default {
         const response = await axios.get(`${backendUrl}/api/backgrounds`)
         if (response.data.success) {
           this.backgrounds = response.data.data
-          // Set the first active background as current image
-          const activeBackground = this.backgrounds.find(bg => bg.isActive)
-          if (activeBackground) {
-            this.currentImage = `${backendUrl}/api/backgrounds/${activeBackground._id}/image`
-          }
+          this.currentIndex = 0
         }
       } catch (error) {
         console.error('Error loading backgrounds:', error)
       }
+    },
+    startAutoplay() {
+      if (this.autoplayTimer || this.slides.length <= 1) return
+      this.autoplayTimer = setInterval(this.next, 5000)
+    },
+    pauseAutoplay() {
+      if (this.autoplayTimer) {
+        clearInterval(this.autoplayTimer)
+        this.autoplayTimer = null
+      }
+    },
+    next() {
+      if (!this.slides.length) return
+      this.currentIndex = (this.currentIndex + 1) % this.slides.length
+    },
+    prev() {
+      if (!this.slides.length) return
+      this.currentIndex = (this.currentIndex - 1 + this.slides.length) % this.slides.length
+    },
+    goTo(index) {
+      if (index >= 0 && index < this.slides.length) {
+        this.currentIndex = index
+      }
+    },
+    getImageUrl(bg) {
+      const backendUrl = this.getBackendUrl()
+      return `${backendUrl}/api/backgrounds/${bg._id}/image`
+    }
+  },
+  computed: {
+    slides() {
+      const active = this.backgrounds.filter(bg => bg.isActive)
+      return active.length ? active : this.backgrounds
     }
   },
   async mounted() {
     this.checkUserRole()
     await this.loadBackgrounds()
+    this.startAutoplay()
+    window.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.pauseAutoplay(); else this.startAutoplay();
+    })
+  },
+  beforeUnmount() {
+    this.pauseAutoplay()
   }
 }
 </script>
@@ -198,49 +332,50 @@ export default {
 <style scoped>
 .banner-container {
   width: 100%;
-  max-width: 1600px;
-  margin: 0 auto;
-  padding: 30px;
+  max-width: none;
   position: relative;
 }
 
 .banner-display {
   width: 100%;
-  height: 450px;
-  border: 2px dashed #ddd;
-  border-radius: 8px;
+  height: 420px;
+  border: none;
+  border-radius: 0;
   overflow: hidden;
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #f8f9fa;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef2f7 100%);
   cursor: pointer;
   position: relative;
   transition: all 0.3s ease;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.06);
 }
 
 .banner-display.has-image {
-  border-style: solid;
+  border-color: #e5e7eb;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.08);
 }
 
 .banner-display:hover {
-  border-color: #28a745;
+  border-color: #cbd5e1;
 }
 
 .delete-btn {
   position: absolute;
   top: 10px;
   right: 10px;
-  width: 30px;
-  height: 30px;
-  background-color: rgba(220, 53, 69, 0.9);
-  border-radius: 50%;
+  padding: 6px 12px;
+  background-color: rgba(220, 53, 69, 0.95);
+  border-radius: 999px;
   display: flex;
   justify-content: center;
   align-items: center;
+  gap: 6px;
   cursor: pointer;
   z-index: 2;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+  border: none;
 }
 
 .delete-btn:hover {
@@ -252,6 +387,49 @@ export default {
   color: white;
   font-size: 14px;
 }
+.delete-btn .btn-label { color: white; font-size: 13px; }
+
+.add-btn {
+  position: absolute;
+  top: 10px;
+  right: 110px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 2px solid #d23b2d;
+  background: rgba(255,255,255,0.95);
+  color: #d23b2d;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+/* Indicators */
+.indicators {
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid #d23b2d;
+  box-sizing: border-box;
+}
+
+.dot.active {
+  width: 16px;
+  background: #d23b2d;
+  border-color: #d23b2d;
+}
+
+/* removed arrows */
 
 .banner-image {
   width: 100%;
@@ -259,8 +437,24 @@ export default {
   object-fit: cover;
 }
 
+@media (min-width: 1280px) {
+  .banner-display {
+    height: 480px;
+  }
+}
+
+@media (min-width: 1536px) {
+  .banner-display {
+    height: 560px;
+  }
+}
+
+/* Smooth fade transition - fade out old, fade in new */
+.fade-enter-active, .fade-leave-active { transition: opacity 0.5s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
 .placeholder {
-  color: #666;
+  color: #374151;
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -269,13 +463,20 @@ export default {
 }
 
 .placeholder i {
-  font-size: 48px;
-  color: #ccc;
+  font-size: 56px;
+  color: #94a3b8;
 }
 
-.placeholder p {
-  margin: 0;
+.placeholder-title {
+  margin: 8px 0 0 0;
   font-size: 18px;
+  font-weight: 700;
+}
+
+.placeholder-desc {
+  margin: 0;
+  font-size: 13px;
+  color: #6b7280;
 }
 
 /* Modal Styles */

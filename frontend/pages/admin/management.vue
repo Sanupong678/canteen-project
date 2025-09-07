@@ -245,6 +245,7 @@
           }
         },
         selectCanteen(canteen) {
+          if (!canteen || !canteen.path) return
           this.$router.push(canteen.path)
         },
       viewShopDetails(shop) {

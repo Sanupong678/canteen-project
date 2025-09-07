@@ -32,6 +32,7 @@
 
   dotenv.config();
   const app = express();
+  const isProduction = process.env.NODE_ENV === 'production';
 
   // Get current directory
   const __filename = fileURLToPath(import.meta.url);
@@ -89,6 +90,15 @@
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+  // Prevent 30s drops: increase per-request timeouts
+  app.use((req, res, next) => {
+    const requestTimeoutMs = parseInt(process.env.REQUEST_TIMEOUT_MS) || 0; // 0 disables
+    const responseTimeoutMs = parseInt(process.env.RESPONSE_TIMEOUT_MS) || 0; // 0 disables
+    try { req.setTimeout(requestTimeoutMs); } catch (_) {}
+    try { res.setTimeout(responseTimeoutMs); } catch (_) {}
+    next();
+  });
+
   // Static files with CORS for all uploads subdirectories
   app.use('/uploads', (req, res, next) => {
     res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
@@ -113,6 +123,16 @@
     res.header('Access-Control-Allow-Headers', 'Content-Type');
     next();
   }, express.static(path.join(__dirname, 'images')));
+
+  // Health check endpoint
+  app.get('/health', (req, res) => {
+    res.json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      dbState: mongoose.connection.readyState
+    });
+  });
 
   // Routes
   app.use('/api/users', userRoutes);
@@ -235,10 +255,25 @@
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   });
 
+  // Initialize Socket.IO
+  try {
+    const { initSocket } = await import('./socket.js');
+    initSocket(server);
+    console.log('🔌 Socket.IO initialized');
+  } catch (e) {
+    console.warn('⚠️ Failed to initialize Socket.IO:', e.message);
+  }
+
   // เพิ่ม error handling สำหรับ server
   server.on('error', (error) => {
     console.error('❌ Server Error:', error);
   });
+
+  // Tune HTTP server timeouts to avoid premature disconnects (~30s)
+  server.keepAliveTimeout = parseInt(process.env.KEEP_ALIVE_TIMEOUT_MS) || 65000; // default 65s
+  server.headersTimeout = parseInt(process.env.HEADERS_TIMEOUT_MS) || 66000; // slightly above keepAliveTimeout
+  server.requestTimeout = parseInt(process.env.REQUEST_TIMEOUT_MS) || 0; // disable request timeout by default
+  try { server.setTimeout(parseInt(process.env.SOCKET_TIMEOUT_MS) || 0); } catch (_) {}
 
   // เพิ่ม graceful shutdown
   process.on('SIGTERM', () => {
@@ -266,24 +301,34 @@
   // เพิ่ม uncaught exception handler
   process.on('uncaughtException', (error) => {
     console.error('❌ Uncaught Exception:', error);
-    server.close(() => {
-      console.log('✅ Server closed due to uncaught exception');
-      mongoose.connection.close(() => {
-        console.log('✅ MongoDB connection closed');
-        process.exit(1);
+    if (isProduction) {
+      server.close(() => {
+        console.log('✅ Server closed due to uncaught exception');
+        mongoose.connection.close(() => {
+          console.log('✅ MongoDB connection closed');
+          process.exit(1);
+        });
       });
-    });
+    } else {
+      // In development, log and keep the process alive for easier debugging
+      console.warn('⚠️ Continuing after uncaught exception in development');
+    }
   });
 
   process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-    server.close(() => {
-      console.log('✅ Server closed due to unhandled rejection');
-      mongoose.connection.close(() => {
-        console.log('✅ MongoDB connection closed');
-        process.exit(1);
+    if (isProduction) {
+      server.close(() => {
+        console.log('✅ Server closed due to unhandled rejection');
+        mongoose.connection.close(() => {
+          console.log('✅ MongoDB connection closed');
+          process.exit(1);
+        });
       });
-    });
+    } else {
+      // In development, log and continue running
+      console.warn('⚠️ Continuing after unhandled rejection in development');
+    }
   });
 
   // Connect to MongoDB and start server

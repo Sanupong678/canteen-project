@@ -6,6 +6,7 @@ import Leave from '../models/leaveModel.js';
 import Repair from '../models/repairModel.js';
 import UserReadStatus from '../models/userReadStatusModel.js';
 import Evaluation from '../models/Evaluation.js';
+import { emitToShop } from '../socket.js';
 
 // Get user notifications
 export const getUserNotifications = async (req, res) => {
@@ -494,6 +495,9 @@ export const createNotification = async (userId, shopId, type, title, message, s
 
     await notification.save();
     console.log(`✅ Notification created: ${type} - ${status}`);
+    try {
+      if (shopId) emitToShop(shopId, 'user:notification:new', { type, title, message, status, relatedId });
+    } catch (_) {}
     return notification;
   } catch (error) {
     console.error('Error creating notification:', error);

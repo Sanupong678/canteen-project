@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import xlsx from 'xlsx';
 import { createBillNotification } from './notificationController.js';
 import { createAdminBillNotification } from './adminNotificationController.js';
+import { emitToShop, emitToAdmin } from '../socket.js';
 
 // Get current file directory name
 const __filename = fileURLToPath(import.meta.url);
@@ -104,6 +105,8 @@ export const uploadBill = async (req, res) => {
     try {
       await createAdminBillNotification(bill, req.user);
       console.log('✅ Admin bill notification created');
+      // Realtime: notify admin list updated
+      emitToAdmin('admin:bill:newUpload', { billId: bill._id, shopId: bill.shopId });
     } catch (notificationError) {
       console.error('❌ Error creating admin bill notification:', notificationError);
     }
@@ -166,6 +169,8 @@ export const verifyBill = async (req, res) => {
     try {
       await createBillNotification(bill, status);
       console.log('✅ Bill notification created');
+      // Realtime: notify shop of bill status change
+      emitToShop(bill.shopId, 'user:bill:updated', { billId: bill._id, status: bill.status });
       
       // ส่ง event ไปยัง frontend (ถ้ามี WebSocket หรือ Server-Sent Events)
       // emit('billUpdated', { shopId: bill.shopId, billId: bill._id, status });
@@ -489,7 +494,16 @@ export const getBillImage = async (req, res) => {
         else if (ext === '.webp') contentType = 'image/webp';
         
         res.set('Content-Type', contentType);
-        return fs.createReadStream(bill.imagePath).pipe(res);
+        const stream = fs.createReadStream(bill.imagePath);
+        stream.on('error', (err) => {
+          console.error('❌ Stream error while sending bill image:', err);
+          if (!res.headersSent) {
+            res.status(500).send('Error streaming image');
+          } else {
+            try { res.end(); } catch (_) {}
+          }
+        });
+        return stream.pipe(res);
       } else {
         console.log('❌ Image file does NOT exist:', bill.imagePath);
         // ลบ path ออกจาก database เมื่อไฟล์หาย
@@ -544,6 +558,8 @@ export const cancelBillImage = async (req, res) => {
     try {
       await createBillNotification(bill, 'รอดำเนินการ');
       console.log('✅ Bill cancellation notification created');
+      // Realtime: notify shop of bill image cancellation
+      emitToShop(bill.shopId, 'user:bill:imageCancelled', { billId: bill._id });
     } catch (notificationError) {
       console.error('❌ Error creating bill cancellation notification:', notificationError);
     }

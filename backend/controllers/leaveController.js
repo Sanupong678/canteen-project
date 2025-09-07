@@ -3,6 +3,7 @@ import Shop from '../models/Shop.js';
 import User from '../models/userModel.js';
 import { createLeaveNotification } from './notificationController.js';
 import { createAdminLeaveNotification } from './adminNotificationController.js';
+import { emitToShop, emitToAdmin } from '../socket.js';
 
 // Get all leaves (admin)
 export const getLeaves = async (req, res) => {
@@ -120,6 +121,7 @@ export const createLeave = async (req, res) => {
     try {
       await createAdminLeaveNotification(savedLeave, req.user);
       console.log('✅ Admin leave notification created');
+      emitToAdmin('admin:leave:new', { leaveId: savedLeave._id, shopId });
     } catch (notificationError) {
       console.error('❌ Error creating admin leave notification:', notificationError);
     }
@@ -167,6 +169,7 @@ export const updateLeaveStatus = async (req, res) => {
     try {
       await createLeaveNotification(leave, status);
       console.log('✅ Leave notification created');
+      emitToShop(leave.shopId, 'user:leave:updated', { leaveId: leave._id, status: leave.status });
     } catch (notificationError) {
       console.error('❌ Error creating leave notification:', notificationError);
     }

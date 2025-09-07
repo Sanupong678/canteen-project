@@ -11,11 +11,13 @@
   },
   "dependencies": {
     "axios": "^1.9.0",
+    "cropperjs": "^1.6.2",
     "date-fns": "^4.1.0",
     "nuxt": "^3.16.2",
     "qrcode": "^1.5.4",
     "sass": "^1.87.0",
     "sass-loader": "^10.5.2",
+    "socket.io-client": "^4.8.1",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0",
     "vuetify": "^3.8.2"

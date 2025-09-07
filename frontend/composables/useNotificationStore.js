@@ -179,13 +179,7 @@ export const useNotificationStore = () => {
     await fetchNotifications()
     isInitialized.value = true
     
-    // ตั้งค่า auto-refresh ทุก 30 วินาที (เฉพาะเมื่อ user อยู่ในหน้า)
-    setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        console.log('🔄 Auto-refreshing notifications...')
-        fetchNotifications()
-      }
-    }, 30000)
+    // Realtime updates handled by socket plugin; no interval
     
     // ตั้งค่า lastFetchTime เพื่อป้องกันการ fetch ซ้ำ
     lastFetchTime.value = Date.now()

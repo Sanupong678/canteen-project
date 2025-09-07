@@ -439,14 +439,23 @@ export default {
       fetchBills()
     })
 
-    // Initial data fetch and auto refresh
+    // Initial data fetch and realtime updates
     onMounted(() => {
       fetchBills()
-      const refreshInterval = setInterval(fetchBills, 30000)
-      
-      onUnmounted(() => {
-        clearInterval(refreshInterval)
-      })
+      try {
+        const { $socket } = useNuxtApp()
+        if ($socket) {
+          const refresh = () => fetchBills()
+          $socket.on('admin:bill:newUpload', refresh)
+          $socket.on('user:bill:updated', refresh)
+          $socket.on('user:bill:imageCancelled', refresh)
+          onUnmounted(() => {
+            $socket.off('admin:bill:newUpload', refresh)
+            $socket.off('user:bill:updated', refresh)
+            $socket.off('user:bill:imageCancelled', refresh)
+          })
+        }
+      } catch (e) { /* no-op */ }
     })
 
     const updateStatus = async (billId, newStatus) => {

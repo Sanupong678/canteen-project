@@ -1,14 +1,17 @@
+
 <template>
   <div class="news-section">
-    <h1>ข่าวสาร</h1>
+    <div class="news-header">
+      <h2 class="title">ข่าวและกิจกรรม</h2>
+    </div>
     <div class="divider"></div>
     
     <div class="news-container">
       <div 
         class="news-item" 
-        v-for="(news, index) in newsList" 
+        v-for="(news, index) in displayNews" 
         :key="news._id || index"
-        @click="readOnly && showImagePreview(news.imageFilename ? `${backendUrl}/api/news/${news._id}/image` : null)"
+        @click="readOnly ? openNewsDetail(news) : null"
       >
         <div class="news-image-container">
           <img 
@@ -26,15 +29,15 @@
             class="delete-btn" 
             @click.stop="showDeleteConfirmation(news._id)"
           >
-            <i class="fas fa-times"></i>
+            ลบ
           </button>
         </div>
         <div class="news-text">
           <h3>{{ news.title }}</h3>
           <p>{{ news.content }}</p>
           <div class="news-meta">
+            <span>{{ formatDate(news.createdAt) }}</span>
             <span v-if="news.author">👤 {{ news.author }}</span>
-            <span v-if="news.views">👁️ {{ news.views }} ครั้ง</span>
           </div>
         </div>
       </div>
@@ -94,6 +97,10 @@
       </div>
     </div>
 
+    <div v-if="readOnly && showAllLink" class="view-all-wrapper">
+      <button class="view-all-btn" @click="goToAllNews">ดูข่าวทั้งหมด</button>
+    </div>
+
     <!-- Delete Confirmation Modal -->
     <div v-if="showDeleteModal" class="modal-overlay" @click="closeModal">
       <div class="modal-content" @click.stop>
@@ -117,6 +124,44 @@
         </button>
       </div>
     </div>
+
+    <!-- Read-only News Detail Modal -->
+    <div v-if="selectedNews && readOnly" class="modal-overlay" @click="closeNewsDetail">
+      <div class="detail-modal-content" @click.stop>
+        <div class="detail-modal-header">
+          <h3>{{ selectedNews.title }}</h3>
+          <button class="close-preview-btn" @click="closeNewsDetail"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="detail-modal-body">
+          <div class="news-detail-image" v-if="selectedNews.imageFilename">
+            <img :src="`${backendUrl}/api/news/${selectedNews._id}/image`" :alt="selectedNews.title">
+          </div>
+          <div class="news-detail-text">
+            <p>{{ selectedNews.content }}</p>
+          </div>
+          <div class="news-detail-meta">
+            <span>{{ formatDate(selectedNews.createdAt) }}</span>
+            <span v-if="selectedNews.author">👤 {{ selectedNews.author }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cropper Modal -->
+    <div v-if="showCropperModal" class="cropper-overlay" @click="closeCropper">
+      <div class="cropper-content" @click.stop>
+        <div class="cropper-header">
+          <h3 class="cropper-title">ครอปรูปภาพ</h3>
+        </div>
+        <div class="cropper-body">
+          <img ref="cropperImg" :src="newNews.imagePreview" alt="Crop" class="cropper-img" />
+        </div>
+        <div class="cropper-actions">
+          <button class="btn btn-secondary" @click="closeCropper">ยกเลิก</button>
+          <button class="btn btn-primary" @click="confirmCrop">ยืนยัน</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -129,6 +174,18 @@ export default {
     readOnly: {
       type: Boolean,
       default: false
+    },
+    limit: {
+      type: Number,
+      default: null
+    },
+    showAllLink: {
+      type: Boolean,
+      default: false
+    },
+    allLinkPath: {
+      type: String,
+      default: '/user/news'
     }
   },
   data() {
@@ -137,6 +194,10 @@ export default {
       showForm: false,
       showDeleteModal: false,
       showImageModal: false,
+      selectedNews: null,
+      showCropperModal: false,
+      cropper: null,
+      cropperReady: false,
       previewImage: null,
       newNews: {
         title: '',
@@ -152,6 +213,17 @@ export default {
         : 'http://localhost:4000'
     }
   },
+  computed: {
+    displayNews() {
+      // If limit provided (e.g., homepage), show newest first limited amount
+      if (this.limit && this.readOnly) {
+        return [...this.newsList]
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+          .slice(0, this.limit)
+      }
+      return this.newsList
+    }
+  },
   methods: {
     async loadNews() {
       try {
@@ -164,6 +236,24 @@ export default {
       } catch (error) {
         console.error('❌ Error loading news:', error)
       }
+    },
+    openNewsDetail(news) {
+      this.selectedNews = news
+    },
+    closeNewsDetail() {
+      this.selectedNews = null
+    },
+    formatDate(dateString) {
+      try {
+        const d = new Date(dateString)
+        const dd = String(d.getDate()).padStart(2, '0')
+        const mm = String(d.getMonth() + 1).padStart(2, '0')
+        const yyyy = d.getFullYear()
+        return `${dd}/${mm}/${yyyy}`
+      } catch { return '' }
+    },
+    goToAllNews() {
+      this.$router.push(this.allLinkPath)
     },
     
     showAddForm() {
@@ -184,12 +274,59 @@ export default {
         }
         
         this.newNews.image = file
-        
         const reader = new FileReader()
         reader.onload = (e) => {
           this.newNews.imagePreview = e.target.result
+          this.$nextTick(() => {
+            this.openCropper()
+          })
         }
         reader.readAsDataURL(file)
+      }
+    },
+
+    async openCropper() {
+      try {
+        this.showCropperModal = true
+        await this.$nextTick()
+        const img = this.$refs.cropperImg
+        if (!img) return
+        // Lazy import to avoid SSR issues
+        const Cropper = (await import('cropperjs')).default
+        if (this.cropper) {
+          this.cropper.destroy()
+          this.cropper = null
+        }
+        this.cropper = new Cropper(img, {
+          viewMode: 1,
+          dragMode: 'move',
+          aspectRatio: NaN, // freeform crop for news
+          autoCropArea: 1,
+          responsive: true,
+          background: false,
+          zoomOnWheel: true
+        })
+      } catch (e) {
+        console.error('Error initializing cropper:', e)
+      }
+    },
+
+    confirmCrop() {
+      if (!this.cropper) return
+      const canvas = this.cropper.getCroppedCanvas()
+      canvas.toBlob((blob) => {
+        if (!blob) return
+        this.newNews.image = new File([blob], 'cropped.jpg', { type: 'image/jpeg' })
+        this.newNews.imagePreview = canvas.toDataURL('image/jpeg', 0.9)
+        this.closeCropper()
+      }, 'image/jpeg', 0.9)
+    },
+
+    closeCropper() {
+      this.showCropperModal = false
+      if (this.cropper) {
+        this.cropper.destroy()
+        this.cropper = null
       }
     },
     
@@ -296,46 +433,88 @@ export default {
 
 <style scoped>
 .news-section {
-  margin-top: 40px;
+  margin-top: 8px;
 }
 
-h1 {
-  color: #333;
-  margin-bottom: 20px;
+.news-header {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.title {
+  color: #111827;
+  margin: 0;
   font-size: 28px;
+  font-weight: 800;
 }
 
 .divider {
-  height: 2px;
-  background-color: #ddd;
-  margin-bottom: 30px;
+  height: 4px;
+  background-color: #e74c3c;
+  border-radius: 999px;
+  margin: 8px 0 18px 0;
 }
 
 .news-container {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
-  margin-top: 20px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 8px;
+}
+
+/* Tablet */
+
+@media (max-width: 900px) {
+  .news-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .news-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+.view-all-wrapper {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.view-all-btn {
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 999px;
+  cursor: pointer;
 }
 
 .news-item {
-  background: white;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: transparent;
+  border-radius: 0;
+  overflow: visible;
+  box-shadow: none;
   position: relative;
   cursor: pointer;
-  transition: transform 0.3s;
-}
-
-.news-item:hover {
-  transform: translateY(-5px);
+  transition: transform 0.25s ease;
 }
 
 .news-image-container {
   position: relative;
-  height: 200px;
   overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+  margin-bottom: 10px;
+}
+
+.news-item:hover .news-image-container {
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
+  transform: translateY(-2px);
 }
 
 .news-image {
@@ -356,28 +535,39 @@ h1 {
 }
 
 .news-text {
-  padding: 15px;
+  padding: 0 2px 2px 2px;
   color: #333;
 }
 
 .news-text h3 {
-  margin: 0 0 10px 0;
+  margin: 0 0 8px 0;
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
+  color: #111827;
+  display: -webkit-box;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .news-text p {
   margin: 0 0 10px 0;
   font-size: 14px;
   line-height: 1.5;
-  color: #666;
+  color: #4b5563;
+  display: -webkit-box;
+  line-clamp: 3;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .news-meta {
   display: flex;
-  gap: 15px;
+  gap: 12px;
   font-size: 12px;
-  color: #888;
+  color: #6b7280;
 }
 
 .delete-btn {
@@ -593,4 +783,39 @@ h1 {
   background-color: white;
   transform: scale(1.1);
 }
+
+/* Read-only detail modal */
+.detail-modal-content { background: #fff; border-radius: 12px; width: min(900px, 96vw); max-height: 90vh; overflow: auto; padding: 16px; }
+.detail-modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; }
+.detail-modal-header h3 { margin: 0; font-weight: 800; color: #111827; }
+.detail-modal-body { padding-top: 12px; }
+.detail-modal-body .news-detail-image img { max-width: 100%; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.detail-modal-body .news-detail-text p { color: #333; line-height: 1.7; font-size: 1rem; }
+.detail-modal-body .news-detail-meta { display: flex; gap: 12px; color: #64748b; font-size: 0.9rem; margin-top: 8px; }
+
+/* Cropper Modal */
+.cropper-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 16px;
+}
+.cropper-content {
+  background: #fff;
+  border-radius: 12px;
+  width: min(900px, 96vw);
+  padding: 12px;
+}
+.cropper-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.cropper-title { margin: 0; font-weight: 800; font-size: 18px; color: #111827; }
+.cropper-body { max-height: 70vh; overflow: hidden; }
+.cropper-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.btn { padding: 8px 14px; border-radius: 8px; border: none; cursor: pointer; }
+.btn-secondary { background: #e5e7eb; color: #111827; }
+.btn-primary { background: #e74c3c; color: #fff; }
+.cropper-img { max-width: 100%; display: block; }
 </style> 

@@ -6,14 +6,7 @@ import LayoutUser from "@/components/LayoutUser.vue";
 import IndexAdmin from "~/pages/admin/index.vue";
 import IndexUser from "~/pages/user/index.vue";
 import Management from "~/pages/admin/management.vue";
-import C5 from "~/pages/admin/canteen/c5.vue";
-import D1 from "~/pages/admin/canteen/d1.vue";
-import E1 from "@/pages/admin/canteen/e1.vue";
-import E2 from "~/pages/admin/canteen/e2.vue";
-import Msquare from "~/pages/admin/canteen/Msquare.vue";
-import RuemRim from "~/pages/admin/canteen/RuemRim.vue";
-import S2 from "~/pages/admin/canteen/s2.vue";
-import Epark from "~/pages/admin/canteen/epark.vue";
+import CanteenDynamic from "@/pages/admin/canteen/CanteenDynamic.vue";
 import UserLeave from "~/pages/user/leave.vue";
 import AdminLeave from "~/pages/admin/leave.vue";
 import UserRepair from "~/pages/user/repair.vue";
@@ -30,7 +23,7 @@ const routes = [
     component: Login,
     meta: { requiresAuth: false }
   },
-  // หน้า Admin
+  // หน้า Admin (กลุ่มเส้นทางหลัก)
   {
     path: "/admin",
     component: LayoutAdmin,
@@ -63,60 +56,20 @@ const routes = [
         meta: { requiresAuth: true, role: 'admin' }
       },
       {
-        path: "canteen/c5",
-        name: "c5",
-        component: C5,
-        meta: { requiresAuth: true, role: 'admin' }
-      },
-      {
-        path: "canteen/d1",
-        name: "d1",
-        component: D1,
-        meta: { requiresAuth: true, role: 'admin' }
-      },
-      {
-        path: "canteen/e1",
-        name: "e1",
-        component: E1,
-        meta: { requiresAuth: true, role: 'admin' }
-      },
-      {
-        path: "canteen/e2",
-        name: "e2",
-        component: E2,
-        meta: { requiresAuth: true, role: 'admin' }
-      },
-      {
-        path: "canteen/msquare",
-        name: "msquare",
-        component: Msquare,
-        meta: { requiresAuth: true, role: 'admin' }
-      },
-      {
-        path: "canteen/ruemrim",
-        name: "ruemrim",
-        component: RuemRim,
-        meta: { requiresAuth: true, role: 'admin' }
-      },
-      {
-        path: "canteen/s2",
-        name: "s2",
-        component: S2,
-        meta: { requiresAuth: true, role: 'admin' }
-      },
-      {
-        path: "canteen/epark",
-        name: "epark",
-        component: Epark,
-        meta: { requiresAuth: true, role: 'admin' }
-      },
-      {
         path: '/admin/evaluation',
         name: 'Evaluation',
         component: Evaluation,
         meta: { requiresAuth: true, role: 'admin' }
       }
     ]
+  },
+
+  // หน้า Admin (เส้นทางไดนามิกแบบ absolute เพื่อแก้ no match)
+  {
+    path: "/admin/canteen/:id",
+    name: "canteenDynamic",
+    component: CanteenDynamic,
+    meta: { requiresAuth: true, role: 'admin' }
   },
 
   // หน้า User

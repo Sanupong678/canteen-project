@@ -3,14 +3,73 @@ import path from 'path';
 import fs from 'fs';
 
 export const getCanteens = async (req, res) => {
-  const canteens = await Canteen.find();
-  res.json(canteens);
+  try {
+    const canteens = await Canteen.find();
+
+    // Resolve image from uploads/canteen by canteen slug if available
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'canteen');
+    const candidateExtensions = ['.png', '.jpeg', '.jpg', '.webp'];
+
+    const normalizeSlug = (value) => {
+      if (!value) return '';
+      const lower = String(value).toLowerCase();
+      // Remove Thai prefix "โรงอาหาร " and spaces
+      const stripped = lower.replace(/โรงอาหาร\s*/g, '').replace(/\s+/g, '');
+      // Map known inconsistencies between path and filename
+      if (stripped === 'dormity') return 'dorm';
+      if (stripped === 'ruemrim') return 'ruem';
+      return stripped;
+    };
+
+    const result = canteens.map((doc) => {
+      const canteen = doc.toObject();
+
+      // Prefer slug from path's last segment, fallback to name
+      const pathSegment = (canteen.path || '').split('/').filter(Boolean).pop();
+      const slug = normalizeSlug(pathSegment || canteen.name);
+
+      let resolvedImage = canteen.image;
+      try {
+        if (slug && fs.existsSync(uploadsDir)) {
+          for (const ext of candidateExtensions) {
+            const fileName = `canteen-${slug}${ext}`;
+            const fullPath = path.join(uploadsDir, fileName);
+            if (fs.existsSync(fullPath)) {
+              resolvedImage = `/uploads/canteen/${fileName}`;
+              break;
+            }
+          }
+        }
+      } catch (_) {
+        // Silently ignore file system errors and keep existing image
+      }
+
+      return { ...canteen, image: resolvedImage };
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error loading canteens:', error);
+    res.status(500).json({ error: 'Failed to load canteens' });
+  }
 };
 
 export const createCanteen = async (req, res) => {
-  const canteen = new Canteen(req.body);
-  await canteen.save();
-  res.status(201).json(canteen);
+  try {
+    const payload = req.body || {};
+    // auto-assign canteenId if missing: next integer after max
+    if (payload.canteenId == null) {
+      const maxDoc = await Canteen.find().sort({ canteenId: -1 }).limit(1);
+      const nextId = (maxDoc[0]?.canteenId || 0) + 1;
+      payload.canteenId = nextId;
+    }
+    const canteen = new Canteen(payload);
+    await canteen.save();
+    res.status(201).json(canteen);
+  } catch (error) {
+    console.error('Error creating canteen:', error);
+    res.status(500).json({ message: error.message });
+  }
 };
 
 export const updateCanteen = async (req, res) => {

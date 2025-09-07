@@ -6,54 +6,63 @@ dotenv.config();
 
 const canteensData = [
   {
+    canteenId: 1,
     name: 'โรงอาหาร C5',
     image: '/images/c5.png',
     path: '/admin/canteen/c5',
     type: 'canteen'
   },
   {
+    canteenId: 2,
     name: 'โรงอาหาร D1',
     image: '/images/d1.png',
     path: '/admin/canteen/d1',
     type: 'canteen'
   },
   {
+    canteenId: 3,
     name: 'โรงอาหาร Dormity',
     image: '/images/dorm.png',
     path: '/admin/canteen/dormity',
     type: 'canteen'
   },
   {
+    canteenId: 6,
     name: 'โรงอาหาร Epark',
     image: '/images/epark.png',
     path: '/admin/canteen/epark',
     type: 'canteen'
   },
   {
+    canteenId: 4,
     name: 'โรงอาหาร E1',
     image: '/images/e1.png',
     path: '/admin/canteen/e1',
     type: 'canteen'
   },
   {
+    canteenId: 5,
     name: 'โรงอาหาร E2',
     image: '/images/e2.png',
     path: '/admin/canteen/e2',
     type: 'canteen'
   },
   {
+    canteenId: 7,
     name: 'โรงอาหาร Msquare',
     image: '/images/msquare.png',
     path: '/admin/canteen/msquare',
     type: 'canteen'
   },
   {
+    canteenId: 8,
     name: 'โรงอาหาร RuemRim',
     image: '/images/ruem.png',
     path: '/admin/canteen/ruemrim',
     type: 'canteen'
   },
   {
+    canteenId: 9,
     name: 'โรงอาหาร S2',
     image: '/images/s2.png',
     path: '/admin/canteen/s2',

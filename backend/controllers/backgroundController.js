@@ -236,7 +236,14 @@ export const getBackgroundImage = async (req, res) => {
     }
     
     console.log('✅ Sending background image:', background.imageFilename);
-    res.sendFile(imagePath);
+    res.sendFile(imagePath, (err) => {
+      if (err) {
+        console.error('❌ Error sending background image file:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ success: false, error: 'Failed to send image' });
+        }
+      }
+    });
   } catch (error) {
     console.error('❌ Error getting background image:', error);
     res.status(500).json({

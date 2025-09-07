@@ -168,6 +168,61 @@ router.get('/s2', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
+// Debug: find shops by exact name(s) and show canteenId
+router.get('/debug/by-name', async (req, res) => {
+  try {
+    const { name } = req.query;
+    if (!name) {
+      return res.status(400).json({ message: 'Query param "name" is required' });
+    }
+    const shop = await Shop.findOne({ name });
+    if (!shop) {
+      return res.status(404).json({ message: `Shop not found for name: ${name}` });
+    }
+    return res.json({ _id: shop._id, name: shop.name, canteenId: shop.canteenId ?? null });
+  } catch (error) {
+    console.error('Error in /debug/by-name:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.get('/debug/by-names', async (req, res) => {
+  try {
+    const { names } = req.query;
+    if (!names) {
+      return res.status(400).json({ message: 'Query param "names" is required (comma-separated)' });
+    }
+    const list = String(names)
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+    if (list.length === 0) {
+      return res.status(400).json({ message: 'No valid names provided' });
+    }
+    const shops = await Shop.find({ name: { $in: list } });
+    const result = list.map(n => {
+      const found = shops.find(s => s.name === n);
+      return found ? { _id: found._id, name: found.name, canteenId: found.canteenId ?? null } : { name: n, notFound: true };
+    });
+    return res.json({ data: result });
+  } catch (error) {
+    console.error('Error in /debug/by-names:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Debug: list shops missing canteenId
+router.get('/debug/missing-canteen', async (req, res) => {
+  try {
+    const shops = await Shop.find({ $or: [ { canteenId: { $exists: false } }, { canteenId: null } ] });
+    const result = shops.map(s => ({ _id: s._id, name: s.name, canteenId: s.canteenId ?? null }));
+    res.json({ count: result.length, data: result });
+  } catch (error) {
+    console.error('Error in /debug/missing-canteen:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
 // Create a new shop
 router.post('/', async (req, res) => {
   try {

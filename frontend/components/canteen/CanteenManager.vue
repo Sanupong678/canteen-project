@@ -1,133 +1,138 @@
 <template>
-  <LayoutAdmin>
-    <div class="canteen-detail">
-      <div class="canteen-header">
-        <div class="header-actions">
-        </div>
+  <div class="canteen-detail">
+    <div class="canteen-header">
+      <div class="header-actions">
       </div>
+    </div>
 
-      <div class="canteen-content">
-        <div class="shop-management">
-          <div class="shop-header">
-            <h2>จัดการโรงอาหารD1</h2>
-            <div class="search-container">
-              <div class="search-box">
-                <input 
-                  type="text" 
-                  v-model="searchQuery" 
-                  class="search-input"
-                  placeholder="ค้นหาร้านค้า..."
-                >
-                <i class="fas fa-search search-icon"></i>
+    <div class="canteen-content">
+      <div class="shop-management">
+        <div class="shop-header">
+          <h2>จัดการโรงอาหาร{{ canteenName }}</h2>
+          <div class="search-container">
+            <div class="search-box">
+              <input 
+                type="text" 
+                v-model="searchQuery" 
+                class="search-input"
+                placeholder="ค้นหาร้านค้า..."
+              >
+              <i class="fas fa-search search-icon"></i>
+            </div>
+            <select v-model="selectedCategory" class="category-select">
+              <option value="">ทุกประเภท</option>
+              <option value="food">อาหาร</option>
+              <option value="drink">เครื่องดื่ม</option>
+              <option value="dessert">ของหวาน</option>
+              <option value="other">อื่นๆ</option>
+            </select>
+            <button class="add-btn" @click="showAddShopForm = true">
+              <i class="fas fa-plus"></i> เพิ่มร้านค้า
+            </button>
+          </div>
+        </div>
+
+        <div class="shop-list">
+          <div v-if="filteredActiveShops.length === 0 && filteredExpiredShops.length === 0" class="empty-state">
+            ยังไม่มีร้านค้าในโรงอาหารนี้
+          </div>
+
+          <!-- Active Shops Section -->
+          <div v-if="filteredActiveShops.length > 0" class="shop-section">
+            <h3 class="section-title active-title">ร้านค้าที่มีสัญญา</h3>
+            <div class="shop-table">
+              <div class="table-header">
+                <div class="header-item">ลำดับ</div>
+                <div class="header-item">ชื่อร้านค้า</div>
+                <div class="header-item">หมวดหมู่</div>
+                <div class="header-item">สถานะ</div>
+                <div class="header-item">การแจ้งเตือน</div>
+                <div class="header-item">รายละเอียด</div>
+                <div class="header-item">แก้ไข</div>
+                <div class="header-item">เปลี่ยนรหัสผ่าน</div>
               </div>
-              <select v-model="selectedCategory" class="category-select">
-                <option value="">ทุกประเภท</option>
-                <option value="food">อาหาร</option>
-                <option value="drink">เครื่องดื่ม</option>
-                <option value="dessert">ของหวาน</option>
-                <option value="other">อื่นๆ</option>
-              </select>
-              <button class="add-btn" @click="showAddShopForm = true">
-                <i class="fas fa-plus"></i> เพิ่มร้านค้า
-              </button>
+
+              <div class="shop-row" v-for="(shop, index) in filteredActiveShops" :key="shop.id">
+                <div class="row-item">{{ index + 1 }}</div>
+                <div class="row-item">{{ shop.name }}</div>
+                <div class="row-item">{{ getShopTypeLabel(shop.type) }}</div>
+                <div class="row-item">
+                  <span class="status-badge active">
+                    <i class="fas fa-clock"></i> เหลือเวลา: {{ calculateRemainingDays(shop) }} วัน
+                  </span>
+                </div>
+                <div class="row-item">
+                  <span class="notification-link" @click="handleShowNotification(shop)">แจ้งเตือน</span>
+                </div>
+                <div class="row-item">
+                  <button class="action-btn details-btn" @click="handleViewDetails(shop)">
+                    <i class="fas fa-info-circle"></i>
+                    <span>รายละเอียด
+                    </span>
+                  </button>
+                </div>
+                <div class="row-item">
+                  <button class="action-btn edit-btn" @click="handleEditShop(shop)">
+                    <i class="fas fa-edit"></i>
+                    <span>แก้ไข</span>
+                  </button>
+                </div>
+                <div class="row-item">
+                  <button class="action-btn qr-btn" @click="handleGenerateCredentials(shop)">
+                    <i class="fas fa-qrcode"></i>
+                    <span>เปลี่ยนรหัส</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div class="shop-list">
-            <div v-if="filteredActiveShops.length === 0 && filteredExpiredShops.length === 0" class="empty-state">
-              ยังไม่มีร้านค้าในโรงอาหารนี้
-            </div>
-
-            <!-- Active Shops Section -->
-            <div v-if="filteredActiveShops.length > 0" class="shop-section">
-              <h3 class="section-title active-title">ร้านค้าที่มีสัญญา</h3>
-              <div class="shop-table">
-                <div class="table-header">
-                  <div class="header-item">ลำดับ</div>
-                  <div class="header-item">ชื่อร้านค้า</div>
-                  <div class="header-item">หมวดหมู่</div>
-                  <div class="header-item">สถานะ</div>
-                  <div class="header-item">การแจ้งเตือน</div>
-                  <div class="header-item">รายละเอียด</div>
-                  <div class="header-item">แก้ไข</div>
-                  <div class="header-item">เปลี่ยนรหัสผ่าน</div>
-                </div>
-
-                <div class="shop-row" v-for="(shop, index) in filteredActiveShops" :key="shop.id">
-                  <div class="row-item">{{ index + 1 }}</div>
-                  <div class="row-item">{{ shop.name }}</div>
-                  <div class="row-item">{{ getShopTypeLabel(shop.type) }}</div>
-                  <div class="row-item">
-                    <span class="status-badge active">
-                      <i class="fas fa-clock"></i> เหลือเวลา: {{ calculateRemainingDays(shop) }} วัน
-                    </span>
-                  </div>
-                  <div class="row-item">
-                    <span class="notification-link" @click="handleShowNotification(shop)">แจ้งเตือน</span>
-                  </div>
-                  <div class="row-item">
-                    <button class="action-btn details-btn" @click="handleViewDetails(shop)">
-                      <i class="fas fa-info-circle"></i>
-                    </button>
-                  </div>
-                  <div class="row-item">
-                    <button class="action-btn edit-btn" @click="handleEditShop(shop)">
-                      <i class="fas fa-edit"></i>
-                    </button>
-                  </div>
-                  <div class="row-item">
-                    <button class="action-btn qr-btn" @click="handleGenerateCredentials(shop)">
-                      <i class="fas fa-qrcode"></i>
-                    </button>
-                  </div>
-                </div>
+          <!-- Expired Shops Section -->
+          <div v-if="filteredExpiredShops.length > 0" class="shop-section">
+            <h3 class="section-title expired-title">
+              <i class="fas fa-exclamation-circle"></i> ร้านค้าที่หมดสัญญา
+            </h3>
+            <div class="shop-table">
+              <div class="table-header">
+                <div class="header-item">ลำดับ</div>
+                <div class="header-item">ชื่อร้านค้า</div>
+                <div class="header-item">หมวดหมู่</div>
+                <div class="header-item">สถานะ</div>
+                <div class="header-item">การแจ้งเตือน</div>
+                <div class="header-item">รายละเอียด</div>
+                <div class="header-item">แก้ไข</div>
+                <div class="header-item">เปลี่ยนรหัสผ่าน</div>
               </div>
-            </div>
 
-            <!-- Expired Shops Section -->
-            <div v-if="filteredExpiredShops.length > 0" class="shop-section">
-              <h3 class="section-title expired-title">
-                <i class="fas fa-exclamation-circle"></i> ร้านค้าที่หมดสัญญา
-              </h3>
-              <div class="shop-table">
-                <div class="table-header">
-                  <div class="header-item">ลำดับ</div>
-                  <div class="header-item">ชื่อร้านค้า</div>
-                  <div class="header-item">หมวดหมู่</div>
-                  <div class="header-item">สถานะ</div>
-                  <div class="header-item">การแจ้งเตือน</div>
-                  <div class="header-item">รายละเอียด</div>
-                  <div class="header-item">แก้ไข</div>
-                  <div class="header-item">เปลี่ยนรหัสผ่าน</div>
+              <div class="shop-row expired" v-for="(shop, index) in filteredExpiredShops" :key="shop.id">
+                <div class="row-item">{{ filteredActiveShops.length + index + 1 }}</div>
+                <div class="row-item">{{ shop.name }}</div>
+                <div class="row-item">{{ getShopTypeLabel(shop.type) }}</div>
+                <div class="row-item">
+                  <span class="status-badge expired">
+                    <i class="fas fa-exclamation-circle"></i> สัญญาหมดอายุ
+                  </span>
                 </div>
-
-                <div class="shop-row expired" v-for="(shop, index) in filteredExpiredShops" :key="shop.id">
-                  <div class="row-item">{{ filteredActiveShops.length + index + 1 }}</div>
-                  <div class="row-item">{{ shop.name }}</div>
-                  <div class="row-item">{{ getShopTypeLabel(shop.type) }}</div>
-                  <div class="row-item">
-                    <span class="status-badge expired">
-                      <i class="fas fa-exclamation-circle"></i> สัญญาหมดอายุ
-                    </span>
-                  </div>
-                  <div class="row-item">
-                    <span class="notification-link" @click="handleExpiredNotification(shop)">แจ้งเตือน</span>
-                  </div>
-                  <div class="row-item">
-                    <button class="action-btn details-btn" @click="handleViewDetails(shop)">
-                      <i class="fas fa-info-circle"></i>
-                    </button>
-                  </div>
-                  <div class="row-item">
-                    <button class="action-btn edit-btn" @click="handleEditShop(shop)">
-                      <i class="fas fa-edit"></i>
-                    </button>
-                  </div>
-                  <div class="row-item">
-                    <button class="action-btn qr-btn" @click="handleGenerateCredentials(shop)">
-                      <i class="fas fa-qrcode"></i>
-                    </button>
-                  </div>
+                <div class="row-item">
+                  <span class="notification-link" @click="handleExpiredNotification(shop)">แจ้งเตือน</span>
+                </div>
+                <div class="row-item">
+                  <button class="action-btn details-btn" @click="handleViewDetails(shop)">
+                    <i class="fas fa-info-circle"></i>
+                    <span>รายละเอียด</span>
+                  </button>
+                </div>
+                <div class="row-item">
+                  <button class="action-btn edit-btn" @click="handleEditShop(shop)">
+                    <i class="fas fa-edit"></i>
+                    <span>แก้ไข</span>
+                  </button>
+                </div>
+                <div class="row-item">
+                  <button class="action-btn qr-btn" @click="handleGenerateCredentials(shop)">
+                    <i class="fas fa-qrcode"></i>
+                    <span>เปลี่ยนรหัส</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -147,7 +152,7 @@
         </div>
         <ShopForm
           :shop-to-edit="shopToEdit"
-          :canteen-id="2"
+          :canteen-id="canteenId"
           @close="closeShopForm"
           @add-shop="handleAddShop"
         />
@@ -172,33 +177,42 @@
     <!-- Notification Modal -->
     <NotificationModal
       v-if="showNotificationModal"
-      :shops="dormityShops"
+      :shops="shops"
       :selected-shop="selectedShop"
       @close="showNotificationModal = false"
       @send-notification="handleSendNotification"
     />
-  </LayoutAdmin>
+  </div>
 </template>
 
 <script>
-import LayoutAdmin from '@/components/LayoutAdmin.vue'
 import ShopForm from '@/components/shop/ShopForm.vue'
 import ShopDetailsModal from '@/components/shop/ShopDetailsModal.vue'
 import PasswordForm from '@/components/shop/PasswordForm.vue'
 import NotificationModal from '@/components/shop/NotificationModal.vue'
 import { shopService } from '@/services/shopService'
+
 export default {
-  name: 'd1',
+  name: 'CanteenManager',
   components: {
-    LayoutAdmin,
     ShopForm,
     ShopDetailsModal,
     PasswordForm,
     NotificationModal
   },
+  props: {
+    canteenId: {
+      type: [Number, String],
+      required: true
+    },
+    canteenName: {
+      type: String,
+      default: ''
+    }
+  },
   data() {
     return {
-      d1Shops: [],
+      shops: [],
       searchQuery: '',
       selectedCategory: '',
       showAddShopForm: false,
@@ -212,7 +226,7 @@ export default {
   },
   computed: {
     filteredActiveShops() {
-      return this.d1Shops
+      return this.shops
         .filter(shop => shop && !this.isExpired(shop))
         .filter(shop =>
           shop.name.toLowerCase().includes(this.searchQuery.toLowerCase()) &&
@@ -220,7 +234,7 @@ export default {
         )
     },
     filteredExpiredShops() {
-      return this.d1Shops
+      return this.shops
         .filter(shop => shop && this.isExpired(shop))
         .filter(shop =>
           shop.name.toLowerCase().includes(this.searchQuery.toLowerCase()) &&
@@ -229,13 +243,25 @@ export default {
     }
   },
   created() {
-    this.loadD1Shops()
+    this.loadShops()
   },
   mounted() {
+    // เริ่มอัปเดตอัตโนมัติ และให้แน่ใจว่าไม่มี interval ซ้อน
+    this.stopRealtimeUpdate()
     this.startRealtimeUpdate()
   },
-  beforeDestroy() {
+  beforeUnmount() {
+    // Vue 3: clear interval ให้เรียบร้อยเมื่อ component ถูกถอด
     this.stopRealtimeUpdate()
+  },
+  watch: {
+    // หากมีการเปลี่ยนโรงอาหารผ่าน prop ให้รีโหลดร้านทันที
+    canteenId: {
+      handler() {
+        this.loadShops()
+      },
+      immediate: false
+    }
   },
   methods: {
     getShopTypeLabel(type) {
@@ -260,19 +286,19 @@ export default {
       const diff = end - now
       return diff > 0 ? Math.ceil(diff / (1000 * 60 * 60 * 24)) : 0
     },
-    async loadD1Shops() {
+    async loadShops() {
       try {
-        const response = await shopService.getD1Shops()
+        const response = await shopService.getCanteenShops(Number(this.canteenId))
         if (response && Array.isArray(response)) {
-          this.d1Shops = response
-          console.log('โหลดข้อมูลร้านค้าสำเร็จ:', this.d1Shops)
+          this.shops = response
+          console.log('โหลดข้อมูลร้านค้าทั้งหมดสำเร็จ:', this.shops)
         } else {
           console.error('Invalid response format:', response)
-          this.d1Shops = []
+          this.shops = []
         }
       } catch (error) {
         console.error('Error loading shops:', error)
-        this.d1Shops = []
+        this.shops = []
       }
     },
     handleViewDetails(shop) {
@@ -292,7 +318,7 @@ export default {
         ...shop,
         contractStartDate: formatDateForInput(shop.contractStartDate),
         contractEndDate: formatDateForInput(shop.contractEndDate),
-        imagePreview: shop.image // Use existing image as preview
+        imagePreview: shop.image
       }
       this.showAddShopForm = true
     },
@@ -341,7 +367,7 @@ export default {
             }
 
             // Reload all shops to ensure data consistency
-            await this.loadD1Shops()
+            await this.loadShops()
             
             // Update selectedShop if it's the same shop being edited
             if (this.selectedShop && this.selectedShop._id === this.shopToEdit._id) {
@@ -363,7 +389,7 @@ export default {
             // Add new shop
             const newShop = await shopService.createShop({
               ...formattedData,
-              canteenId: 2
+              canteenId: Number(this.canteenId)
             })
             console.log('Created new shop:', newShop)
             
@@ -372,7 +398,7 @@ export default {
             }
 
             // Reload all shops to ensure data consistency
-            await this.loadD1Shops()
+            await this.loadShops()
             this.closeShopForm()
           } catch (createError) {
             console.error('Error creating shop:', createError)
@@ -396,30 +422,29 @@ export default {
         }
 
         // อัพเดตรหัสผ่านเฉพาะร้านค้าที่เลือก
-        const updatedShop = await shopService.updateShop(this.selectedShop._id, {
-          ...this.selectedShop,
-          credentials: {
-            ...this.selectedShop.credentials,
-            password: newPassword
-          }
-        })
+        const result = await shopService.updatePassword(this.selectedShop._id, newPassword)
 
-        if (!updatedShop) {
+        if (!result) {
           return
         }
 
         // รีโหลดข้อมูลร้านค้าทั้งหมดเพื่อให้แสดงข้อมูลล่าสุด
-        await this.loadD1
+        await this.loadShops()
         
-        // อัพเดตข้อมูลร้านค้าที่เลือกอยู่ถ้าเป็นร้านค้าที่เพิ่งแก้ไข
-        if (this.selectedShop._id === updatedShop._id) {
-          this.selectedShop = updatedShop
-        }
-
         // ปิดฟอร์ม
         this.showPasswordForm = false
+        
+        // แสดงข้อความสำเร็จ
+        this.handleShowNotification({
+          type: 'success',
+          message: 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว'
+        })
       } catch (error) {
         console.error('เกิดข้อผิดพลาดในการเปลี่ยนรหัสผ่าน:', error)
+        this.handleShowNotification({
+          type: 'error',
+          message: 'ไม่สามารถเปลี่ยนรหัสผ่านได้'
+        })
       }
     },
     async handleSendNotification(notificationData) {
@@ -439,8 +464,11 @@ export default {
       }
     },
     startRealtimeUpdate() {
+      if (this.timer) {
+        clearInterval(this.timer)
+      }
       this.timer = setInterval(() => {
-        this.loadDormityShops()
+        this.loadShops()
       }, 60000) // Update every minute
     },
     stopRealtimeUpdate() {
@@ -649,6 +677,7 @@ h2 {
   align-items: center;
   justify-content: center;
   text-align: center;
+  
 }
 
 .status-badge {
@@ -701,6 +730,10 @@ h2 {
   gap: 6px;
   width: 100px;
   margin: 0 auto;
+}
+
+.action-btn span {
+  font-size: 12px;
 }
 
 .details-btn {
@@ -830,4 +863,6 @@ h2 {
     margin: 10px;
   }
 }
-</style> 
+</style>
+
+

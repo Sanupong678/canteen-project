@@ -34,16 +34,19 @@
           <div class="row-item">
             <button class="action-btn details-btn" @click="$emit('view-details', shop)">
               <i class="fas fa-info-circle"></i>
+              <span>รายละเอียด</span>
             </button>
           </div>
           <div class="row-item">
             <button class="action-btn edit-btn" @click="$emit('edit-shop', shop)">
               <i class="fas fa-edit"></i>
+              <span>แก้ไข</span>
             </button>
           </div>
           <div class="row-item">
             <button class="action-btn qr-btn" @click="$emit('generate-credentials', shop)">
               <i class="fas fa-qrcode"></i>
+              <span>เปลี่ยนรหัส</span>
             </button>
           </div>
         </div>
@@ -268,16 +271,22 @@ export default {
 }
 
 .action-btn {
-  width: 32px;
-  height: 32px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   color: white;
   transition: opacity 0.2s;
+  padding: 6px 10px;
+  height: 32px;
+  min-width: 90px;
+}
+
+.action-btn span {
+  font-size: 12px;
 }
 
 .action-btn:hover {

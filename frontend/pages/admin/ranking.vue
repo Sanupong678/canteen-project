@@ -482,6 +482,11 @@ export default {
         console.log('🔄 Loading shops from database...');
         const response = await axios.get('/api/shops', { params })
         this.shops = response.data.data || response.data
+        // Safety filter on client to ensure only shops from the selected canteen are shown
+        if (canteenId) {
+          const cid = parseInt(canteenId)
+          this.shops = (this.shops || []).filter(s => parseInt(s.canteenId) === cid)
+        }
         console.log('✅ Shops loaded from database:', this.shops.length, 'shops');
         
         // ดึงข้อมูลการประเมินจาก evaluations collection เพื่อรวมกับข้อมูลร้านค้า
@@ -531,6 +536,8 @@ export default {
         
         // รีเซ็ต unknownCanteenIds เมื่อโหลดข้อมูลใหม่
         this.unknownCanteenIds.clear()
+        // Keep filteredShops in sync with canteen filter immediately
+        this.filteredShops = this.shops
       } catch (error) {
         console.error('❌ Error loading shops:', error)
       }

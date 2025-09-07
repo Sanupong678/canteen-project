@@ -47,45 +47,64 @@
               ></textarea>
             </div>
 
-            <!-- Leave History Section -->
-            <div class="form-group">
-              <button
-                @click="showHistory = !showHistory"
-                class="history-button"
+            <!-- Leave History Section moved below submit button -->
+
+            <!-- Submit Button (match repair styles) -->
+            <div class="text-center mt-6">
+              <v-btn
+                color="primary"
+                block
+                :loading="isLoading"
+                :disabled="!isFormValid || isLoading"
+                class="submit-btn"
+                @click="submitLeave"
               >
-                ประวัติการลา
-              </button>
-              
-              <div v-if="showHistory" class="history-container">
-                <div v-if="leaveHistory.length === 0" class="text-gray-500 text-center py-4">
-                  <p class="text-lg font-medium mb-2">ยังไม่เคยแจ้งลามาก่อน</p>
-                  <p class="text-sm text-gray-400">เมื่อคุณแจ้งลาครั้งแรก ข้อมูลจะแสดงที่นี่</p>
-                </div>
-                <div v-else class="space-y-3">
-                  <div
-                    v-for="(leave, index) in leaveHistory"
-                    :key="index"
-                    class="history-item"
-                  >
-                    <p class="font-semibold">วันที่ลา: {{ formatDate(leave.startDate) }} ถึง {{ formatDate(leave.endDate) }}</p>
-                    <p>เหตุผล: {{ leave.issue || leave.reason }}</p>
-                    <p class="status-badge" :class="leave.status">
-                      สถานะ: {{ getStatusText(leave.status) }}
-                    </p>
-                  </div>
+                ยืนยันการลา
+              </v-btn>
+            </div>
+
+            <!-- History toggle below submit button -->
+            <div class="history-link" @click="showHistory = !showHistory">
+              ประวัติการลา
+            </div>
+
+            <div v-if="showHistory" class="history-container">
+              <div v-if="leaveHistory.length === 0" class="text-gray-500 text-center py-4">
+                <p class="text-lg font-medium mb-2">ยังไม่เคยแจ้งลามาก่อน</p>
+                <p class="text-sm text-gray-400">เมื่อคุณแจ้งลาครั้งแรก ข้อมูลจะแสดงที่นี่</p>
+              </div>
+              <div v-else class="space-y-3">
+                <div
+                  v-for="(leave, index) in paginatedLeaveHistory"
+                  :key="index"
+                  class="history-item"
+                >
+                  <p class="font-semibold">วันที่ลา: {{ formatDate(leave.startDate) }} ถึง {{ formatDate(leave.endDate) }}</p>
+                  <p>เหตุผล: {{ leave.issue || leave.reason }}</p>
+                  <p class="status-badge" :class="leave.status">
+                    สถานะ: {{ getStatusText(leave.status) }}
+                  </p>
                 </div>
               </div>
             </div>
 
-            <!-- Submit Button -->
-            <div class="text-center mt-6">
-              <button
-                @click="submitLeave"
-                :disabled="!isFormValid"
-                class="submit-button"
-              >
-                ยืนยันการลา
-              </button>
+            <!-- Pagination -->
+            <div v-if="showHistory && leaveHistory.length > 0" class="pagination-section">
+              <div class="items-per-page">
+                <span class="label">Items per page:</span>
+                <span class="fixed-size">5</span>
+                <span class="range">{{ startIndexDisplay }}-{{ endIndexDisplay }} of {{ leaveHistory.length }}</span>
+              </div>
+              <div class="pagination">
+                <button
+                  v-for="p in totalPages"
+                  :key="`p-`+p"
+                  class="page-num"
+                  :class="{ active: p === currentPage }"
+                  @click="goToPage(p)"
+                >{{ p }}</button>
+                <button class="page-next" :disabled="currentPage === totalPages" @click="nextPage">next</button>
+              </div>
             </div>
           </div>
         </div>
@@ -106,6 +125,8 @@ const showHistory = ref(false)
 const leaveHistory = ref([])
 const dateError = ref('')
 const isLoading = ref(false)
+const pageSize = 5
+const currentPage = ref(1)
 
 const { $axios } = useNuxtApp()
 
@@ -222,6 +243,17 @@ const getStatusText = (status) => {
   }
   return statusMap[status] || status
 }
+
+// Pagination for user leave history (5 per page)
+const totalPages = computed(() => Math.max(1, Math.ceil(leaveHistory.value.length / pageSize)))
+const paginatedLeaveHistory = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return leaveHistory.value.slice(start, start + pageSize)
+})
+const goToPage = (p) => { if (p < 1 || p > totalPages.value) return; currentPage.value = p }
+const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++ }
+const startIndexDisplay = computed(() => (leaveHistory.value.length ? (currentPage.value - 1) * pageSize + 1 : 0))
+const endIndexDisplay = computed(() => Math.min(currentPage.value * pageSize, leaveHistory.value.length))
 </script>
 
 <style scoped>
@@ -353,6 +385,31 @@ const getStatusText = (status) => {
   box-shadow: 0 4px 12px rgba(231, 76, 60, 0.15);
 }
 
+/* New: history-link container same width as submit button */
+.history-link {
+  display: block;
+  width: 100%;
+  color: #e74c3c;
+  font-weight: 600;
+  padding: 12px 20px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, #fdf2f2 0%, #fce8e8 100%);
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  box-shadow: 0 2px 8px rgba(231, 76, 60, 0.1);
+  margin: 1rem 0 0.75rem 0;
+  text-align: center;
+  text-decoration: none;
+}
+
+.history-link:hover {
+  color: #c0392b;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.15);
+}
+
 .history-container {
   background: white;
   border-radius: 12px;
@@ -361,6 +418,16 @@ const getStatusText = (status) => {
   box-shadow: 0 4px 12px rgba(231, 76, 60, 0.1);
   border-left: 4px solid #e74c3c;
 }
+
+/* Pagination styles */
+.pagination-section { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; margin-top: 12px; }
+.items-per-page { display: flex; align-items: center; gap: 10px; color: #374151; font-size: 14px; }
+.items-per-page .fixed-size { padding: 6px 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; min-width: 48px; text-align: center; }
+.items-per-page .range { margin-left: 12px; color: #6b7280; }
+.pagination { display: flex; gap: 6px; }
+.page-num { min-width: 32px; height: 32px; border: 1px solid #e5e7eb; background: #fff; color: #7f1d1d; border-radius: 2px; cursor: pointer; }
+.page-num.active { background: #7f1d1d; color: #fff; border-color: #7f1d1d; }
+.page-next { border: 1px solid #e5e7eb; background: #fff; color: #7f1d1d; border-radius: 2px; padding: 0 10px; cursor: pointer; }
 
 .history-item {
   background: linear-gradient(135deg, #fdf2f2 0%, #fce8e8 100%);
@@ -430,6 +497,24 @@ const getStatusText = (status) => {
   transform: none;
   box-shadow: none;
 }
+
+/* Match repair submit button styles */
+.submit-btn {
+  margin-top: 1.5rem;
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.2);
+}
+
+.submit-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(231, 76, 60, 0.3); }
+.submit-btn:disabled { background: #cbd5e0 !important; cursor: not-allowed; transform: none; box-shadow: none; }
 
 .text-gray-500 {
   color: #6b7280;

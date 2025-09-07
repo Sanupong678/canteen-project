@@ -197,7 +197,14 @@ export const getNewsImage = async (req, res) => {
     }
     
     console.log('✅ Sending news image:', news.imageFilename);
-    res.sendFile(imagePath);
+    res.sendFile(imagePath, (err) => {
+      if (err) {
+        console.error('❌ Error sending news image file:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ success: false, error: 'Failed to send image' });
+        }
+      }
+    });
   } catch (error) {
     console.error('❌ Error getting news image:', error);
     res.status(500).json({

@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 
 const canteenSchema = new mongoose.Schema({
+  canteenId: {
+    type: Number,
+    required: false,
+    index: true
+  },
   name: {
     type: String,
     required: [true, 'Canteen name is required'],

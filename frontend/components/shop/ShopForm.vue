@@ -87,23 +87,33 @@
 
               <div class="form-group">
                 <label for="canteenId">โรงอาหาร</label>
-                <select
-                  id="canteenId"
-                  v-model="shop.canteenId"
-                  required
-                  class="form-input"
-                >
-                  <option value="">เลือกโรงอาหาร</option>
-                  <option value="1">โรงอาหาร C5</option>
-                  <option value="2">โรงอาหาร D1</option>
-                  <option value="3">โรงอาหาร Dormity</option>
-                  <option value="4">โรงอาหาร E1</option>
-                  <option value="5">โรงอาหาร E2</option>
-                  <option value="6">โรงอาหาร Epark</option>
-                  <option value="7">โรงอาหาร Msquare</option>
-                  <option value="8">โรงอาหาร RuemRim</option>
-                  <option value="9">โรงอาหาร S2</option>
-                </select>
+                <template v-if="props.canteenId">
+                  <input
+                    id="canteenId"
+                    :value="props.canteenId"
+                    class="form-input"
+                    disabled
+                  >
+                </template>
+                <template v-else>
+                  <select
+                    id="canteenId"
+                    v-model="shop.canteenId"
+                    required
+                    class="form-input"
+                  >
+                    <option value="">เลือกโรงอาหาร</option>
+                    <option value="1">โรงอาหาร C5</option>
+                    <option value="2">โรงอาหาร D1</option>
+                    <option value="3">โรงอาหาร Dormity</option>
+                    <option value="4">โรงอาหาร E1</option>
+                    <option value="5">โรงอาหาร E2</option>
+                    <option value="6">โรงอาหาร Epark</option>
+                    <option value="7">โรงอาหาร Msquare</option>
+                    <option value="8">โรงอาหาร RuemRim</option>
+                    <option value="9">โรงอาหาร S2</option>
+                  </select>
+                </template>
               </div>
 
               <div class="form-group">
@@ -388,6 +398,7 @@ const handleSubmit = () => {
   // ส่งข้อมูลร้านค้าไปยัง parent component
   const shopData = {
     ...shop.value,
+    canteenId: props.canteenId || shop.value.canteenId,
     credentials: {
       username: shop.value.credentials.username,
       password: shop.value.credentials.password

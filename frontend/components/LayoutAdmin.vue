@@ -2,14 +2,22 @@
   <div class="admin-layout">
     <!-- Navbar ชั้นที่ 1 -->
     <nav class="navbar-top">
-      <div class="navbar-container">
-        <div class="logo">
-          <img src="/images/Logo.jpg" alt="Logo">
+      <div class="navbar-container grid navbar-top-container">
+        <div class="brand area-left">
+          <div class="logo">
+            <img src="/images/Logo.jpg" alt="Logo">
+          </div>
+          <div class="navbar-title">
+            <h1 class="navbar-title-text">มหาวิทยาลัยเเม่ฟ้าหลวง</h1>
+            <p class="navbar-subtitle-text">ระบบบริหารจัดการโรงอาหาร</p>
+          </div>
         </div>
-        <div class="user-actions">
+        <div class="user-actions area-right">
           <AdminNotificationDropdown />
           <div class="user-profile" @click="toggleUserMenu">
+            <div class="avatar">{{ displayInitials }}</div>
             <span class="username">{{ displayName }}</span>
+            <span class="caret">▾</span>
             <div class="user-menu" v-if="showUserMenu">
               <button @click="handleLogout">ออกจากระบบ</button>
             </div>
@@ -22,12 +30,12 @@
     <nav class="navbar-bottom">
       <div class="navbar-container">
         <ul class="nav-list">
-          <li><router-link to="/admin">หน้าแรก</router-link></li>
-          <li><router-link to="/admin/management">การจัดการ</router-link></li>
-          <li><router-link to="/admin/ranking">จัดอันดับ</router-link></li>
-          <li><router-link to="/admin/repair">แจ้งซ่อม</router-link></li>
-          <li><router-link to="/admin/leave">แจ้งลา</router-link></li>
-          <li><router-link to="/admin/bill">บิล</router-link></li>
+          <li><router-link to="/admin" class="nav-link" active-class="active">หน้าแรก</router-link></li>
+          <li><router-link to="/admin/management" class="nav-link" active-class="active">การจัดการ</router-link></li>
+          <li><router-link to="/admin/ranking" class="nav-link" active-class="active">จัดอันดับ</router-link></li>
+          <li><router-link to="/admin/repair" class="nav-link" active-class="active">แจ้งซ่อม</router-link></li>
+          <li><router-link to="/admin/leave" class="nav-link" active-class="active">แจ้งลา</router-link></li>
+          <li><router-link to="/admin/bill" class="nav-link" active-class="active">บิล</router-link></li>
         </ul>
       </div>
     </nav>
@@ -60,6 +68,13 @@ export default {
       displayName: localStorage.getItem('displayName') || 'Admin User'
     }
   },
+  computed: {
+    displayInitials() {
+      const parts = (this.displayName || '').trim().split(' ')
+      const initials = parts.filter(Boolean).slice(0, 2).map(p => p[0]).join('')
+      return initials || 'A'
+    }
+  },
   methods: {
     toggleUserMenu() {
       this.showUserMenu = !this.showUserMenu
@@ -85,6 +100,7 @@ export default {
 </script>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700;800;900&family=Inter:wght@400;600;700&display=swap');
 .admin-layout {
   min-height: 100vh;
   display: flex;
@@ -94,8 +110,14 @@ export default {
 /* Navbar ชั้นที่ 1 */
 .navbar-top {
   background-color: white;
-  padding: 10px 0;
+  padding: 6px 0;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-top-container {
+  max-width: none;
+  margin: 0;
+  padding: 0 35px;
 }
 
 .navbar-container {
@@ -107,8 +129,59 @@ export default {
   align-items: center;
 }
 
-.logo img {
-  height: 50px;
+/* Make top and bottom nav stretch edge-to-edge */
+.navbar-top .navbar-container {
+  max-width: none;
+  margin: 0;
+  padding: 0 35px;
+}
+
+.navbar-container.grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.area-left { justify-self: start; }
+.area-center { justify-self: center; }
+.area-right { justify-self: end; }
+
+.logo img { height: 72px; }
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.navbar-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 2px;
+}
+
+.navbar-title-text {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  color: #111827;
+  font-family: 'Kanit', 'Noto Sans Thai', sans-serif;
+  line-height: 1.1;
+}
+
+.navbar-subtitle-text {
+  margin: 0;
+  font-size: 16px;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  font-family: 'Kanit', 'Noto Sans Thai', sans-serif;
+  align-self: center;
+  text-align: center;
+  line-height: 1.1;
 }
 
 .user-actions {
@@ -136,6 +209,27 @@ export default {
 .user-profile {
   position: relative;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #111827;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.caret {
+  color: #6b7280;
+  font-size: 12px;
 }
 
 .user-menu {
@@ -162,7 +256,12 @@ export default {
 /* Navbar ชั้นที่ 2 */
 .navbar-bottom {
   background-color: #e74c3c;
-  padding: 10px 0;
+  padding: 6px 0;
+}
+
+.navbar-bottom .navbar-container {
+  max-width: none;
+  padding: 0 12px;
 }
 
 .nav-list {
@@ -170,27 +269,33 @@ export default {
   list-style: none;
   margin: 0;
   padding: 0;
-  gap: 10px;
-  justify-content: center;
+  width: 100%;
+  justify-content: space-evenly;
 }
 
 .nav-list li {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding-left: 100px;
 }
 
-.nav-list a {
+.nav-link {
   color: white;
   text-decoration: none;
   font-weight: 500;
   text-align: center;
   padding: 8px 16px;
+  border-radius: 6px;
+  transition: background-color 0.2s ease, transform 0.1s ease;
 }
 
-.nav-list a:hover {
-  text-decoration: underline;
+.nav-link:hover {
+  background: rgba(255,255,255,0.15);
+  transform: translateY(-1px);
+}
+
+.nav-link.active {
+  background: rgba(255,255,255,0.25);
 }
 
 /* Main Content */
