@@ -22,12 +22,15 @@
   import shopRoutes from './routes/shopRoutes.js';
   import billRoutes from './routes/billRoutes.js';
   import uploadRoutes from './routes/uploadRoutes.js';
-  import notificationRoutes from './routes/notificationRoutes.js';
-  import adminNotificationRoutes from './routes/adminNotificationRoutes.js';
-  import evaluationRoutes from './routes/evaluationRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
+import adminNotificationRoutes from './routes/adminNotificationRoutes.js';
+import evaluationRoutes from './routes/evaluationRoutes.js';
+import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificationRoutes.js';
   import monthSettingsRoutes from './routes/monthSettingsRoutes.js';
   import rankingRoutes from './routes/rankingRoutes.js';
   import moneyHistoryRoutes from './routes/moneyHistoryRoutes.js';
+  import welcomeRoutes from './routes/welcomeRoutes.js';
+  import evaluationTopicRoutes from './routes/evaluationTopicRoutes.js';
   import connectDB from './config/database.js';
 
   dotenv.config();
@@ -148,9 +151,12 @@
   app.use('/api/notifications', notificationRoutes);
   app.use('/api/admin-notifications', adminNotificationRoutes);
   app.use('/api/evaluations', evaluationRoutes);
+  app.use('/api/monthly-ranking-notifications', monthlyRankingNotificationRoutes);
   app.use('/api/month-settings', monthSettingsRoutes);
   app.use('/api/rankings', rankingRoutes);
   app.use('/api/money-history', moneyHistoryRoutes);
+  app.use('/api/welcome', welcomeRoutes);
+  app.use('/api/evaluation-topics', evaluationTopicRoutes);
 
   // Add CORS headers for all API routes
   app.use('/api', (req, res, next) => {
@@ -276,38 +282,50 @@
   try { server.setTimeout(parseInt(process.env.SOCKET_TIMEOUT_MS) || 0); } catch (_) {}
 
   // เพิ่ม graceful shutdown
-  process.on('SIGTERM', () => {
+  process.on('SIGTERM', async () => {
     console.log('🛑 SIGTERM received, shutting down gracefully');
-    server.close(() => {
+    server.close(async () => {
       console.log('✅ Server closed');
-      mongoose.connection.close(() => {
+      try {
+        await mongoose.connection.close();
         console.log('✅ MongoDB connection closed');
         process.exit(0);
-      });
+      } catch (error) {
+        console.error('❌ Error closing MongoDB connection:', error);
+        process.exit(1);
+      }
     });
   });
 
-  process.on('SIGINT', () => {
+  process.on('SIGINT', async () => {
     console.log('🛑 SIGINT received, shutting down gracefully');
-    server.close(() => {
+    server.close(async () => {
       console.log('✅ Server closed');
-      mongoose.connection.close(() => {
+      try {
+        await mongoose.connection.close();
         console.log('✅ MongoDB connection closed');
         process.exit(0);
-      });
+      } catch (error) {
+        console.error('❌ Error closing MongoDB connection:', error);
+        process.exit(1);
+      }
     });
   });
 
   // เพิ่ม uncaught exception handler
-  process.on('uncaughtException', (error) => {
+  process.on('uncaughtException', async (error) => {
     console.error('❌ Uncaught Exception:', error);
     if (isProduction) {
-      server.close(() => {
+      server.close(async () => {
         console.log('✅ Server closed due to uncaught exception');
-        mongoose.connection.close(() => {
+        try {
+          await mongoose.connection.close();
           console.log('✅ MongoDB connection closed');
           process.exit(1);
-        });
+        } catch (closeError) {
+          console.error('❌ Error closing MongoDB connection:', closeError);
+          process.exit(1);
+        }
       });
     } else {
       // In development, log and keep the process alive for easier debugging
@@ -315,15 +333,19 @@
     }
   });
 
-  process.on('unhandledRejection', (reason, promise) => {
+  process.on('unhandledRejection', async (reason, promise) => {
     console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
     if (isProduction) {
-      server.close(() => {
+      server.close(async () => {
         console.log('✅ Server closed due to unhandled rejection');
-        mongoose.connection.close(() => {
+        try {
+          await mongoose.connection.close();
           console.log('✅ MongoDB connection closed');
           process.exit(1);
-        });
+        } catch (closeError) {
+          console.error('❌ Error closing MongoDB connection:', closeError);
+          process.exit(1);
+        }
       });
     } else {
       // In development, log and continue running

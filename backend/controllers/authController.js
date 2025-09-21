@@ -130,13 +130,13 @@ export const login = async (req, res) => {
       console.log('====== Login Response ======');
       console.log('Setting cookie with token');
 
-      // ตั้งค่า cookie
-      res.cookie('token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
-      });
+    // ตั้งค่า cookie สำหรับ admin (ใช้ชื่อต่างกัน)
+    res.cookie('admin_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax', // เปลี่ยนเป็น lax เพื่อให้เปิดหลาย tab ได้
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    });
 
       console.log('Cookie set successfully');
       console.log('==========================');
@@ -220,8 +220,8 @@ export const login = async (req, res) => {
     });
     await loginRecord.save();
 
-    // ตั้งค่า cookie
-    res.cookie('token', token, {
+    // ตั้งค่า cookie สำหรับ user (ใช้ชื่อต่างกัน)
+    res.cookie('user_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -257,19 +257,28 @@ export const login = async (req, res) => {
 
 export const logout = async (req, res) => {
   try {
-    const token = req.cookies.token;
+    // ตรวจสอบ token จาก cookies ต่างๆ
+    const adminToken = req.cookies.admin_token;
+    const userToken = req.cookies.user_token;
+    const legacyToken = req.cookies.token;
     
-    // อัพเดทสถานะ session
-    await Session.findOneAndUpdate(
-      { token },
-      { 
-        status: 'logged_out',
-        logoutTime: new Date()
-      }
-    );
+    const token = adminToken || userToken || legacyToken;
     
-    // ลบ cookie
-    res.clearCookie('token');
+    if (token) {
+      // อัพเดทสถานะ session (ถ้ามี)
+      await Session.findOneAndUpdate(
+        { token },
+        { 
+          status: 'logged_out',
+          logoutTime: new Date()
+        }
+      );
+    }
+    
+    // ลบ cookies ทั้งหมด
+    res.clearCookie('admin_token');
+    res.clearCookie('user_token');
+    res.clearCookie('token'); // ลบ legacy cookie ด้วย
     
     res.json({ success: true, message: 'Logged out successfully' });
   } catch (error) {

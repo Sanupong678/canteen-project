@@ -14,8 +14,8 @@
             <div class="summary-label">เงิน</div>
           </div>
           <div class="summary-item">
-            <div class="summary-value">{{ currentData.score }}</div>
-            <div class="summary-label">คะแนน</div>
+            <div class="summary-value">{{ formatScore(currentData.score) }}</div>
+            <div class="summary-label">คะแนนเฉลี่ย</div>
           </div>
           <div class="summary-item">
             <div class="summary-value">{{ currentData.rank }}</div>
@@ -91,6 +91,13 @@ const formatMoney = (amount) => {
   return new Intl.NumberFormat('th-TH').format(amount)
 }
 
+const formatScore = (score) => {
+  if (score === null || score === undefined || score === 0) {
+    return '0.00'
+  }
+  return parseFloat(score).toFixed(2)
+}
+
 const formatDate = (dateString) => {
   if (!dateString) return 'ไม่ระบุ';
   const date = new Date(dateString);
@@ -115,10 +122,34 @@ const fetchMoneyHistory = async () => {
   try {
     console.log('🔍 Fetching combined money and evaluation history...');
     
-    // Get shop ID from localStorage
-    const shopId = localStorage.getItem('shopId');
+    // ตรวจสอบว่าเราอยู่ใน client-side หรือไม่
+    if (typeof window === 'undefined') {
+      console.log('❌ Running on server-side, skipping localStorage access')
+      return
+    }
+    
+    // ดึง shopId แบบเดียวกับ fetchCurrentData
+    const userData = JSON.parse(sessionStorage.getItem('userData') || '{}')
+    const shopIdFromUserData = userData.id
+    const shopIdFromShopData = JSON.parse(sessionStorage.getItem('shopData') || '{}').id
+    const userId = sessionStorage.getItem('userId')
+    
+    const shopId = shopIdFromUserData || shopIdFromShopData || userId
+    
+    console.log('🆔 ShopId for money history:', shopId)
+    
     if (!shopId) {
       console.error('❌ No shop ID found in localStorage');
+      // ใช้ fallback shopId
+      const fallbackShopId = "68af13d9a31f74d33dc429ec" // shopId ของร้าน "rairak"
+      console.log('🔄 Using fallback shopId for money history:', fallbackShopId)
+      
+      const response = await axios.get(`/api/money-history/shop/${fallbackShopId}/combined`);
+      console.log('📊 Combined history response:', response.data);
+      
+      if (response.data.success) {
+        moneyHistory.value = response.data.data;
+      }
       return;
     }
 
@@ -143,32 +174,32 @@ const fetchCurrentData = async () => {
       return
     }
     
-    // 1. ตรวจสอบ localStorage ทั้งหมด
-    console.log('📦 All localStorage keys:', Object.keys(localStorage))
+    // 1. ตรวจสอบ sessionStorage ทั้งหมด
+    console.log('📦 All sessionStorage keys:', Object.keys(sessionStorage))
     
-    // 2. แสดงค่าของ localStorage แต่ละตัว
-    for (let key of Object.keys(localStorage)) {
-      console.log(`📋 ${key}:`, localStorage.getItem(key))
+    // 2. แสดงค่าของ sessionStorage แต่ละตัว
+    for (let key of Object.keys(sessionStorage)) {
+      console.log(`📋 ${key}:`, sessionStorage.getItem(key))
     }
     
     // 3. ดึง userData
-    const userData = JSON.parse(localStorage.getItem('userData') || '{}')
-    console.log('👤 userData from localStorage:', userData)
+    const userData = JSON.parse(sessionStorage.getItem('userData') || '{}')
+    console.log('👤 userData from sessionStorage:', userData)
     console.log('🔑 userData keys:', Object.keys(userData))
     
     // 4. ลองดึง shopId จากหลายแหล่ง
     const shopIdFromUserData = userData.id
-    const shopIdFromShopData = JSON.parse(localStorage.getItem('shopData') || '{}').id
-    const userId = localStorage.getItem('userId')
-    const displayName = localStorage.getItem('displayName')
+    const shopIdFromShopData = JSON.parse(sessionStorage.getItem('shopData') || '{}').id
+    const userId = sessionStorage.getItem('userId')
+    const displayName = sessionStorage.getItem('displayName')
     
     console.log('🆔 shopId from userData.id:', shopIdFromUserData)
     console.log('🏪 shopId from shopData.id:', shopIdFromShopData)
-    console.log('👤 userId from localStorage:', userId)
-    console.log('📝 displayName from localStorage:', displayName)
+    console.log('👤 userId from sessionStorage:', userId)
+    console.log('📝 displayName from sessionStorage:', displayName)
     
     // 5. ลองหาจาก token
-    const token = localStorage.getItem('token')
+    const token = sessionStorage.getItem('token')
     console.log('🔐 token exists:', !!token)
     
     // 6. เลือก shopId ที่มีค่า
@@ -178,11 +209,11 @@ const fetchCurrentData = async () => {
     if (!shopId) {
       console.error('❌ ไม่พบ shopId ในทุกแหล่ง')
       console.log('📋 Available keys in userData:', Object.keys(userData))
-      console.log('📋 Available keys in shopData:', Object.keys(JSON.parse(localStorage.getItem('shopData') || '{}')))
+      console.log('📋 Available keys in shopData:', Object.keys(JSON.parse(sessionStorage.getItem('shopData') || '{}')))
       
       // ลองใช้ shopId จาก database โดยตรง (ชั่วคราว)
       console.log('🔄 Using fallback shopId from database')
-      const fallbackShopId = "68543280a5a8cdcf77de089d"
+      const fallbackShopId = "68af13d9a31f74d33dc429ec" // shopId ของร้าน "rairak"
       console.log('🆔 Using fallback shopId:', fallbackShopId)
       
       // ดึงข้อมูลเงินจาก moneyhistory

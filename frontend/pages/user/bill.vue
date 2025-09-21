@@ -3,7 +3,16 @@
     <div class="page-container">
       <div class="content-wrapper">
         <div class="header-section">
-          <h1 class="page-title">บิลค่าบริการ</h1>
+          <div class="header-content">
+            <h1 class="page-title">บิลค่าบริการ</h1>
+            <p class="page-subtitle">รายการบิลที่ต้องดำเนินการ</p>
+          </div>
+          <div class="header-actions">
+            <router-link to="/user/bill-history" class="history-button">
+              <i class="fas fa-history"></i>
+              ดูประวัติ
+            </router-link>
+          </div>
         </div>
 
         <div class="bill-container">
@@ -12,12 +21,25 @@
             <select id="paymentTypeSelect" v-model="selectedType" class="select-type">
               <option value="water">ค่าน้ำ</option>
               <option value="electricity">ค่าไฟ</option>
+              <option value="utilities">รวม (ค่าน้ำ+ค่าไฟ)</option>
             </select>
             <label for="paymentTypeSelect" class="re-only">เลือกประเภท</label>
           </div>
 
           <!-- Bill List -->
           <div class="bills-list">
+            <div v-if="filteredBills.length === 0" class="no-bills-message">
+              <div class="no-bills-icon">
+                <i class="fas fa-check-circle"></i>
+              </div>
+              <h3>ไม่มีรายการที่ต้องดำเนินการ</h3>
+              <p>ยอดเยี่ยม! คุณได้ชำระบิลทั้งหมดแล้ว</p>
+              <router-link to="/user/bill-history" class="view-history-link">
+                <i class="fas fa-history"></i>
+                ดูประวัติการชำระ
+              </router-link>
+            </div>
+            
             <div v-for="bill in filteredBills" :key="bill.id" class="bill-card">
               <div class="bill-details">
                 <div class="left-section">
@@ -40,7 +62,8 @@
 
                 <div class="right-section">
                   <div class="payment-info">
-                    <h3 class="amount">฿{{ formatAmount(bill.amount) }}</h3>
+                    <h3 v-if="bill.amount" class="amount">฿{{ formatAmount(bill.amount) }}</h3>
+                    <h3 v-else class="amount amount-pending">รอการกำหนดจำนวนเงิน</h3>
                     <div class="account-info">
                       <p>เลขบัญชี: {{ bill.accountNumber }}</p>
                       <p>ชื่อบัญชี: {{ bill.accountName }}</p>
@@ -60,8 +83,11 @@
                       :disabled="!!bill.image"
                       @click="triggerFileInput(bill.id)"
                     >
-                      อัปโหลดสลิป
+                      {{ bill.type === 'utilities' ? 'อัปโหลดสลิปรวม (Utilities)' : 'อัปโหลดสลิป' }}
                     </button>
+                    <div v-else-if="!bill.amount" class="waiting-message">
+                      <p>รอการกำหนดจำนวนเงินจากผู้ดูแลระบบ</p>
+                    </div>
                     <!-- ปุ่มยืนยันอัปโหลด -->
                     <button
                       v-if="selectedFiles[bill.id]"
@@ -98,7 +124,10 @@ export default {
     const selectedFiles = ref({})
 
     const filteredBills = computed(() => {
-      return bills.value.filter(bill => bill.type === selectedType.value)
+      return bills.value.filter(bill => 
+        bill.type === selectedType.value && 
+        bill.status !== 'เสร็จสิ้น'
+      )
     })
 
     const formatDate = (date) => {
@@ -117,7 +146,10 @@ export default {
     }
 
     const getBillTypeText = (type) => {
-      return type === 'water' ? 'ค่าน้ำ' : 'ค่าไฟ'
+      if (type === 'water') return 'ค่าน้ำ'
+      if (type === 'electricity') return 'ค่าไฟ'
+      if (type === 'utilities') return 'รวม (ค่าน้ำ+ค่าไฟ)'
+      return type
     }
 
     const getStatusText = (bill) => {
@@ -162,6 +194,11 @@ export default {
 
     // ฟังก์ชันตรวจสอบว่าสามารถอัปโหลดสลิปได้หรือไม่
     const canUploadSlip = (bill) => {
+      // ไม่แสดงปุ่มเมื่อยังไม่มี amount (รอ admin อัปโหลด Excel)
+      if (!bill.amount) {
+        return false
+      }
+      
       // แสดงปุ่มเมื่อ status เป็น 'รอดำเนินการ' หรือ 'เลยกำหนด'
       if (bill.status === 'รอดำเนินการ' || bill.status === 'เลยกำหนด') {
         return true
@@ -221,6 +258,7 @@ export default {
         formData.append('slip', file)
         formData.append('billId', bill.id)
         formData.append('transferDate', new Date().toISOString())
+        formData.append('billType', bill.type)
         
         const token = localStorage.getItem('token')
         console.log('Token status:', token ? 'Present' : 'Missing')
@@ -358,14 +396,50 @@ export default {
   border-radius: 12px;
   margin-bottom: 24px;
   box-shadow: 0 4px 20px rgba(231, 76, 60, 0.15);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-content {
+  flex: 1;
 }
 
 .page-title {
   font-size: 2rem;
   font-weight: 700;
   color: white;
-  margin: 0;
+  margin: 0 0 8px 0;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.page-subtitle {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.history-button {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  text-decoration: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
 }
 
 .bill-container {
@@ -514,6 +588,12 @@ export default {
   text-shadow: 0 2px 4px rgba(231, 76, 60, 0.1);
 }
 
+.amount-pending {
+  color: #f39c12;
+  font-size: 20px;
+  font-weight: 600;
+}
+
 .account-info {
   color: #4a5568;
   margin-bottom: 24px;
@@ -555,6 +635,67 @@ export default {
   box-shadow: none;
 }
 
+.waiting-message {
+  background: linear-gradient(135deg, #FFF3CD 0%, #FEF3C7 100%);
+  border: 1px solid #FDE68A;
+  border-radius: 8px;
+  padding: 12px 16px;
+  text-align: center;
+  margin-top: 8px;
+}
+
+.waiting-message p {
+  color: #92400E;
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0;
+}
+
+.no-bills-message {
+  text-align: center;
+  padding: 60px 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(231, 76, 60, 0.1);
+}
+
+.no-bills-icon {
+  font-size: 4rem;
+  color: #27ae60;
+  margin-bottom: 20px;
+}
+
+.no-bills-message h3 {
+  color: #2d3748;
+  margin-bottom: 12px;
+  font-size: 1.5rem;
+}
+
+.no-bills-message p {
+  color: #718096;
+  font-size: 1rem;
+  margin-bottom: 24px;
+}
+
+.view-history-link {
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+  text-decoration: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.2);
+}
+
+.view-history-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(231, 76, 60, 0.3);
+}
+
 /* ซ่อน Scrollbar */
 ::-webkit-scrollbar {
   display: none;
@@ -572,7 +713,15 @@ export default {
   }
 
   .header-section {
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
     padding: 16px;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: center;
   }
 
   .payment-type-dropdown {

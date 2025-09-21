@@ -78,7 +78,11 @@ const billStorage = multer.diskStorage({
       const year = currentDate.getFullYear();
       const month = String(currentDate.getMonth() + 1).padStart(2, '0');
       const shopId = req.user?.shopId || 'default';
-      const uploadPath = `uploads/bills/${shopId}/${year}/${month}/`;
+      // choose folder based on billType in body: water, electricity, utilities
+      const billTypeRaw = req.body?.billType || 'misc';
+      const billType = typeof billTypeRaw === 'string' ? billTypeRaw.toLowerCase() : billTypeRaw;
+      const typeFolder = ['water', 'electricity', 'utilities'].includes(billType) ? billType : 'misc';
+      const uploadPath = `uploads/bills/${shopId}/${year}/${month}/${typeFolder}/`;
 
       if (!fs.existsSync(uploadPath)) {
         fs.mkdirSync(uploadPath, { recursive: true });
@@ -91,7 +95,9 @@ const billStorage = multer.diskStorage({
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const filename = 'bill-' + uniqueSuffix + path.extname(file.originalname);
+    const billTypeRaw = req.body?.billType || 'bill';
+    const billType = typeof billTypeRaw === 'string' ? billTypeRaw.toLowerCase() : billTypeRaw;
+    const filename = `${billType}-` + uniqueSuffix + path.extname(file.originalname);
     cb(null, filename);
   }
 });

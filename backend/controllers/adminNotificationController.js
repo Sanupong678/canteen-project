@@ -1,4 +1,3 @@
-import { AdminToUserNotification, UserToAdminNotification } from '../models/adminNotificationModel.js';
 import Shop from '../models/Shop.js';
 import Notification from '../models/notificationModel.js';
 import User from '../models/userModel.js';
@@ -53,7 +52,17 @@ export const sendAdminNotification = async (req, res) => {
     
     console.log('📝 Admin notification data:', adminNotificationData);
     
-    const adminNotification = new AdminToUserNotification(adminNotificationData);
+    const adminNotification = new Notification({
+      type: 'admin_notification',
+      title: title,
+      message: message,
+      priority: priority,
+      recipients: recipients,
+      recipientShopId: recipientShopId,
+      sentBy: sentBy || req.user.username,
+      sentAt: new Date(),
+      isRead: false
+    });
 
     console.log('💾 Saving admin notification...');
     await adminNotification.save();
@@ -102,12 +111,9 @@ export const sendAdminNotification = async (req, res) => {
           status: 'new',
           isRead: false,
           relatedId: adminNotification._id,
-          // เพิ่มข้อมูลความสำคัญ
-          adminNotificationData: {
-            priority: priority,
-            sentBy: sentBy,
-            sentAt: adminNotification.sentAt
-          }
+          priority: priority,
+          sentBy: sentBy,
+          sentAt: adminNotification.sentAt
         });
 
         const savedNotification = await notification.save();
@@ -160,9 +166,11 @@ export const getShopAdminNotifications = async (req, res) => {
     
     // หา notifications ที่ส่งให้ร้านค้านี้
     const notifications = await Notification.find({
-      shopId: shopId,
-      type: 'admin_notification'
-    }).sort({ createdAt: -1 });
+      $or: [
+        { shopId: shopId, type: 'admin_notification' },
+        { recipientShopId: shopId, type: 'admin_notification' }
+      ]
+    }).sort({ isRead: 1, createdAt: -1 }); // ยังไม่อ่านขึ้นก่อน, แล้วเรียงตามวันที่ใหม่สุด
 
     res.status(200).json({
       success: true,
@@ -185,9 +193,12 @@ export const getAdminNotifications = async (req, res) => {
     console.log('🔍 Fetching admin notifications...');
     console.log('👤 User:', req.user);
     
-    // ดึงข้อมูล notifications ทั้งหมด
-    const notifications = await UserToAdminNotification.find()
-      .sort({ createdAt: -1 })
+    // ดึงข้อมูล notifications ทั้งหมด (user-to-admin notifications)
+    // เรียงลำดับ: ข้อมูลที่ยังไม่อ่านขึ้นก่อน, แล้วเรียงตามวันที่อัปเดตล่าสุด
+    const notifications = await Notification.find({
+      type: { $in: ['bill', 'leave', 'repair'] }
+    })
+      .sort({ isRead: 1, createdAt: -1 }) // isRead: 1 = false (ยังไม่อ่าน) ขึ้นก่อน, createdAt: -1 = ใหม่สุดขึ้นก่อน
       .limit(50);
     
     console.log('📋 Found admin notifications:', notifications.length);
@@ -226,7 +237,7 @@ export const markAdminNotificationAsRead = async (req, res) => {
     console.log('🔄 Marking admin notification as read:', id);
     console.log('👤 User:', req.user);
     
-    const notification = await UserToAdminNotification.findByIdAndUpdate(
+    const notification = await Notification.findByIdAndUpdate(
       id,
       { isRead: true },
       { new: true }
@@ -265,7 +276,10 @@ export const markAllAdminNotificationsAsRead = async (req, res) => {
     console.log('👤 User:', req.user);
     
     // ตรวจสอบจำนวน notifications ที่ยังไม่ได้อ่าน
-    const unreadCount = await UserToAdminNotification.countDocuments({ isRead: false });
+    const unreadCount = await Notification.countDocuments({ 
+      type: { $in: ['bill', 'leave', 'repair'] },
+      isRead: false 
+    });
     console.log('📊 Unread notifications count:', unreadCount);
     
     if (unreadCount === 0) {
@@ -277,8 +291,11 @@ export const markAllAdminNotificationsAsRead = async (req, res) => {
       });
     }
     
-    const result = await UserToAdminNotification.updateMany(
-      { isRead: false },
+    const result = await Notification.updateMany(
+      { 
+        type: { $in: ['bill', 'leave', 'repair'] },
+        isRead: false 
+      },
       { isRead: true }
     );
     
@@ -338,7 +355,7 @@ export const createAdminBillNotification = async (bill, user) => {
     
     console.log('📝 Notification data:', notificationData);
     
-    const notification = new UserToAdminNotification(notificationData);
+    const notification = new Notification(notificationData);
     
     console.log('💾 Saving admin bill notification...');
     await notification.save();
@@ -386,7 +403,7 @@ export const createAdminLeaveNotification = async (leave, user) => {
     
     console.log('📝 Notification data:', notificationData);
     
-    const notification = new UserToAdminNotification(notificationData);
+    const notification = new Notification(notificationData);
     
     console.log('💾 Saving admin leave notification...');
     await notification.save();
@@ -436,7 +453,7 @@ export const createAdminRepairNotification = async (repair, user) => {
     
     console.log('📝 Notification data:', notificationData);
     
-    const notification = new UserToAdminNotification(notificationData);
+    const notification = new Notification(notificationData);
     
     console.log('💾 Saving admin repair notification...');
     await notification.save();

@@ -210,26 +210,32 @@ export const getMoneyHistory = async (req, res) => {
   }
 };
 
-// Get current month revenue for a shop
+// Get current month revenue for a shop (ดึงจาก Evaluation)
 export const getCurrentMonthRevenue = async (req, res) => {
   try {
     const { shopId } = req.params;
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
 
-    const currentRevenue = await MoneyHistory.findOne({
+    console.log('🔍 Getting current month revenue from Evaluation for shopId:', shopId);
+
+    // ดึงข้อมูลจาก Evaluation collection แทน MoneyHistory
+    const currentEvaluation = await Evaluation.findOne({
       shopId,
-      month: currentMonth,
-      year: currentYear
+      evaluationMonth: currentMonth,
+      evaluationYear: currentYear,
+      isActive: true
     });
+
+    console.log('📊 Current evaluation found:', !!currentEvaluation);
 
     res.json({
       success: true,
       data: {
         month: currentMonth,
         year: currentYear,
-        totals: currentRevenue ? currentRevenue.totals : 0,
-        uploadedAt: currentRevenue ? currentRevenue.uploadedAt : null
+        totals: currentEvaluation ? (currentEvaluation.revenue || 0) : 0,
+        uploadedAt: currentEvaluation ? currentEvaluation.updatedAt : null
       }
     });
 
@@ -287,7 +293,7 @@ export const getAllMoneyHistory = async (req, res) => {
 
 export { upload };
 
-// Get combined money and evaluation history for a shop
+// Get combined money and evaluation history for a shop (ดึงจาก Evaluation เท่านั้น)
 export const getCombinedHistory = async (req, res) => {
   try {
     const { shopId } = req.params;
@@ -299,14 +305,9 @@ export const getCombinedHistory = async (req, res) => {
       });
     }
 
-    console.log('🔍 Fetching combined history for shopId:', shopId);
+    console.log('🔍 Fetching combined history from Evaluation for shopId:', shopId);
 
-    // Get money history
-    const moneyHistory = await MoneyHistory.find({ shopId })
-      .sort({ year: -1, month: -1 })
-      .limit(24); // Get last 24 months
-
-    // Get evaluation history
+    // ดึงข้อมูลจาก Evaluation collection เท่านั้น
     const evaluationHistory = await Evaluation.find({ 
       shopId,
       isActive: true 
@@ -314,89 +315,54 @@ export const getCombinedHistory = async (req, res) => {
       .sort({ evaluationYear: -1, evaluationMonth: -1 })
       .limit(24); // Get last 24 months
 
-    console.log('💰 Money history records:', moneyHistory.length);
     console.log('📊 Evaluation history records:', evaluationHistory.length);
 
-    // Create a map of evaluation data by month/year
-    const evaluationMap = new Map();
-    evaluationHistory.forEach(evaluation => {
-      const key = `${evaluation.evaluationYear}-${evaluation.evaluationMonth}`;
-      evaluationMap.set(key, {
-        score: evaluation.totalScore,
-        rank: null, // Will be calculated
-        evaluatedAt: evaluation.evaluatedAt,
-        finalStatus: evaluation.finalStatus
-      });
-    });
-
     // Calculate ranks for each month
+    const combinedHistory = [];
+    
     for (const evaluation of evaluationHistory) {
       const key = `${evaluation.evaluationYear}-${evaluation.evaluationMonth}`;
       
-      // Get all evaluations for this month to calculate rank
+      // Get all evaluations for this month in the same canteen to calculate rank
       const monthEvaluations = await Evaluation.find({
         evaluationYear: evaluation.evaluationYear,
         evaluationMonth: evaluation.evaluationMonth,
-        isActive: true
-      }).sort({ totalScore: -1 }); // Sort by score descending
+        isActive: true,
+        evaluationSent: true
+      }).populate('shopId', 'canteenId').sort({ totalScore: -1 }); // Sort by score descending
 
-      // Find rank of current shop
-      const rank = monthEvaluations.findIndex(evalItem => 
-        evalItem.shopId.toString() === shopId
+      // Get the canteenId of the current shop
+      const currentShop = await Shop.findById(shopId).select('canteenId');
+      const currentCanteenId = currentShop ? currentShop.canteenId : null;
+      
+      // Filter evaluations to only include shops in the same canteen
+      const sameCanteenEvaluations = monthEvaluations.filter(evaluation => 
+        evaluation.shopId && evaluation.shopId.canteenId === currentCanteenId
+      );
+
+      console.log('📊 Month evaluations for ranking:', monthEvaluations.length);
+      console.log('📊 Same canteen evaluations:', sameCanteenEvaluations.length);
+
+      // Find rank of current shop within the same canteen
+      const rank = sameCanteenEvaluations.findIndex(evaluationItem => 
+        evaluationItem.shopId._id.toString() === shopId
       ) + 1;
 
-      if (evaluationMap.has(key)) {
-        evaluationMap.get(key).rank = rank;
-      }
-    }
-
-    // Combine data
-    const combinedHistory = [];
-    const processedMonths = new Set();
-
-    // Process money history
-    moneyHistory.forEach(money => {
-      const key = `${money.year}-${money.month}`;
-      const evaluation = evaluationMap.get(key);
-      
       const historyItem = {
-        year: money.year,
-        month: money.month,
-        revenue: money.totals,
-        score: evaluation ? evaluation.score : null,
-        rank: evaluation ? evaluation.rank : null,
-        uploadedAt: money.uploadedAt,
-        evaluatedAt: evaluation ? evaluation.evaluatedAt : null,
-        finalStatus: evaluation ? evaluation.finalStatus : null,
-        hasRevenue: true,
-        hasEvaluation: !!evaluation
+        year: evaluation.evaluationYear,
+        month: evaluation.evaluationMonth,
+        revenue: evaluation.revenue || 0,
+        score: evaluation.totalScore,
+        rank: rank,
+        uploadedAt: evaluation.updatedAt, // ใช้วันที่อัปเดตแทน
+        evaluatedAt: evaluation.evaluatedAt,
+        finalStatus: evaluation.finalStatus,
+        hasRevenue: !!(evaluation.revenue && evaluation.revenue > 0),
+        hasEvaluation: true
       };
 
       combinedHistory.push(historyItem);
-      processedMonths.add(key);
-    });
-
-    // Add evaluation records that don't have money history
-    evaluationHistory.forEach(evaluation => {
-      const key = `${evaluation.evaluationYear}-${evaluation.evaluationMonth}`;
-      
-      if (!processedMonths.has(key)) {
-        const historyItem = {
-          year: evaluation.evaluationYear,
-          month: evaluation.evaluationMonth,
-          revenue: null,
-          score: evaluation.totalScore,
-          rank: evaluationMap.get(key)?.rank || null,
-          uploadedAt: null,
-          evaluatedAt: evaluation.evaluatedAt,
-          finalStatus: evaluation.finalStatus,
-          hasRevenue: false,
-          hasEvaluation: true
-        };
-
-        combinedHistory.push(historyItem);
-      }
-    });
+    }
 
     // Sort by year and month descending
     combinedHistory.sort((a, b) => {

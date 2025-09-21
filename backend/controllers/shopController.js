@@ -45,6 +45,18 @@ export const createShop = async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating shop:', error);
+    
+    // จัดการ error สำหรับ duplicate username
+    if (error.code === 11000 && error.keyPattern && error.keyPattern['credentials.username']) {
+      return res.status(400).json({
+        success: false,
+        message: 'ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว กรุณาเปลี่ยนชื่อใหม่',
+        errorType: 'duplicate_username',
+        field: 'username'
+      });
+    }
+    
+    // จัดการ error อื่นๆ
     res.status(500).json({
       success: false,
       message: error.message

@@ -14,6 +14,10 @@
         </div>
         <div class="shop-info">
           <div class="detail-item">
+            <label>รหัสร้าน:</label>
+            <span>{{ shop.customId || 'ไม่ระบุ' }}</span>
+          </div>
+          <div class="detail-item">
             <label>ชื่อร้าน:</label>
             <span>{{ shop.name }}</span>
           </div>
@@ -28,6 +32,10 @@
           <div class="detail-item">
             <label>รายละเอียด:</label>
             <span>{{ shop.description }}</span>
+          </div>
+          <div class="detail-item">
+            <label>โรงอาหาร:</label>
+            <span>{{ getCanteenName(shop.canteenId) }}</span>
           </div>
           <div class="detail-item">
             <label>วันที่เริ่มสัญญา:</label>
@@ -87,6 +95,16 @@ export default {
         other: 'อื่นๆ'
       }
       return types[type] || type
+    },
+    getCanteenName(canteenId) {
+      const canteens = {
+        1: 'โรงอาหาร 1',
+        2: 'โรงอาหาร 2',
+        3: 'โรงอาหาร 3',
+        4: 'โรงอาหาร 4',
+        5: 'โรงอาหาร 5'
+      }
+      return canteens[canteenId] || `โรงอาหาร ${canteenId}` || 'ไม่ระบุ'
     },
     formatDate(dateString) {
       if (!dateString) return '-'

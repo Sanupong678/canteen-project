@@ -65,17 +65,31 @@ export default {
         console.log('✅ Login response:', response.data)
         
         if (response.data.success) {
-          // เก็บ token และ displayName ใน localStorage
-          localStorage.setItem('token', response.data.token)
-          localStorage.setItem('displayName', response.data.displayName || (response.data.userData && response.data.userData.name) || '')
-          localStorage.setItem('isAuthenticated', 'true');
-          localStorage.setItem('userRole', response.data.role);
+          // Clear old session data ก่อน
+          sessionStorage.clear()
           
-          console.log('💾 Stored in localStorage:', {
+          // เก็บ token และ displayName ใน sessionStorage
+          sessionStorage.setItem('token', response.data.token)
+          sessionStorage.setItem('displayName', response.data.displayName || (response.data.userData && response.data.userData.name) || '')
+          sessionStorage.setItem('isAuthenticated', 'true');
+          sessionStorage.setItem('userRole', response.data.role);
+          
+          // เก็บ userId และ shopData สำหรับ user
+          if (response.data.userData) {
+            // เก็บ userId (ใช้ shop._id เป็น userId สำหรับ user)
+            sessionStorage.setItem('userId', response.data.userData.id || '');
+            // เก็บ shopData
+            sessionStorage.setItem('shopData', JSON.stringify(response.data.userData));
+          }
+          
+          console.log('💾 Stored in sessionStorage:', {
             token: response.data.token ? 'exists' : 'missing',
+            tokenValue: response.data.token ? response.data.token.substring(0, 20) + '...' : 'missing',
             displayName: response.data.displayName,
             isAuthenticated: 'true',
-            userRole: response.data.role
+            userRole: response.data.role,
+            userId: response.data.userData?._id || response.data.userData?.id || 'missing',
+            shopData: response.data.userData?.shopData ? 'exists' : 'missing'
           })
           
           // ตั้งค่า axios

@@ -18,7 +18,7 @@ import UserRanking from "~/pages/user/ranking.vue";
 const routes = [
   // หน้า Login
   {
-    path: "/",
+    path: "/login",
     name: "Login",
     component: Login,
     meta: { requiresAuth: false }
@@ -100,6 +100,11 @@ const routes = [
         component: () => import('~/pages/user/bill.vue')
       },
       {
+        path: "bill-history",
+        name: "billHistory",
+        component: () => import('~/pages/user/bill-history.vue')
+      },
+      {
         path: "ranking",
         name: "userRanking",
         component: UserRanking,
@@ -125,9 +130,9 @@ router.beforeEach((to, from, next) => {
   const isAuthenticated = localStorage.getItem('isAuthenticated');
   const userRole = localStorage.getItem('userRole');
 
-  // ถ้าไม่ใช่หน้า login และยังไม่ได้ login
+  // ถ้าไม่ใช่หน้า login/welcome และยังไม่ได้ login
   if (to.meta.requiresAuth && !isAuthenticated) {
-    next('/');
+    next('/login');
   }
   // ถ้าเป็นหน้า admin แต่ role ไม่ใช่ admin
   else if (to.path.startsWith('/admin') && userRole !== 'admin') {
@@ -138,7 +143,7 @@ router.beforeEach((to, from, next) => {
     next('/admin');
   }
   // ถ้า login แล้วและพยายามไปหน้า login
-  else if (to.path === '/' && isAuthenticated) {
+  else if (to.path === '/login' && isAuthenticated) {
     next(userRole === 'admin' ? '/admin' : '/user');
   }
   else {

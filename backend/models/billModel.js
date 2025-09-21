@@ -16,7 +16,7 @@ const billSchema = new mongoose.Schema({
   },
   billType: {
     type: String,
-    enum: ['water', 'electricity'],
+    enum: ['water', 'electricity', 'utilities', 'Utilities'],
     required: true
   },
   month: {

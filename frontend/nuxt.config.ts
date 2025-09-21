@@ -2,7 +2,7 @@
 import { defineNuxtConfig } from 'nuxt/config'
 
 export default defineNuxtConfig({
-  css: ['vuetify/styles', 'cropperjs/dist/cropper.css'],
+  css: ['vuetify/styles', '@mdi/font/css/materialdesignicons.min.css', 'cropperjs/dist/cropper.css'],
 
   build: {
     transpile: ['vuetify'],
@@ -45,6 +45,7 @@ export default defineNuxtConfig({
 
   // Register plugins
   plugins: [
-    { src: '~/plugins/socket.client.js', mode: 'client' }
+    { src: '~/plugins/socket.client.js', mode: 'client' },
+    { src: '~/plugins/vuetify.js' }
   ]
 })

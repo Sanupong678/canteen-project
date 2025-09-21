@@ -19,7 +19,19 @@
             <span class="username">{{ displayName }}</span>
             <span class="caret">▾</span>
             <div class="user-menu" v-if="showUserMenu">
-              <button @click="handleLogout">ออกจากระบบ</button>
+              <div class="menu-item" @click="openChangePasswordModal">
+                <i class="fas fa-key menu-icon"></i>
+                <span class="menu-text">เปลี่ยนรหัส</span>
+              </div>
+              <div class="menu-item" @click="openDetailsModal">
+                <i class="fas fa-info-circle menu-icon"></i>
+                <span class="menu-text">รายละเอียด</span>
+              </div>
+              <div class="menu-divider"></div>
+              <div class="menu-item logout-item" @click="handleLogout">
+                <i class="fas fa-sign-out-alt menu-icon"></i>
+                <span class="menu-text">ออกจากระบบ</span>
+              </div>
             </div>
           </div>
         </div>
@@ -46,10 +58,177 @@
 
     <!-- Footer -->
     <footer class="user-footer">
-      <p>สำนักงานมหาวิทยาลัยส่วนกลาง กรุงเทพมหานคร</p>
-      <p>127 ถ.ปัญญาอุดม 2 ชั้น 2</p>
-      <p>โทรศัพท์: 0-2679-0038-9 | โทรสาร: 0-2679-0038</p>
+      <div class="footer-content">
+        <div class="footer-section">
+          <h3 class="footer-title">ติดต่อเรา</h3>
+          <div class="contact-info">
+            <div class="contact-item">
+              <i class="fas fa-building"></i>
+              <span>ศูนย์อาหารมหาวิทยาลัยแม่ฟ้าหลวง (Mfu Food Court)</span>
+            </div>
+            <div class="contact-item">
+              <i class="fas fa-map-marker-alt"></i>
+              <span>Chiang Rai, Thailand, Chiang Rai</span>
+            </div>
+            <div class="contact-item">
+              <i class="fas fa-phone"></i>
+              <span>053 917 144</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="footer-section">
+          <h3 class="footer-title">ติดตาม</h3>
+          <div class="social-links">
+            <a href="https://asset.mfu.ac.th/asset-home.html" 
+               class="social-link" 
+               title="สำนักงานจัดการทรัพย์สินและรายได้"
+               target="_blank">
+              <i class="fas fa-university"></i>
+              <span>สำนักงานจัดการทรัพย์สินและรายได้</span>
+            </a>
+            <a href="https://www.facebook.com/MFUFOODCOURT" 
+               class="social-link facebook" 
+               target="_blank">
+              <i class="fab fa-facebook-f"></i>
+              <span>Facebook</span>
+            </a>
+          </div>
+        </div>
+      </div>
     </footer>
+
+    <!-- Change Password Modal -->
+    <div v-if="showChangePasswordModal" class="password-modal" @click="closeChangePasswordModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>เปลี่ยนรหัสผ่าน</h3>
+          <button class="modal-close-btn" @click="closeChangePasswordModal">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="credentials-section">
+            <div class="shop-info-header">
+              <h4>ข้อมูลร้านค้า</h4>
+              <p class="shop-name">{{ shopData.name || 'ไม่ระบุ' }}</p>
+            </div>
+            <div class="credentials-info">
+              <h4>ข้อมูลการเข้าสู่ระบบ</h4>
+              <div class="credential-item">
+                <label>ชื่อผู้ใช้:</label>
+                <span>{{ shopData.credentials?.username || 'ไม่ระบุ' }}</span>
+              </div>
+              <div class="credential-item">
+                <label>รหัสผ่านปัจจุบัน:</label>
+                <span>{{ shopData.credentials?.password ? '••••••••' : 'ไม่ระบุ' }}</span>
+              </div>
+            </div>
+            <div class="password-section">
+              <h4>เปลี่ยนรหัสผ่าน</h4>
+              <div class="form-group">
+                <label>รหัสผ่านใหม่:</label>
+                <input 
+                  type="password" 
+                  v-model="passwordForm.newPassword" 
+                  placeholder="กรอกรหัสผ่านใหม่"
+                  :class="{ 'error': passwordError }"
+                >
+                <small class="error-message" v-if="passwordError">{{ passwordError }}</small>
+              </div>
+              <div class="form-group">
+                <label>ยืนยันรหัสผ่าน:</label>
+                <input 
+                  type="password" 
+                  v-model="passwordForm.confirmPassword" 
+                  placeholder="กรอกรหัสผ่านใหม่อีกครั้ง"
+                  :class="{ 'error': confirmPasswordError }"
+                >
+                <small class="error-message" v-if="confirmPasswordError">{{ confirmPasswordError }}</small>
+              </div>
+              <div class="password-requirements">
+                <p>รหัสผ่านต้องมี:</p>
+                <ul>
+                  <li :class="{ 'met': passwordForm.newPassword.length >= 8 }">อย่างน้อย 8 ตัวอักษร</li>
+                  <li :class="{ 'met': /[A-Z]/.test(passwordForm.newPassword) }">ตัวอักษรพิมพ์ใหญ่ 1 ตัว</li>
+                  <li :class="{ 'met': /[a-z]/.test(passwordForm.newPassword) }">ตัวอักษรพิมพ์เล็ก 1 ตัว</li>
+                  <li :class="{ 'met': /[0-9]/.test(passwordForm.newPassword) }">ตัวเลข 1 ตัว</li>
+                </ul>
+              </div>
+              <div class="form-actions">
+                <button class="cancel-btn" @click="closeChangePasswordModal">ยกเลิก</button>
+                <button class="save-btn" @click="handleChangePassword" :disabled="!isPasswordValid">
+                  <i class="fas fa-key"></i> เปลี่ยนรหัสผ่าน
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Details Modal -->
+    <div v-if="showDetailsModal" class="modal-overlay" @click="closeDetailsModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>รายละเอียดร้านค้า</h3>
+          <button class="close-btn" @click="closeDetailsModal">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div class="shop-image-container">
+            <img :src="getFullImageUrl(shopData.image)" alt="รูปภาพร้านค้า" class="shop-image">
+          </div>
+          <div class="shop-info">
+            <div class="detail-item">
+              <label>รหัสร้าน:</label>
+              <span>{{ shopData.customId || 'ไม่ระบุ' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>ชื่อร้าน:</label>
+              <span>{{ shopData.name || 'ไม่ระบุ' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>ประเภท:</label>
+              <span>{{ getShopTypeLabel(shopData.type) }}</span>
+            </div>
+            <div class="detail-item">
+              <label>ตำแหน่ง:</label>
+              <span>{{ shopData.location || 'ไม่ระบุ' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>รายละเอียด:</label>
+              <span>{{ getDescription(shopData.description) }}</span>
+            </div>
+            <div class="detail-item">
+              <label>โรงอาหาร:</label>
+              <span>{{ getCanteenName(shopData.canteenId) }}</span>
+            </div>
+            <div class="detail-item">
+              <label>วันที่เริ่มสัญญา:</label>
+              <span>{{ formatDate(shopData.contractStartDate) || 'ไม่ระบุ' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>วันที่สิ้นสุดสัญญา:</label>
+              <span class="detail-value">{{ formatDate(shopData.contractEndDate) || 'ไม่ระบุ' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>สถานะสัญญา:</label>
+              <span :class="{ 'expired': isExpired(shopData) }">
+                <i :class="isExpired(shopData) ? 'fas fa-exclamation-circle' : 'fas fa-check-circle'"></i>
+                {{ isExpired(shopData) ? 'หมดอายุ' : 'มีผล' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="close-btn" @click="closeDetailsModal">ปิด</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -66,20 +245,39 @@ export default {
       showUserMenu: false,
       displayName: 'User Name',
       shopData: {},
-      userId: null
+      userId: null,
+      showChangePasswordModal: false,
+      showDetailsModal: false,
+      passwordForm: {
+        newPassword: '',
+        confirmPassword: ''
+      },
+      passwordError: '',
+      confirmPasswordError: ''
     }
   },
   async mounted() {
     // Check if we're on the client side
     if (process.client) {
-      // Set data from localStorage only on client side
-      this.displayName = localStorage.getItem('displayName') || 'User Name'
-      this.shopData = JSON.parse(localStorage.getItem('shopData') || '{}')
-      this.userId = localStorage.getItem('userId')
+      // Set data from sessionStorage only on client side
+      this.displayName = sessionStorage.getItem('displayName') || 'User Name'
+      this.shopData = JSON.parse(sessionStorage.getItem('shopData') || '{}')
+      this.userId = sessionStorage.getItem('userId')
+      
+      // Debug sessionStorage data
+      console.log('🔍 sessionStorage data:', {
+        displayName: this.displayName,
+        userId: this.userId,
+        shopData: this.shopData,
+        rawShopData: sessionStorage.getItem('shopData'),
+        token: sessionStorage.getItem('token') ? sessionStorage.getItem('token').substring(0, 20) + '...' : 'missing',
+        isAuthenticated: sessionStorage.getItem('isAuthenticated'),
+        userRole: sessionStorage.getItem('userRole')
+      })
       
       // ตรวจสอบ authentication
-      const isAuthenticated = localStorage.getItem('isAuthenticated')
-      const token = localStorage.getItem('token')
+      const isAuthenticated = sessionStorage.getItem('isAuthenticated')
+      const token = sessionStorage.getItem('token')
       
       if (!isAuthenticated || !token) {
         console.log('❌ User not authenticated, redirecting to login')
@@ -88,7 +286,7 @@ export default {
       }
       
       // ตรวจสอบ role
-      const userRole = localStorage.getItem('userRole')
+      const userRole = sessionStorage.getItem('userRole')
       if (userRole !== 'user') {
         console.log('❌ User role is not user, redirecting to login')
         this.$router.push('/login')
@@ -96,6 +294,14 @@ export default {
       }
       
       console.log('✅ User authenticated successfully')
+      console.log('👤 User data:', {
+        displayName: this.displayName,
+        userId: this.userId,
+        shopData: this.shopData
+      })
+      
+      // ดึงข้อมูลร้านค้าจาก API
+      await this.fetchShopDetails()
       
       // Initialize notifications ทันที
       try {
@@ -113,13 +319,192 @@ export default {
     },
     handleLogout() {
       if (process.client) {
-        localStorage.removeItem('userRole')
-        localStorage.removeItem('isAuthenticated')
-        localStorage.removeItem('displayName')
-        localStorage.removeItem('userId')
-        localStorage.removeItem('shopData')
+        // Clear all session data
+        sessionStorage.clear()
+        
+        // Clear cookies
+        document.cookie = 'user_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+        document.cookie = 'admin_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+        
+        console.log('✅ Logged out successfully, cleared session data')
       }
-      this.$router.push('/')
+      this.$router.push('/login')
+    },
+    openChangePasswordModal() {
+      this.showChangePasswordModal = true
+      this.showUserMenu = false
+    },
+    closeChangePasswordModal() {
+      this.showChangePasswordModal = false
+      this.passwordForm = {
+        newPassword: '',
+        confirmPassword: ''
+      }
+      this.passwordError = ''
+      this.confirmPasswordError = ''
+    },
+    openDetailsModal() {
+      this.showDetailsModal = true
+      this.showUserMenu = false
+    },
+    closeDetailsModal() {
+      this.showDetailsModal = false
+    },
+    getShopTypeLabel(type) {
+      const types = {
+        food: 'อาหาร',
+        beverage: 'เครื่องดื่ม',
+        other: 'อื่นๆ'
+      }
+      return types[type] || type || 'ไม่ระบุ'
+    },
+    getFullImageUrl(imagePath) {
+      if (!imagePath) return '/images/default-shop.jpg'
+      if (imagePath.startsWith('http')) return imagePath
+      return `${process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000'}${imagePath}`
+    },
+    getCanteenName(canteenId) {
+      const canteens = {
+        1: 'โรงอาหาร 1',
+        2: 'โรงอาหาร 2',
+        3: 'โรงอาหาร 3',
+        4: 'โรงอาหาร 4',
+        5: 'โรงอาหาร 5'
+      }
+      return canteens[canteenId] || `โรงอาหาร ${canteenId}` || 'ไม่ระบุ'
+    },
+    formatDate(dateString) {
+      if (!dateString) return '-'
+      const date = new Date(dateString)
+      return date.toLocaleDateString('th-TH', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+    },
+    isExpired(shop) {
+      if (!shop || !shop.contractEndDate) return false
+      const endDate = new Date(shop.contractEndDate)
+      const today = new Date()
+      return endDate < today
+    },
+    getDescription(description) {
+      if (!description || description === null || description === undefined) {
+        return 'ไม่ระบุ'
+      }
+      const trimmed = description.toString().trim()
+      return trimmed === '' ? 'ไม่ระบุ' : trimmed
+    },
+    validatePassword() {
+      this.passwordError = ''
+      this.confirmPasswordError = ''
+
+      if (!this.passwordForm.newPassword) {
+        this.passwordError = 'กรุณากรอกรหัสผ่านใหม่'
+        return false
+      }
+
+      if (this.passwordForm.newPassword.length < 8) {
+        this.passwordError = 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร'
+        return false
+      }
+
+      if (!/[A-Z]/.test(this.passwordForm.newPassword)) {
+        this.passwordError = 'รหัสผ่านต้องมีตัวอักษรพิมพ์ใหญ่ 1 ตัว'
+        return false
+      }
+
+      if (!/[a-z]/.test(this.passwordForm.newPassword)) {
+        this.passwordError = 'รหัสผ่านต้องมีตัวอักษรพิมพ์เล็ก 1 ตัว'
+        return false
+      }
+
+      if (!/[0-9]/.test(this.passwordForm.newPassword)) {
+        this.passwordError = 'รหัสผ่านต้องมีตัวเลข 1 ตัว'
+        return false
+      }
+
+      if (this.passwordForm.newPassword !== this.passwordForm.confirmPassword) {
+        this.confirmPasswordError = 'รหัสผ่านไม่ตรงกัน'
+        return false
+      }
+
+      return true
+    },
+    async fetchShopDetails() {
+      try {
+        // ดึง shopId จาก localStorage หรือ shopData
+        // สำหรับ user, userId จะเป็น shop._id
+        const shopId = this.userId || this.shopData._id || this.shopData.id
+        
+        console.log('🔍 Debug shopId lookup:', {
+          'this.shopData._id': this.shopData._id,
+          'this.shopData.id': this.shopData.id,
+          'this.userId': this.userId,
+          'final shopId': shopId
+        })
+        
+        if (!shopId) {
+          console.log('❌ No shopId found')
+          console.log('❌ Available data:', {
+            shopData: this.shopData,
+            userId: this.userId
+          })
+          console.log('❌ sessionStorage data:', {
+            userId: sessionStorage.getItem('userId'),
+            shopData: sessionStorage.getItem('shopData'),
+            displayName: sessionStorage.getItem('displayName'),
+            userRole: sessionStorage.getItem('userRole')
+          })
+          return
+        }
+        
+        console.log('🔍 Fetching shop details for shopId:', shopId)
+        
+        const response = await this.$axios.get(`/api/shops/details/${shopId}`)
+        
+        if (response.data.success) {
+          this.shopData = response.data.data
+          console.log('✅ Shop details fetched successfully:', this.shopData)
+          console.log('🔍 Description value:', this.shopData.description)
+          console.log('🔍 Description type:', typeof this.shopData.description)
+        }
+      } catch (error) {
+        console.error('❌ Error fetching shop details:', error)
+      }
+    },
+    async handleChangePassword() {
+      if (this.validatePassword()) {
+        try {
+          const shopId = this.shopData._id || this.shopData.id
+          
+          if (!shopId) {
+            alert('ไม่พบข้อมูลร้านค้า')
+            return
+          }
+          
+          console.log('Changing password for shop:', shopId)
+          console.log('New password:', this.passwordForm.newPassword)
+          
+          const response = await this.$axios.put(`/api/shops/update-password/${shopId}`, {
+            newPassword: this.passwordForm.newPassword
+          })
+          
+          if (response.data.success) {
+            alert('เปลี่ยนรหัสผ่านเรียบร้อยแล้ว')
+            this.closeChangePasswordModal()
+            
+            // ดึงข้อมูลร้านค้าใหม่เพื่ออัปเดต credentials
+            await this.fetchShopDetails()
+          } else {
+            alert(response.data.message || 'ไม่สามารถเปลี่ยนรหัสผ่านได้')
+          }
+        } catch (error) {
+          console.error('เกิดข้อผิดพลาดในการเปลี่ยนรหัสผ่าน:', error)
+          const errorMessage = error.response?.data?.message || 'ไม่สามารถเปลี่ยนรหัสผ่านได้'
+          alert(errorMessage)
+        }
+      }
     }
   },
   computed: {
@@ -131,6 +516,25 @@ export default {
     },
     shopLocation() {
       return this.shopData.location || ''
+    },
+    userInitials() {
+      if (this.displayName && this.displayName !== 'User Name') {
+        return this.displayName.charAt(0).toUpperCase()
+      }
+      return 'U'
+    },
+    isPasswordValid() {
+      return (
+        this.passwordForm.newPassword &&
+        this.passwordForm.confirmPassword &&
+        this.passwordForm.newPassword === this.passwordForm.confirmPassword &&
+        this.passwordForm.newPassword.length >= 8 &&
+        /[A-Z]/.test(this.passwordForm.newPassword) &&
+        /[a-z]/.test(this.passwordForm.newPassword) &&
+        /[0-9]/.test(this.passwordForm.newPassword) &&
+        !this.passwordError &&
+        !this.confirmPasswordError
+      )
     }
   }
 }
@@ -138,6 +542,7 @@ export default {
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700;800;900&family=Inter:wght@400;600;700&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
 .user-layout {
   min-height: 100vh;
   display: flex;
@@ -273,20 +678,58 @@ export default {
   top: 100%;
   right: 0;
   background: white;
-  padding: 10px;
-  border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  min-width: 150px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  min-width: 220px;
+  padding: 8px 0;
+  border: 1px solid #e2e8f0;
+  z-index: 1000;
+  margin-top: 8px;
 }
 
-.user-menu button {
-  width: 100%;
-  padding: 8px;
-  border: none;
-  background: #e74c3c;
-  color: white;
-  border-radius: 4px;
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
   cursor: pointer;
+  transition: all 0.2s ease;
+  color: #374151;
+  font-weight: 500;
+}
+
+.menu-item:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.menu-item.logout-item {
+  color: #dc2626;
+}
+
+.menu-item.logout-item:hover {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.menu-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 12px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-text {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.menu-divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 4px 0;
 }
 
 /* Navbar ชั้นที่ 2 */
@@ -345,12 +788,399 @@ export default {
 .user-footer {
   background-color: #e74c3c;
   color: white;
+  padding: 30px 20px;
+}
+
+.footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  gap: 60px;
   text-align: center;
+}
+
+.footer-section {
+  flex: 1;
+}
+
+.footer-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  color: white;
+  font-family: 'Kanit', sans-serif;
+}
+
+.contact-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.contact-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.contact-item i {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #ffd700;
+}
+
+.social-links {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.social-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: white;
+  text-decoration: none;
+  font-size: 16px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+}
+
+.social-link:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.social-link.facebook:hover {
+  background-color: #1877f2;
+  border-color: #1877f2;
+}
+
+.social-link i {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #ffd700;
+}
+
+.social-link.facebook i {
+  color: #1877f2;
+}
+
+.social-link.facebook:hover i {
+  color: white;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .user-menu {
+    min-width: 200px;
+  }
+  
+  .menu-item {
+    padding: 10px 14px;
+  }
+  
+  .menu-text {
+    font-size: 13px;
+  }
+  
+  .footer-content {
+    flex-direction: column;
+    gap: 30px;
+  }
+  
+  .footer-title {
+    font-size: 20px;
+  }
+  
+  .contact-item,
+  .social-link {
+    font-size: 14px;
+  }
+}
+
+/* Modal Styles */
+.password-modal, .modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 20px;
+}
+
+.modal-close-btn, .close-btn {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 5px;
+}
+
+.modal-body {
   padding: 20px;
 }
 
-.user-footer p {
-  margin: 5px 0;
+.modal-footer {
+  padding: 20px;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Password Form Styles */
+.credentials-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.shop-info-header, .credentials-info, .password-section {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 4px;
+}
+
+.shop-info-header h4, .credentials-info h4, .password-section h4 {
+  margin: 0 0 10px 0;
+  color: #666;
+  font-size: 16px;
+}
+
+.shop-name {
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.credential-item {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.credential-item:last-child {
+  margin-bottom: 0;
+}
+
+.credential-item label {
+  color: #666;
+  font-weight: 500;
+}
+
+.credential-item span {
+  color: #333;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  color: #666;
+  font-weight: 500;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.form-group input.error {
+  border-color: #dc3545;
+}
+
+.error-message {
+  color: #dc3545;
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.password-requirements {
+  margin: 15px 0;
+  padding: 15px;
+  background-color: white;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+}
+
+.password-requirements p {
+  margin: 0 0 10px 0;
+  color: #666;
+  font-weight: 500;
+}
+
+.password-requirements ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.password-requirements li {
+  color: #666;
+  margin-bottom: 5px;
+  padding-left: 20px;
+  position: relative;
+}
+
+.password-requirements li:before {
+  content: '×';
+  position: absolute;
+  left: 0;
+  color: #dc3545;
+}
+
+.password-requirements li.met {
+  color: #28a745;
+}
+
+.password-requirements li.met:before {
+  content: '✓';
+  color: #28a745;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.cancel-btn, .save-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cancel-btn {
+  background-color: #f8f9fa;
+  color: #666;
+}
+
+.save-btn {
+  background-color: #28a745;
+  color: white;
+}
+
+.save-btn:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+/* Details Modal Styles */
+.shop-image-container {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.shop-image {
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.shop-info {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.detail-item {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.detail-item label {
+  color: #666;
+  font-weight: 500;
+}
+
+.detail-item span {
+  color: #333;
+}
+
+.detail-item span.expired {
+  color: #dc3545;
+}
+
+/* Responsive Modal */
+@media (max-width: 768px) {
+  .modal-content {
+    width: 95%;
+  }
+
+  .credential-item, .detail-item {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .cancel-btn, .save-btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 </style>
   

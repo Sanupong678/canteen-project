@@ -7,17 +7,17 @@ const unreadCount = ref(0)
 const isInitialized = ref(false)
 const lastFetchTime = ref(null)
 
-// ฟังก์ชันสำหรับเข้าถึง localStorage อย่างปลอดภัย
-const getLocalStorage = (key, defaultValue = '0') => {
+// ฟังก์ชันสำหรับเข้าถึง sessionStorage อย่างปลอดภัย
+const getSessionStorage = (key, defaultValue = '0') => {
   if (process.client) {
-    return localStorage.getItem(key) || defaultValue
+    return sessionStorage.getItem(key) || defaultValue
   }
   return defaultValue
 }
 
-const setLocalStorage = (key, value) => {
+const setSessionStorage = (key, value) => {
   if (process.client) {
-    localStorage.setItem(key, value)
+    sessionStorage.setItem(key, value)
   }
 }
 
@@ -47,8 +47,8 @@ export const useNotificationStore = () => {
   // Fetch notifications
   const fetchNotifications = async () => {
     try {
-      const token = getLocalStorage('token')
-      const isAuthenticated = getLocalStorage('isAuthenticated')
+      const token = getSessionStorage('token')
+      const isAuthenticated = getSessionStorage('isAuthenticated')
       
       if (!token || !isAuthenticated) {
         console.log('❌ No token or not authenticated')
@@ -78,16 +78,16 @@ export const useNotificationStore = () => {
         
         // อัปเดต unread count จาก server response
         const newUnreadCount = notifications.value.filter(n => !n.isRead).length
-        const savedUnreadCount = parseInt(getLocalStorage('userUnreadCount', '0'))
+        const savedUnreadCount = parseInt(getSessionStorage('userUnreadCount', '0'))
         
-        // ถ้า localStorage เป็น 0 และ server ก็ไม่มี unread notifications
+        // ถ้า sessionStorage เป็น 0 และ server ก็ไม่มี unread notifications
         if (savedUnreadCount === 0 && newUnreadCount === 0) {
           unreadCount.value = 0
-          console.log('📱 Using saved unread count (0) from localStorage')
+          console.log('📱 Using saved unread count (0) from sessionStorage')
         } else {
           // อัปเดตจาก server response
           unreadCount.value = newUnreadCount
-          setLocalStorage('userUnreadCount', unreadCount.value.toString())
+          setSessionStorage('userUnreadCount', unreadCount.value.toString())
           console.log('📊 Updated unread count from server:', unreadCount.value)
         }
         
@@ -115,7 +115,7 @@ export const useNotificationStore = () => {
   // Mark all as read
   const markAllAsRead = async () => {
     try {
-      const token = getLocalStorage('token')
+      const token = getSessionStorage('token')
       const response = await axios.put('/api/notifications/mark-all-read', {}, {
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -126,7 +126,7 @@ export const useNotificationStore = () => {
         // อัปเดต local state
         notifications.value.forEach(n => n.isRead = true)
         unreadCount.value = 0
-        setLocalStorage('userUnreadCount', '0')
+        setSessionStorage('userUnreadCount', '0')
         
         // แจ้งเตือน components อื่นๆ
         emitEvent('allNotificationsRead', {
@@ -142,7 +142,7 @@ export const useNotificationStore = () => {
   // Mark single notification as read
   const markAsRead = async (notificationId) => {
     try {
-      const token = getLocalStorage('token')
+      const token = getSessionStorage('token')
       await axios.put(`/api/notifications/${notificationId}/read`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -152,7 +152,7 @@ export const useNotificationStore = () => {
       if (notification && !notification.isRead) {
         notification.isRead = true
         unreadCount.value--
-        setLocalStorage('userUnreadCount', unreadCount.value.toString())
+        setSessionStorage('userUnreadCount', unreadCount.value.toString())
         
         // แจ้งเตือน components อื่นๆ
         emitEvent('notificationRead', {
@@ -169,11 +169,11 @@ export const useNotificationStore = () => {
   const initialize = async () => {
     console.log('🚀 Initializing notification store...')
     
-    // โหลด unread count จาก localStorage ก่อน
-    const savedUnreadCount = getLocalStorage('userUnreadCount')
+    // โหลด unread count จาก sessionStorage ก่อน
+    const savedUnreadCount = getSessionStorage('userUnreadCount')
     if (savedUnreadCount !== null) {
       unreadCount.value = parseInt(savedUnreadCount)
-      console.log('📱 Loaded unread count from localStorage:', unreadCount.value)
+      console.log('📱 Loaded unread count from sessionStorage:', unreadCount.value)
     }
     
     await fetchNotifications()

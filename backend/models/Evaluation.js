@@ -6,14 +6,6 @@ const evaluationSchema = new mongoose.Schema({
     ref: 'Shop',
     required: true
   },
-  shopName: {
-    type: String,
-    required: true
-  },
-  canteenName: {
-    type: String,
-    required: true
-  },
   revenue: {
     type: Number,
     default: 0
@@ -21,9 +13,19 @@ const evaluationSchema = new mongoose.Schema({
   items: [{
     id: mongoose.Schema.Types.ObjectId,
     title: String,
+    description: String,
+    maxScore: Number,
     status: {
       type: String,
       enum: ['ผ่าน', 'ไม่ผ่าน', ''],
+      default: ''
+    },
+    suggestion: {
+      type: String,
+      default: ''
+    },
+    driveLink: {
+      type: String,
       default: ''
     }
   }],
@@ -35,7 +37,7 @@ const evaluationSchema = new mongoose.Schema({
   },
   finalStatus: {
     type: String,
-    enum: ['ผ่าน', 'ไม่ผ่าน'],
+    enum: ['ผ่าน', 'ไม่ผ่าน', 'คัดออก'],
     required: true
   },
   evaluationMonth: {
@@ -48,6 +50,18 @@ const evaluationSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  evaluationRound: {
+    type: Number,
+    required: true,
+    default: 1,
+    min: 1
+  },
+  resetId: {
+    type: Number,
+    required: true,
+    default: 1,
+    min: 1
+  },
   evaluatedAt: {
     type: Date,
     default: Date.now
@@ -59,13 +73,24 @@ const evaluationSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  evaluationSent: {
+    type: Boolean,
+    default: false
+  },
+  sentAt: {
+    type: Date
+  },
+  sentBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   }
 }, {
   timestamps: true
 });
 
-// Compound index เพื่อป้องกันการประเมินซ้ำในเดือนเดียวกัน
-evaluationSchema.index({ shopId: 1, evaluationMonth: 1, evaluationYear: 1 }, { unique: true });
+// Compound index เพื่อป้องกันการประเมินซ้ำในเดือนเดียวกันและรอบเดียวกัน
+evaluationSchema.index({ shopId: 1, evaluationMonth: 1, evaluationYear: 1, evaluationRound: 1, resetId: 1 }, { unique: true });
 
 const Evaluation = mongoose.model('Evaluation', evaluationSchema);
 

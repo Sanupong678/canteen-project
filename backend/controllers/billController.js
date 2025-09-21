@@ -82,6 +82,13 @@ export const uploadBill = async (req, res) => {
     bill.imageUploadDate = new Date();
     bill.imageExpiryDate = new Date(Date.now() + (5 * 365 * 24 * 60 * 60 * 1000)); // 5 ปี
     bill.payment_date = transferDate ? new Date(transferDate) : new Date();
+
+    // Normalize billType if passed (support Utilities/UTILITIES)
+    const billTypeRaw = req.body?.billType;
+    const billType = typeof billTypeRaw === 'string' ? billTypeRaw.toLowerCase() : billTypeRaw;
+    if (billType && ['water','electricity','utilities'].includes(billType)) {
+      bill.billType = bill.billType || billType;
+    }
     
     // ตรวจสอบว่าอัปโหลดเกินกำหนดหรือไม่
     const dueDate = new Date(bill.dueDate);
@@ -158,6 +165,16 @@ export const verifyBill = async (req, res) => {
     bill.admin_comment = admin_comment;
     await bill.save();
 
+    // If this is a utilities (combined) bill and marked as เสร็จสิ้น, cascade status to water & electricity of the same period
+    if ((bill.billType === 'utilities' || bill.billType === 'Utilities') && bill.status === 'เสร็จสิ้น') {
+      const periodMatch = { shopId: bill.shopId, month: bill.month, year: bill.year };
+      const related = await Bill.updateMany(
+        { ...periodMatch, billType: { $in: ['water', 'electricity'] } },
+        { $set: { status: 'เสร็จสิ้น' } }
+      );
+      console.log('Cascaded status to W/E bills for utilities payment:', related.modifiedCount);
+    }
+
     console.log('✅ Bill updated successfully:', {
       id: bill._id,
       shopId: bill.shopId,
@@ -189,19 +206,38 @@ export const verifyBill = async (req, res) => {
 // Get all bills (admin)
 export const getAllBills = async (req, res) => {
   try {
-    const { billType, status, canteenId, month } = req.query;
+    const { billType, status, canteenId, month, year, shopName } = req.query;
     let query = {};
     
-    if (billType) query.billType = billType;
-    if (status) query.status = status;
-
-    // ดึงข้อมูลร้านค้าทั้งหมด
-    let shops;
-    if (canteenId) {
-      shops = await Shop.find({ canteenId });
-    } else {
-      shops = await Shop.find();
+    if (billType) {
+      const normalized = String(billType).toLowerCase();
+      if (normalized === 'utilities') {
+        query.billType = { $in: ['utilities', 'Utilities'] };
+      } else if (normalized === 'water' || normalized === 'electricity') {
+        query.billType = normalized;
+      } else {
+        query.billType = billType; // fallback as-is
+      }
     }
+    
+    // Normalize status (support both Thai and English keys, and legacy labels)
+    if (status) {
+      const statusMap = {
+        pending: 'รอดำเนินการ',
+        waiting: 'รอตรวจสอบ',
+        confirmed: 'เสร็จสิ้น',
+        rejected: 'เลยกำหนด',
+        'ยืนยันแล้ว': 'เสร็จสิ้น',
+        'เลยกำหนดชำระ': 'เลยกำหนด'
+      };
+      query.status = statusMap[status] || status;
+    }
+
+    // ดึงข้อมูลร้านค้าตามตัวกรองโรงอาหารและชื่อร้าน
+    const shopFilter = {};
+    if (canteenId) shopFilter.canteenId = parseInt(canteenId);
+    if (shopName) shopFilter.name = new RegExp(shopName, 'i');
+    const shops = await Shop.find(shopFilter);
 
     // ตรวจสอบและสร้างบิลสำหรับเดือนปัจจุบันเท่านั้น
     const currentMonth = new Date().getMonth() + 1;
@@ -259,6 +295,45 @@ export const getAllBills = async (req, res) => {
         await electricityBill.save();
         console.log(`Created electricity bill for shop ${shop.name} for month ${currentMonth}/${currentYear}`);
       }
+
+      // ตรวจสอบบิล Utilities (รวม) ของเดือนปัจจุบัน
+      let utilitiesBill = await Bill.findOne({
+        shopId: shop._id,
+        billType: { $in: ['utilities','Utilities'] },
+        month: currentMonth,
+        year: currentYear
+      });
+
+      if (!utilitiesBill) {
+        const combinedAmount =
+          (waterBill && typeof waterBill.amount === 'number' ? waterBill.amount : 0) +
+          (electricityBill && typeof electricityBill.amount === 'number' ? electricityBill.amount : 0);
+
+        utilitiesBill = new Bill({
+          shopId: shop._id,
+          shopName: shop.name,
+          shopCustomId: shop.customId,
+          canteenId: shop.canteenId,
+          contractStartDate: shop.contractStartDate,
+          contractEndDate: shop.contractEndDate,
+          billType: 'utilities',
+          status: 'รอดำเนินการ',
+          month: currentMonth,
+          year: currentYear,
+          amount: combinedAmount > 0 ? combinedAmount : null
+        });
+        await utilitiesBill.save();
+        console.log(`Created utilities bill for shop ${shop.name} for month ${currentMonth}/${currentYear}`);
+      } else {
+        // keep utilities amount in sync when water/electricity amounts exist
+        const combinedAmount =
+          (waterBill && typeof waterBill.amount === 'number' ? waterBill.amount : 0) +
+          (electricityBill && typeof electricityBill.amount === 'number' ? electricityBill.amount : 0);
+        if (combinedAmount > 0 && utilitiesBill.amount !== combinedAmount) {
+          utilitiesBill.amount = combinedAmount;
+          await utilitiesBill.save();
+        }
+      }
     }
 
     // ดึงข้อมูลบิลตาม query
@@ -267,9 +342,12 @@ export const getAllBills = async (req, res) => {
       query.shopId = { $in: shopIds };
     }
 
-    // ถ้ามีการกรองตามเดือน
+    // ถ้ามีการกรองตามเดือน/ปี
     if (month) {
-      query.month = month;
+      query.month = parseInt(month);
+    }
+    if (year) {
+      query.year = parseInt(year);
     }
 
     // ดึงข้อมูล bills พร้อมกับข้อมูลร้านค้า
@@ -389,7 +467,10 @@ const getCanteenName = (canteenId) => {
 };
 
 const getBillTypeText = (type) => {
-  return type === 'water' ? 'ค่าน้ำ' : 'ค่าไฟ';
+  if (type === 'water') return 'ค่าน้ำ';
+  if (type === 'electricity') return 'ค่าไฟ';
+  if (type === 'utilities') return 'รวม (ค่าน้ำ+ค่าไฟ)';
+  return type;
 };
 
 const getThaiMonth = (monthNumber) => {

@@ -6,44 +6,44 @@
           <h1 class="page-title">จัดการการลา</h1>
         </div>
 
-        <!-- Filters Section -->
+        <!-- Filters Section (Bill-style) -->
         <div class="filters-section">
-          <v-row>
-            <v-col cols="12" sm="4">
+          <v-row class="filters-row" align="center" no-gutters>
+            <v-col cols="12" md="auto" class="filter-col search-col">
               <v-text-field
                 v-model="search"
-                label="ค้นหาชื่อร้านค้า"
-                outlined
-                dense
+                placeholder="ค้นหาชื่อร้านค้า"
+                variant="solo"
                 hide-details
-                class="custom-select"
-                prepend-inner-icon="mdi-magnify"
-                clearable
-              ></v-text-field>
+                class="search-input filter-input filter-input--search"
+                append-inner-icon="mdi-magnify"
+                @click:append-inner="() => {}"
+                @keyup.enter="() => {}"
+              />
             </v-col>
-            <v-col cols="12" sm="4">
-              <v-select
-                v-model="filters.canteen"
-                :items="canteenOptions"
-                label="โรงอาหาร"
-                clearable
-                outlined
-                dense
-                hide-details
-                class="custom-select"
-              ></v-select>
-            </v-col>
-            <v-col cols="12" sm="4">
-              <v-select
-                v-model="filters.status"
-                :items="statusOptions"
-                label="สถานะ"
-                clearable
-                outlined
-                dense
-                hide-details
-                class="custom-select"
-              ></v-select>
+            <v-col cols="12" md="auto" class="filters-left">
+              <div class="filters-left-row">
+                <v-select
+                  v-model="filters.canteen"
+                  :items="['ทั้งหมด', ...canteenOptions]"
+                  label="โรงอาหาร"
+                  variant="solo"
+                  hide-details
+                  class="custom-select pill-select filter-input filter-input--md"
+                  menu-icon="mdi-menu-down"
+                  prepend-inner-icon="mdi-store-outline"
+                />
+                <v-select
+                  v-model="filters.status"
+                  :items="['ทั้งหมด', ...statusOptions.map(s => s.text || s)]"
+                  label="สถานะ"
+                  variant="solo"
+                  hide-details
+                  class="custom-select pill-select filter-input filter-input--md"
+                  menu-icon="mdi-menu-down"
+                  prepend-inner-icon="mdi-check-circle-outline"
+                />
+              </div>
             </v-col>
           </v-row>
         </div>
@@ -324,6 +324,46 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.filters-section {
+  background: #ffffff;
+  padding: 12px 16px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(231, 76, 60, 0.1);
+}
+.filters-row { gap: 12px; flex-wrap: wrap; }
+.filter-col { flex: 1 1 auto; }
+.search-col { order: 1; }
+.filters-left { order: 2; flex: 1 1 auto; }
+.filters-left-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+.filter-input :deep(.v-field) { height: 44px !important; }
+.filter-input :deep(.v-field__input) { align-items: center !important; }
+.filter-input :deep(.v-field__prepend-inner), .filter-input :deep(.v-field__append-inner) { align-items: center !important; }
+.filter-input :deep(.v-field__prepend-inner .v-icon),
+.filter-input :deep(.v-field__append-inner .v-icon) { align-self: center !important; margin-top: 0 !important; }
+.pill-select :deep(.v-field-label) { top: 50% !important; transform: translateY(-50%) scale(1) !important; opacity: 1 !important; }
+.pill-select :deep(.v-select__selection),
+.pill-select :deep(.v-select__selection-text) { display: flex !important; align-items: center !important; }
+.filter-input--md :deep(.v-select__menu-icon),
+.filter-input--md :deep(.v-select__menu-icon .v-icon) { display: flex !important; align-items: center !important; height: 100% !important; }
+.pill-select :deep(.v-field) { border-radius: 28px !important; background: #fff !important; border: 1px solid #e9ecef !important; box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important; }
+.pill-select :deep(.v-field--focused) { box-shadow: 0 0 0 3px rgba(33,150,243,0.18), 0 2px 8px rgba(0,0,0,0.08) !important; border-color: #2196f3 !important; }
+.filter-input--md { width: 130px; }
+.filter-input--search { width: min(520px, 100%); }
+.pill-select :deep(.v-select__menu-icon .v-icon) { color: #374151 !important; }
+.search-input :deep(.v-field__append-inner .v-icon) { color: #374151 !important; }
+
+@media (min-width: 992px) {
+  .search-col { order: 1; }
+  .filters-left { order: 2; }
+  .filters-left-row { flex-wrap: nowrap; }
+}
+
+@media (max-width: 991px) {
+  .search-col { width: 100%; }
+  .filters-left { width: 100%; }
+}
 .page-container {
   padding: 2rem;
   background-color: #f0f2f5;

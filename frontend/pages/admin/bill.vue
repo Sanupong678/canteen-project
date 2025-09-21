@@ -8,30 +8,66 @@
 
         <!-- Filters Section -->
         <div class="filters-section">
-          <v-row>
-            <v-col cols="12" sm="9">
-              <v-select
-                v-model="selectedCanteen"
-                :items="canteenTypes"
-                label="โรงอาหาร"
-                clearable
-                outlined
-                dense
+          <v-row class="filters-row" align="center" no-gutters>
+            <!-- Search on the right (desktop) / on top (mobile) -->
+            <v-col cols="12" md="auto" class="filter-col search-col">
+              <v-text-field
+                v-model="searchShopName"
+                placeholder="ค้นหาชื่อร้านค้า"
+                variant="solo"
                 hide-details
-                class="custom-select"
+                class="search-input filter-input filter-input--search"
+                append-inner-icon="mdi-magnify"
+                @click:append-inner="triggerSearch"
+                @keyup.enter="triggerSearch"
+                aria-label="ค้นหาชื่อร้านค้า"
               />
             </v-col>
-            <v-col cols="12" sm="3">
-              <v-select
-                v-model="selectedStatus"
-                :items="statusTypes"
-                label="สถานะ"
-                clearable
-                outlined
-                dense
-                hide-details
-                class="custom-select"
-              />
+
+            <!-- Dropdown group (left aligned) -->
+            <v-col cols="12" md="auto" class="filters-left">
+              <div class="filters-left-row">
+                <v-select
+                  v-model="selectedCanteen"
+                  :items="canteenTypes"
+                  label="โรงอาหาร"
+                  variant="solo"
+                  hide-details
+                  class="custom-select pill-select filter-input filter-input--md"
+                  menu-icon="mdi-menu-down"
+                  prepend-inner-icon="mdi-store-outline"
+                />
+                <v-select
+                  v-model="selectedStatus"
+                  :items="statusTypes"
+                  label="สถานะ"
+                  variant="solo"
+                  hide-details
+                  class="custom-select pill-select filter-input filter-input--md"
+                  menu-icon="mdi-menu-down"
+                  prepend-inner-icon="mdi-check-circle-outline"
+                />
+                <v-select
+                  v-model="selectedMonth"
+                  :items="monthTypes"
+                  label="เดือน"
+                  variant="solo"
+                  hide-details
+                  class="custom-select pill-select filter-input filter-input--md"
+                  menu-icon="mdi-menu-down"
+                  prepend-inner-icon="mdi-calendar-month-outline"
+                />
+                <v-select
+                  v-model="selectedYear"
+                  :items="yearOptions"
+                  label="ปี"
+                  variant="solo"
+                  hide-details
+                  class="custom-select pill-select filter-input filter-input--md"
+                  menu-icon="mdi-menu-down"
+                  prepend-inner-icon="mdi-calendar-outline"
+                />
+              </div>
             </v-col>
           </v-row>
         </div>
@@ -58,6 +94,7 @@
             <v-btn-toggle v-model="selectedBillType" mandatory>
               <v-btn value="electricity">ค่าไฟ</v-btn>
               <v-btn value="water">ค่าน้ำ</v-btn>
+              <v-btn value="utilities">รวม (Utilities)</v-btn>
             </v-btn-toggle>
           </div>
         </div>
@@ -65,36 +102,32 @@
         <!-- Data Table -->
         <v-data-table
           :headers="headers"
-          :items="filteredBills"
+          :items="pagedBills"
           :loading="loading"
           class="elevation-1 custom-table"
-          :items-per-page="10"
-          :footer-props="{
-            'items-per-page-options': [10, 20, 50],
-            'items-per-page-text': 'รายการต่อหน้า'
-          }"
+          hide-default-footer
           :no-data-text="'ยังไม่มีรายการบิล'"
           :no-results-text="'ไม่พบรายการที่ค้นหา'"
           :loading-text="'กำลังโหลดข้อมูล...'"
         >
           <!-- Header Labels -->
           <template v-slot:header.shopId>
-            <span><b>ID</b></span>
+            <span><b>รหัสร้าน</b></span>
           </template>
           <template v-slot:header.guestInfo>
-            <span><b>Guest Information</b></span>
+            <span><b>ข้อมูลร้านค้า</b></span>
           </template>
           <template v-slot:header.reservation>
-            <span><b>Reservation Details</b></span>
+            <span><b>รายละเอียดวัน</b></span>
           </template>
           <template v-slot:header.special>
             <span><b>{{ selectedBillType === 'electricity' ? 'ค่าไฟ' : 'ค่าน้ำ' }}</b></span>
           </template>
           <template v-slot:header.status>
-            <span><b>Status</b></span>
+            <span><b>สถานะ</b></span>
           </template>
           <template v-slot:header.actions>
-            <span><b>Actions</b></span>
+            <span><b>การจัดการ</b></span>
           </template>
 
           <!-- ID Shop -->
@@ -104,45 +137,64 @@
 
           <!-- Guest Information -->
           <template v-slot:item.guestInfo="{ item }">
-            <div>
-              <div><b>{{ item.canteen }}</b></div>
-              <div>{{ item.shopName }}</div>
-              <div v-if="item.email"><v-icon small>mdi-email</v-icon> {{ item.email }}</div>
-              <div v-if="item.phone"><v-icon small>mdi-phone</v-icon> {{ item.phone }}</div>
+            <div class="guest-info">
+              <div class="guest-info-line">
+                <v-icon x-small class="guest-info-icon">mdi-domain</v-icon>
+                <span class="guest-info-label">โรงอาหาร:</span>
+                <span class="guest-info-value"><b>{{ item.canteen }}</b></span>
+              </div>
+              <div class="guest-info-line">
+                <v-icon x-small class="guest-info-icon">mdi-account-outline</v-icon>
+                <span class="guest-info-label">ชื่อร้านค้า:</span>
+                <span class="guest-info-value">{{ item.shopName }}</span>
+              </div>
+              <div v-if="item.email" class="guest-info-line">
+                <v-icon x-small class="guest-info-icon">mdi-email</v-icon>
+                <span class="guest-info-label">อีเมล:</span>
+                <span class="guest-info-value">{{ item.email }}</span>
+              </div>
+              <div v-if="item.phone" class="guest-info-line">
+                <v-icon x-small class="guest-info-icon">mdi-phone</v-icon>
+                <span class="guest-info-label">โทร:</span>
+                <span class="guest-info-value">{{ item.phone }}</span>
+              </div>
             </div>
           </template>
 
           <!-- Reservation Details -->
           <template v-slot:item.reservation="{ item }">
             <div>
-              <div><b>Start-date:</b> {{ formatDate(item.createdAt) }}</div>
-              <div><b>End-date:</b> {{ item.createdAt ? formatDate(addDays(new Date(item.createdAt), 10)) : '-' }}</div>
+              <div class="guest-info-line">
+                <v-icon x-small class="guest-info-icon">mdi-calendar-start</v-icon>
+                <span class="guest-info-label">วันที่เริ่ม:</span>
+                <span class="guest-info-value">{{ formatDate(item.createdAt) }}</span>
+              </div>
+              <div class="guest-info-line">
+                <v-icon x-small class="guest-info-icon">mdi-calendar-end</v-icon>
+                <span class="guest-info-label">วันที่สิ้นสุด:</span>
+                <span class="guest-info-value">{{ item.createdAt ? formatDate(addDays(new Date(item.createdAt), 10)) : '-' }}</span>
+              </div>
             </div>
           </template>
 
           <!-- ค่าไฟ หรือ ค่าน้ำ ตามประเภทที่เลือก -->
           <template v-slot:item.special="{ item }">
-            <span v-if="selectedBillType === 'electricity'">
+            <template v-if="selectedBillType === 'electricity'">
               <b>ค่าไฟ: {{ item.amount ? item.amount + ' บาท' : '-' }}</b>
-              <span
-                v-if="item.image || item.slip_image_url"
-                :class="{'yellow--text': !!item.image || !!item.slip_image_url}"
-                @click="(item.image || item.slip_image_url) && openImagePreview(item.image || item.slip_image_url, item)"
-                style="cursor: pointer; margin-left: 8px;"
-              >
-                <v-icon small>mdi-image</v-icon>
-              </span>
-            </span>
-            <span v-else>
+            </template>
+            <template v-else-if="selectedBillType === 'water'">
               <b>ค่าน้ำ: {{ item.amount ? item.amount + ' บาท' : '-' }}</b>
-              <span
-                v-if="item.image || item.slip_image_url"
-                :class="{'yellow--text': !!item.image || !!item.slip_image_url}"
-                @click="(item.image || item.slip_image_url) && openImagePreview(item.image || item.slip_image_url, item)"
-                style="cursor: pointer; margin-left: 8px;"
-              >
-                <v-icon small>mdi-image</v-icon>
-              </span>
+            </template>
+            <template v-else>
+              <b>รวม (ค่าน้ำ+ค่าไฟ): {{ item.amount ? item.amount + ' บาท' : '-' }}</b>
+            </template>
+            <span
+              v-if="item.image || item.slip_image_url"
+              :class="{'yellow--text': !!item.image || !!item.slip_image_url}"
+              @click="(item.image || item.slip_image_url) && openImagePreview(item.image || item.slip_image_url, item)"
+              style="cursor: pointer; margin-left: 8px;"
+            >
+              <v-icon small>mdi-image</v-icon>
             </span>
           </template>
 
@@ -174,6 +226,24 @@
             </template>
           </template>
         </v-data-table>
+        <!-- Pagination (10 per page, same as repair admin) -->
+        <div v-if="filteredBills.length > 0" class="pagination-section">
+          <div class="items-per-page">
+            <span class="label">Items per page:</span>
+            <span class="fixed-size">10</span>
+            <span class="range">{{ startIndexDisplay }}-{{ endIndexDisplay }} of {{ filteredBills.length }}</span>
+          </div>
+          <div class="pagination">
+            <button
+              v-for="p in totalPages"
+              :key="'pg-'+p"
+              class="page-num"
+              :class="{ active: p === currentPage }"
+              @click="goToPage(p)"
+            >{{ p }}</button>
+            <button class="page-next" :disabled="currentPage === totalPages" @click="nextPage">next</button>
+          </div>
+        </div>
       </div>
 
       <!-- Image Preview Dialog -->
@@ -237,13 +307,15 @@ export default {
     const selectedCanteen = ref('')
     const selectedStatus = ref('')
     const selectedMonth = ref('')
+    const selectedYear = ref('')
+    const searchShopName = ref('')
     const showPreview = ref(false)
     const previewImage = ref('')
     const currentBill = ref(null)
     const imageError = ref(false)
 
     // เพิ่มตัวแปรสำหรับเลือกประเภทบิล (ค่าไฟ/ค่าน้ำ)
-    const selectedBillType = ref('electricity') // 'electricity' หรือ 'water'
+    const selectedBillType = ref('electricity') // 'electricity' | 'water' | 'utilities'
 
     const canteenMap = {
       1: 'โรงอาหาร C5',
@@ -259,17 +331,18 @@ export default {
 
     const headers = computed(() => [
       { text: 'ID', value: 'shopId', align: 'start' },
-      { text: 'Guest Information', value: 'guestInfo', align: 'start' },
-      { text: 'Reservation Details', value: 'reservation', align: 'start' },
-      { text: selectedBillType.value === 'electricity' ? 'ค่าไฟ' : 'ค่าน้ำ', value: 'special', align: 'start' },
-      { text: 'Status', value: 'status', align: 'center' },
-      { text: 'Actions', value: 'actions', align: 'center', sortable: false }
+      { text: 'ข้อมูลร้านค้า', value: 'guestInfo', align: 'start' },
+      { text: 'รายละเอียดวัน', value: 'reservation', align: 'start' },
+      { text: selectedBillType.value === 'electricity' ? 'ค่าไฟ' : selectedBillType.value === 'water' ? 'ค่าน้ำ' : 'รวม (Utilities)', value: 'special', align: 'start' },
+      { text: 'สถานะ', value: 'status', align: 'center' },
+      { text: 'การจัดการ', value: 'actions', align: 'center', sortable: false }
     ])
 
     const billTypes = [
       'ทั้งหมด',
       'ค่าน้ำ',
-      'ค่าไฟ'
+      'ค่าไฟ',
+      'รวม (Utilities)'
     ]
 
     const statusTypes = [
@@ -297,6 +370,15 @@ export default {
       'พฤศจิกายน',
       'ธันวาคม'
     ]
+
+    const yearOptions = (() => {
+      const currentYear = new Date().getFullYear()
+      const years = ['ทั้งหมด']
+      for (let y = currentYear; y >= currentYear - 5; y--) {
+        years.push(String(y))
+      }
+      return years
+    })()
 
     const monthToNumber = {
       'มกราคม': '1',
@@ -345,7 +427,8 @@ export default {
     const getBillTypeText = (type) => {
       const types = {
         water: 'ค่าน้ำ',
-        electricity: 'ค่าไฟ'
+        electricity: 'ค่าไฟ',
+        utilities: 'รวม (ค่าน้ำ+ค่าไฟ)'
       }
       return types[type] || type
     }
@@ -386,7 +469,8 @@ export default {
         if (selectedType.value && selectedType.value !== 'ทั้งหมด') {
           const billTypeMap = {
             'ค่าน้ำ': 'water',
-            'ค่าไฟ': 'electricity'
+            'ค่าไฟ': 'electricity',
+            'รวม (Utilities)': 'utilities'
           }
           query.append('billType', billTypeMap[selectedType.value])
         }
@@ -405,6 +489,12 @@ export default {
         }
         if (selectedMonth.value && selectedMonth.value !== 'ทั้งหมด') {
           query.append('month', monthToNumber[selectedMonth.value])
+        }
+        if (selectedYear.value && selectedYear.value !== 'ทั้งหมด') {
+          query.append('year', selectedYear.value)
+        }
+        if (searchShopName.value && searchShopName.value.trim()) {
+          query.append('shopName', searchShopName.value.trim())
         }
 
         const response = await $axios.get(`/api/bills/admin?${query.toString()}`)
@@ -435,7 +525,7 @@ export default {
     }
 
     // Watch for filter changes
-    watch([selectedType, selectedStatus, selectedCanteen, selectedMonth], () => {
+    watch([selectedType, selectedStatus, selectedCanteen, selectedMonth, selectedYear, searchShopName], () => {
       fetchBills()
     })
 
@@ -495,11 +585,28 @@ export default {
     // filter ข้อมูลตามประเภทที่เลือก
     const filteredBills = computed(() => {
       return bills.value.filter(bill => {
-        return selectedBillType.value === 'electricity'
-          ? (bill.billType === 'ค่าไฟ' || bill.billType === 'electricity')
-          : (bill.billType === 'ค่าน้ำ' || bill.billType === 'water')
+        if (selectedBillType.value === 'electricity') {
+          return bill.billType === 'ค่าไฟ' || bill.billType === 'electricity'
+        }
+        if (selectedBillType.value === 'water') {
+          return bill.billType === 'ค่าน้ำ' || bill.billType === 'water'
+        }
+        return bill.billType === 'รวม (ค่าน้ำ+ค่าไฟ)' || bill.billType === 'utilities'
       })
     })
+
+    // Pagination (same behavior as repair admin: 10 per page)
+    const pageSize = 10
+    const currentPage = ref(1)
+    const totalPages = computed(() => Math.max(1, Math.ceil(filteredBills.value.length / pageSize)))
+    const pagedBills = computed(() => {
+      const start = (currentPage.value - 1) * pageSize
+      return filteredBills.value.slice(start, start + pageSize)
+    })
+    const goToPage = (p) => { if (p < 1 || p > totalPages.value) return; currentPage.value = p }
+    const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++ }
+    const startIndexDisplay = computed(() => (filteredBills.value.length ? (currentPage.value - 1) * pageSize + 1 : 0))
+    const endIndexDisplay = computed(() => Math.min(currentPage.value * pageSize, filteredBills.value.length))
 
     const selectedFile = ref(null)
     const fileName = ref("")
@@ -564,6 +671,10 @@ export default {
       }
     }
 
+    const triggerSearch = () => {
+      fetchBills()
+    }
+
     return {
       bills,
       loading,
@@ -572,12 +683,15 @@ export default {
       selectedStatus,
       selectedCanteen,
       selectedMonth,
+      selectedYear,
+      searchShopName,
       showPreview,
       previewImage,
       selectedBillType,
       filteredBills,
       canteenTypes,
       monthTypes,
+      yearOptions,
       billTypes,
       statusTypes,
       canteenMap,
@@ -600,9 +714,18 @@ export default {
       formatDateTime,
       getImageUrl,
       cancelSlipImage,
+      triggerSearch,
       imageError,
       showPreview,
-      previewImage
+      previewImage,
+      // pagination
+      currentPage,
+      totalPages,
+      pagedBills,
+      goToPage,
+      nextPage,
+      startIndexDisplay,
+      endIndexDisplay
     }
   }
 }
@@ -641,21 +764,145 @@ export default {
 
 .filters-section {
   background: #ffffff;
-  padding: 20px;
+  padding: 12px 16px;
   border-radius: 12px;
   margin-bottom: 24px;
   box-shadow: 0 4px 20px rgba(231, 76, 60, 0.1);
 }
 
+.filters-row {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-col { flex: 2 1 auto; }
+.search-col { order: 1; }
+.filters-left { order: 2; flex: 1 1 auto; }
+
+.filters-left-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-input :deep(.v-field) { height: 44px !important; }
+.filter-input :deep(.v-field__input) { align-items: center !important; }
+.filter-input :deep(.v-field__prepend-inner),
+.filter-input :deep(.v-field__append-inner) { align-items: center !important; }
+.filter-input :deep(.v-field__prepend-inner .v-icon),
+.filter-input :deep(.v-field__append-inner .v-icon) { align-self: center !important; margin-top: 0 !important; }
+
+/* Keep label centered like a placeholder (no floating) */
+.pill-select :deep(.v-field-label) {
+  top: 50% !important;
+  transform: translateY(-50%) scale(1) !important;
+  opacity: 1 !important;
+}
+
+/* Ensure v-select selection text sits middle */
+.pill-select :deep(.v-select__selection-text),
+.pill-select :deep(.v-select__selection) {
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Right arrow vertical centering */
+.filter-input--md :deep(.v-select__menu-icon),
+.filter-input--md :deep(.v-select__menu-icon .v-icon) {
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+}
+
+.filter-input--md { width: 130px; }
+
+.filter-input--search { width: min(520px, 100%); }
+
 .custom-select {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(231, 76, 60, 0.1);
+  background: transparent;
+  box-shadow: none;
 }
 
 .custom-select :deep(.v-select__selections) {
   font-size: 14px;
   font-weight: 500;
+}
+
+.custom-select :deep(.v-input__control),
+.custom-select :deep(.v-field) {
+  min-height: 40px !important;
+}
+
+.pill-select :deep(.v-field) {
+  border-radius: 28px !important;
+  background: #fff !important;
+  border: 1px solid #e9ecef !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+.pill-select :deep(.v-field--focused) {
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.18), 0 2px 8px rgba(0,0,0,0.08) !important;
+  border-color: #2196f3 !important; /* ring-primary */
+}
+
+.pill-select :deep(.v-select__selections) {
+  padding-left: 10px !important;
+}
+
+.pill-select :deep(.v-select__menu-icon .v-icon) {
+  color: #6b7280 !important; /* gray-500 */
+}
+
+.pill-select:focus-within :deep(.v-select__menu-icon .v-icon) {
+  color: #2563eb !important; /* blue-600 */
+}
+
+.search-input {
+  --pill-radius: 28px;
+}
+
+.search-input :deep(.v-field) {
+  border-radius: var(--pill-radius) !important;
+  background: #fff !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  border: 1px solid #eee !important;
+}
+
+.search-input :deep(.v-field__input) {
+  padding-left: 16px !important;
+  font-size: 16px !important;
+  color: #333 !important;
+}
+
+.search-input :deep(.v-field__append-inner .v-icon) {
+  color: #c0392b !important;
+  transition: color 0.2s ease;
+}
+
+.search-input :deep(.v-field__clearable) {
+  display: none !important;
+}
+
+.search-input:hover :deep(.v-field__append-inner .v-icon),
+.search-input:focus-within :deep(.v-field__append-inner .v-icon) {
+  color: #e74c3c !important;
+}
+
+/* Desktop alignment: search left, dropdowns right */
+@media (min-width: 992px) {
+  .search-col { order: 1; }
+  .filters-left { order: 2; }
+  .filters-left-row { flex-wrap: nowrap; }
+}
+
+/* Mobile-first: search on top, dropdowns stack below */
+@media (max-width: 991px) {
+  .filters-row { gap: 10px; }
+  .search-col { order: 1; width: 100%; }
+  .filters-left { order: 2; width: 100%; }
+  .filter-input--md { width: calc(50% - 6px); }
+  .filter-input--search { width: 100%; }
 }
 
 .custom-table {
@@ -692,6 +939,16 @@ export default {
   padding: 12px !important;
   border-bottom: 1px solid #fecaca;
 }
+
+/* Pagination styles (copied from repair admin) */
+.pagination-section { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; margin-top: 12px; }
+.items-per-page { display: flex; align-items: center; gap: 10px; color: #374151; font-size: 14px; }
+.items-per-page .fixed-size { padding: 6px 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; min-width: 48px; text-align: center; }
+.items-per-page .range { margin-left: 12px; color: #6b7280; }
+.pagination { display: flex; gap: 6px; }
+.page-num { min-width: 32px; height: 32px; border: 1px solid #e5e7eb; background: #fff; color: #7f1d1d; border-radius: 2px; cursor: pointer; }
+.page-num.active { background: #7f1d1d; color: #fff; border-color: #7f1d1d; }
+.page-next { border: 1px solid #e5e7eb; background: #fff; color: #7f1d1d; border-radius: 2px; padding: 0 10px; cursor: pointer; }
 
 .v-chip {
   margin: 4px;
@@ -804,6 +1061,13 @@ export default {
   min-width: 120px;
   border-radius: 8px;
 }
+
+/* Guest info lines with icons */
+.guest-info { display: flex; flex-direction: column; gap: 4px; }
+.guest-info-line { display: flex; align-items: center; gap: 6px; }
+.guest-info-icon { color: #6b7280; }
+.guest-info-label { color: #6b7280; font-weight: 500; font-size: 12px; }
+.guest-info-value { font-size: 14px; }
 
 /* เพิ่ม CSS สำหรับการแสดงข้อมูลค่าไฟและค่าน้ำ */
 .bills-display {

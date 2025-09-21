@@ -68,23 +68,6 @@ const shopSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
-  // Evaluation fields
-  score: {
-    type: Number,
-    default: 100
-  },
-  evaluationStatus: {
-    type: String,
-    enum: ['ผ่าน', 'ไม่ผ่าน'],
-    default: 'ผ่าน'
-  },
-  evaluationCompleted: {
-    type: Boolean,
-    default: false
-  },
-  evaluationDate: {
-    type: Date
-  },
   createdAt: {
     type: Date,
     default: Date.now

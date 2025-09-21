@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 import Notification from '../models/notificationModel.js';
-import { AdminToUserNotification } from '../models/adminNotificationModel.js';
 import Bill from '../models/billModel.js';
 import Leave from '../models/leaveModel.js';
 import Repair from '../models/repairModel.js';
@@ -191,32 +190,32 @@ export const getUserNotifications = async (req, res) => {
       }
     }
 
-    // ดึงข้อมูล Ranking Evaluation notifications ล่าสุด
-    console.log('🔍 Searching for ranking evaluation notifications with shopId:', shopId);
-    const rankingEvaluationQuery = (shopId && shopId !== 'admin') ? { shopId, type: 'ranking_evaluation' } : { type: 'ranking_evaluation' };
-    const latestRankingEvaluationNotifications = await Notification.find(rankingEvaluationQuery)
-      .sort({ createdAt: -1 })
+    // ดึงข้อมูล Monthly Ranking notifications ล่าสุด
+    console.log('🔍 Searching for monthly ranking notifications with shopId:', shopId);
+    const monthlyRankingQuery = (shopId && shopId !== 'admin') ? { shopId, type: 'monthly_ranking' } : { type: 'monthly_ranking' };
+    const latestMonthlyRankingNotifications = await Notification.find(monthlyRankingQuery)
+      .sort({ isRead: 1, createdAt: -1 }) // ยังไม่อ่านขึ้นก่อน, แล้วเรียงตามวันที่ใหม่สุด
       .limit(5);
     
-    console.log('📋 Found ranking evaluation notifications:', latestRankingEvaluationNotifications.length);
-    for (const rankingEvaluationNotification of latestRankingEvaluationNotifications) {
-      console.log('📋 Ranking evaluation notification:', {
-        id: rankingEvaluationNotification._id,
-        message: rankingEvaluationNotification.message,
-        createdAt: rankingEvaluationNotification.createdAt,
-        isRead: rankingEvaluationNotification.isRead
+    console.log('📋 Found monthly ranking notifications:', latestMonthlyRankingNotifications.length);
+    for (const monthlyRankingNotification of latestMonthlyRankingNotifications) {
+      console.log('📋 Monthly ranking notification:', {
+        id: monthlyRankingNotification._id,
+        message: monthlyRankingNotification.message,
+        createdAt: monthlyRankingNotification.createdAt,
+        isRead: monthlyRankingNotification.isRead
       });
       
       notifications.push({
-        _id: `ranking_evaluation_${rankingEvaluationNotification._id}`,
-        type: 'ranking_evaluation',
-        title: rankingEvaluationNotification.title,
-        message: rankingEvaluationNotification.message,
-        status: rankingEvaluationNotification.status,
-        createdAt: rankingEvaluationNotification.createdAt,
-        isRead: rankingEvaluationNotification.isRead,
+        _id: `monthly_ranking_${monthlyRankingNotification._id}`,
+        type: 'monthly_ranking',
+        title: monthlyRankingNotification.title,
+        message: monthlyRankingNotification.message,
+        status: monthlyRankingNotification.status,
+        createdAt: monthlyRankingNotification.createdAt,
+        isRead: monthlyRankingNotification.isRead,
         details: {
-          rankingEvaluationData: rankingEvaluationNotification.rankingEvaluationData
+          monthlyRankingData: monthlyRankingNotification.monthlyRankingData
         }
       });
     }
@@ -224,14 +223,15 @@ export const getUserNotifications = async (req, res) => {
     // ดึง admin notifications สำหรับร้านค้านี้ (ไม่แสดงให้ admin เอง)
     if (req.user.role !== 'admin') {
       console.log('🔍 Fetching admin notifications for shopId:', shopId);
-      const adminNotifications = await AdminToUserNotification.find({
+      const adminNotifications = await Notification.find({
+        type: 'admin_notification',
         $or: [
           { recipients: 'all' },
           { recipients: 'active' },
           { recipients: 'expired' },
           { recipientShopId: shopId }
         ]
-      }).sort({ createdAt: -1 });
+      }).sort({ isRead: 1, createdAt: -1 }); // ยังไม่อ่านขึ้นก่อน, แล้วเรียงตามวันที่ใหม่สุด
 
       console.log('📋 Found admin notifications:', adminNotifications.length);
 
@@ -262,8 +262,14 @@ export const getUserNotifications = async (req, res) => {
       console.log('🔍 Admin user - skipping admin notifications');
     }
 
-    // เรียงลำดับตามวันที่อัปเดตล่าสุด (ใหม่สุดอยู่บน)
+    // เรียงลำดับ: ข้อมูลที่ยังไม่อ่านขึ้นก่อน, แล้วเรียงตามวันที่อัปเดตล่าสุด
     notifications.sort((a, b) => {
+      // ถ้าข้อมูลหนึ่งยังไม่อ่านและอีกอันอ่านแล้ว ให้ข้อมูลที่ยังไม่อ่านขึ้นก่อน
+      if (a.isRead !== b.isRead) {
+        return a.isRead ? 1 : -1; // false (ยังไม่อ่าน) จะได้ -1, true (อ่านแล้ว) จะได้ 1
+      }
+      
+      // ถ้าสถานะการอ่านเหมือนกัน ให้เรียงตามวันที่อัปเดตล่าสุด
       const dateA = new Date(a.createdAt)
       const dateB = new Date(b.createdAt)
       return dateB - dateA // เรียงจากใหม่ไปเก่า
@@ -327,9 +333,8 @@ export const markNotificationAsRead = async (req, res) => {
     // ตรวจสอบว่าเป็น admin notification หรือไม่
     if (id.startsWith('admin_')) {
       const adminNotificationId = id.replace('admin_', '');
-      const { AdminToUserNotification } = await import('../models/adminNotificationModel.js');
       
-      const adminNotification = await AdminToUserNotification.findById(adminNotificationId);
+      const adminNotification = await Notification.findById(adminNotificationId);
       if (!adminNotification) {
         return res.status(404).json({
           success: false,
@@ -439,9 +444,9 @@ export const markAllNotificationsAsRead = async (req, res) => {
 
     // อัปเดต admin notifications ให้เป็น isRead = true
     if (shopId) {
-      const { AdminToUserNotification } = await import('../models/adminNotificationModel.js');
-      await AdminToUserNotification.updateMany(
+      await Notification.updateMany(
         {
+          type: 'admin_notification',
           $or: [
             { recipients: 'all' },
             { recipients: 'active' },

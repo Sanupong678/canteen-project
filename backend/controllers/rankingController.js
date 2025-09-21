@@ -1,9 +1,11 @@
 import Ranking from '../models/rankingModel.js';
 import Canteen from '../models/canteenModel.js';
 import Evaluation from '../models/Evaluation.js';
+import Shop from '../models/Shop.js';
 import multer from 'multer';
 import xlsx from 'xlsx';
 import path from 'path';
+import fs from 'fs';
 
 // Get all rankings with filters
 const getRankings = async (req, res) => {
@@ -109,7 +111,7 @@ const getRankingStats = async (req, res) => {
   }
 };
 
-// Get current month data for user ranking
+// Get current month data for user ranking (ดึงจาก Evaluation)
 const getCurrentRankingData = async (req, res) => {
   try {
     const { shopId } = req.query;
@@ -120,6 +122,8 @@ const getCurrentRankingData = async (req, res) => {
         message: 'ต้องระบุ shopId'
       });
     }
+    
+    console.log('🔍 Getting current ranking data from Evaluation for shopId:', shopId);
     
     // ดึงข้อมูลเดือนปัจจุบัน
     const currentDate = new Date();
@@ -134,6 +138,8 @@ const getCurrentRankingData = async (req, res) => {
       isActive: true
     });
     
+    console.log('📊 Current evaluation found:', !!evaluation);
+    
     if (!evaluation) {
       return res.json({
         success: true,
@@ -146,21 +152,106 @@ const getCurrentRankingData = async (req, res) => {
     }
     
     // คำนวณลำดับในโรงอาหารเดียวกัน
+    // ใช้ canteenId จาก Shop แทน canteenName จาก Evaluation
+    const shop = await Shop.findById(shopId);
+    const canteenId = shop?.canteenId;
+    
+    console.log('🏪 Shop canteenId:', canteenId);
+    console.log('📊 Evaluation canteenName:', evaluation.canteenName);
+    
+    // หา evaluations ใน canteen เดียวกัน โดยใช้ canteenId จาก Shop
     const allEvaluations = await Evaluation.find({
-      canteenName: evaluation.canteenName,
       evaluationMonth: currentMonth,
       evaluationYear: currentYear,
-      isActive: true
-    }).sort({ totalScore: -1 }); // เรียงจากคะแนนสูงสุดไปต่ำสุด
+      isActive: true,
+      evaluationSent: true
+    }).populate('shopId', 'canteenId').sort({ totalScore: -1 });
     
-    // หาลำดับของ shop นี้
-    const rank = allEvaluations.findIndex(evaluation => evaluation.shopId.toString() === shopId) + 1;
+    // กรองเฉพาะ evaluations ที่อยู่ใน canteen เดียวกัน
+    const sameCanteenEvaluations = allEvaluations.filter(evaluation => 
+      evaluation.shopId && evaluation.shopId.canteenId === canteenId
+    );
+    
+    console.log('📊 All evaluations for ranking:', allEvaluations.length);
+    console.log('📊 Same canteen evaluations:', sameCanteenEvaluations.length);
+    console.log('📊 Same canteen evaluations data:', sameCanteenEvaluations.map(evaluation => ({
+      shopId: evaluation.shopId._id.toString(),
+      canteenId: evaluation.shopId.canteenId,
+      totalScore: evaluation.totalScore,
+      evaluationSent: evaluation.evaluationSent
+    })));
+    
+    // คำนวณคะแนนเฉลี่ยของร้านค้านี้จากประวัติทั้งหมด
+    const allShopEvaluations = await Evaluation.find({
+      shopId,
+      isActive: true,
+      evaluationSent: true,
+      totalScore: { $exists: true, $ne: null }
+    }).sort({ evaluationYear: -1, evaluationMonth: -1 });
+    
+    console.log('📊 All shop evaluations for average:', allShopEvaluations.length);
+    
+    let currentShopAverageScore = 0;
+    if (allShopEvaluations.length > 0) {
+      const totalScore = allShopEvaluations.reduce((sum, evaluation) => sum + (evaluation.totalScore || 0), 0);
+      currentShopAverageScore = Math.round((totalScore / allShopEvaluations.length) * 100) / 100; // รอบเป็นทศนิยม 2 ตำแหน่ง
+    }
+    
+    console.log('📊 Current shop average score calculated:', currentShopAverageScore);
+    console.log('📊 Total evaluations used:', allShopEvaluations.length);
+    
+    // คำนวณคะแนนเฉลี่ยของทุกร้านค้าใน canteen เดียวกัน
+    const allShopsInCanteen = await Shop.find({ canteenId }).select('_id');
+    const shopIdsInCanteen = allShopsInCanteen.map(shop => shop._id);
+    
+    console.log('📊 All shops in canteen:', shopIdsInCanteen.length);
+    
+    const shopsWithAverageScores = [];
+    
+    for (const shopIdInCanteen of shopIdsInCanteen) {
+      // คำนวณคะแนนเฉลี่ยของแต่ละร้าน
+      const shopEvaluations = await Evaluation.find({
+        shopId: shopIdInCanteen,
+        isActive: true,
+        evaluationSent: true,
+        totalScore: { $exists: true, $ne: null }
+      });
+      
+      if (shopEvaluations.length > 0) {
+        const totalScore = shopEvaluations.reduce((sum, evaluation) => sum + (evaluation.totalScore || 0), 0);
+        const averageScore = Math.round((totalScore / shopEvaluations.length) * 100) / 100;
+        
+        shopsWithAverageScores.push({
+          shopId: shopIdInCanteen,
+          averageScore: averageScore,
+          evaluationCount: shopEvaluations.length
+        });
+      }
+    }
+    
+    // เรียงลำดับตามคะแนนเฉลี่ยจากมากไปน้อย
+    shopsWithAverageScores.sort((a, b) => b.averageScore - a.averageScore);
+    
+    console.log('📊 Shops with average scores:', shopsWithAverageScores.map(shop => ({
+      shopId: shop.shopId.toString(),
+      averageScore: shop.averageScore,
+      evaluationCount: shop.evaluationCount
+    })));
+    
+    // หาลำดับของร้านค้านี้จากคะแนนเฉลี่ย
+    const rank = shopsWithAverageScores.findIndex(shop => shop.shopId.toString() === shopId) + 1;
+    
+    console.log('📊 Calculated rank based on average score:', rank);
+    console.log('📊 Target shopId:', shopId);
+    console.log('📊 Target shop average score:', currentShopAverageScore);
     
     const currentData = {
       money: evaluation.revenue || 0,
-      score: evaluation.totalScore || 0,
-      rank: rank
+      score: currentShopAverageScore, // คะแนนเฉลี่ยของร้านค้านี้
+      rank: rank // อันดับจากการเปรียบเทียบคะแนนเฉลี่ย
     };
+    
+    console.log('✅ Current ranking data:', currentData);
     
     res.json({
       success: true,
@@ -175,7 +266,7 @@ const getCurrentRankingData = async (req, res) => {
   }
 };
 
-// Get monthly history for user ranking
+// Get monthly history for user ranking (ดึงจาก Evaluation)
 const getMonthlyHistory = async (req, res) => {
   try {
     const { shopId } = req.query;
@@ -187,52 +278,61 @@ const getMonthlyHistory = async (req, res) => {
       });
     }
     
-    // ดึงข้อมูล evaluation ทั้งหมดของ shop นี้
-    const evaluations = await Evaluation.find({
-      shopId: shopId,
-      isActive: true
-    }).sort({ evaluationYear: -1, evaluationMonth: -1 });
+    console.log('🔍 Getting monthly history from Evaluation for shopId:', shopId);
     
+    // ดึงข้อมูล evaluation history
+    const evaluationHistory = await Evaluation.find({ 
+      shopId,
+      isActive: true 
+    })
+      .sort({ evaluationYear: -1, evaluationMonth: -1 })
+      .limit(12); // Get last 12 months
+    
+    console.log('📊 Evaluation history records:', evaluationHistory.length);
+    
+    // Calculate ranks for each month
     const monthlyHistory = [];
-    const currentDate = new Date();
-    const currentMonth = currentDate.getMonth() + 1;
-    const currentYear = currentDate.getFullYear();
     
-    for (const evaluation of evaluations) {
-      // คำนวณลำดับในโรงอาหารเดียวกันในเดือนนั้น
-      const allEvaluationsInMonth = await Evaluation.find({
-        canteenName: evaluation.canteenName,
-        evaluationMonth: evaluation.evaluationMonth,
+    for (const evaluation of evaluationHistory) {
+      // Get all evaluations for this month to calculate rank
+      const monthEvaluations = await Evaluation.find({
         evaluationYear: evaluation.evaluationYear,
+        evaluationMonth: evaluation.evaluationMonth,
         isActive: true
-      }).sort({ totalScore: -1 }); // เรียงจากคะแนนสูงสุดไปต่ำสุด
+      }).sort({ totalScore: -1 }); // Sort by score descending
       
-      // หาลำดับของ shop นี้
-      const rank = allEvaluationsInMonth.findIndex(evaluation => evaluation.shopId.toString() === shopId) + 1;
+      // Find rank of current shop
+      const rank = monthEvaluations.findIndex(evalItem => 
+        evalItem.shopId.toString() === shopId
+      ) + 1;
       
-      // แปลงเดือนเป็นภาษาไทย
-      const monthNames = [
-        'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-        'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
-      ];
-      
-      const monthName = monthNames[evaluation.evaluationMonth - 1];
-      const isCurrent = evaluation.evaluationMonth === currentMonth && evaluation.evaluationYear === currentYear;
-      
-      monthlyHistory.push({
-        month: `${monthName} ${evaluation.evaluationYear}`,
-        money: evaluation.revenue || 0,
-        score: evaluation.totalScore || 0,
+      const historyItem = {
+        year: evaluation.evaluationYear,
+        month: evaluation.evaluationMonth,
+        revenue: evaluation.revenue || 0,
+        score: evaluation.totalScore,
         rank: rank,
-        notes: evaluation.finalStatus === 'ผ่าน' ? 'ผ่านการประเมิน' : 'ไม่ผ่านการประเมิน',
-        isCurrent: isCurrent
-      });
+        finalStatus: evaluation.finalStatus,
+        evaluatedAt: evaluation.evaluatedAt,
+        updatedAt: evaluation.updatedAt
+      };
+      
+      monthlyHistory.push(historyItem);
     }
+    
+    // Sort by year and month descending
+    monthlyHistory.sort((a, b) => {
+      if (a.year !== b.year) return b.year - a.year;
+      return b.month - a.month;
+    });
+    
+    console.log('📈 Monthly history records:', monthlyHistory.length);
     
     res.json({
       success: true,
       data: monthlyHistory
     });
+    
   } catch (error) {
     console.error('Error getting monthly history:', error);
     res.status(500).json({
@@ -245,21 +345,12 @@ const getMonthlyHistory = async (req, res) => {
 // Create new ranking
 const createRanking = async (req, res) => {
   try {
-    const { shopName, canteenId, revenue, evaluationStatus, overallStatus, notes } = req.body;
-    
-    // Get canteen name
-    const canteen = await Canteen.findById(canteenId);
-    if (!canteen) {
-      return res.status(404).json({
-        success: false,
-        message: 'ไม่พบโรงอาหารที่ระบุ'
-      });
-    }
+    const { shopName, canteenId, canteenName, revenue, evaluationStatus, overallStatus, notes } = req.body;
     
     const ranking = new Ranking({
       shopName,
       canteenId,
-      canteenName: canteen.name,
+      canteenName,
       revenue: revenue || 0,
       evaluationStatus: evaluationStatus || 'ไม่ผ่าน',
       overallStatus: overallStatus || 'รอดำเนินการ',
@@ -270,13 +361,14 @@ const createRanking = async (req, res) => {
     
     res.status(201).json({
       success: true,
+      message: 'สร้างข้อมูล ranking สำเร็จ',
       data: ranking
     });
   } catch (error) {
     console.error('Error creating ranking:', error);
     res.status(500).json({
       success: false,
-      message: 'เกิดข้อผิดพลาดในการสร้าง ranking'
+      message: 'เกิดข้อผิดพลาดในการสร้างข้อมูล ranking'
     });
   }
 };
@@ -287,13 +379,6 @@ const updateRanking = async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
     
-    // If updating evaluation status, add evaluation date and evaluator info
-    if (updateData.evaluationStatus) {
-      updateData.evaluationDate = new Date();
-      updateData.evaluatorId = req.user?._id || null;
-      updateData.evaluatorName = req.user?.name || 'Admin';
-    }
-    
     const ranking = await Ranking.findByIdAndUpdate(
       id,
       updateData,
@@ -303,19 +388,20 @@ const updateRanking = async (req, res) => {
     if (!ranking) {
       return res.status(404).json({
         success: false,
-        message: 'ไม่พบ ranking ที่ระบุ'
+        message: 'ไม่พบข้อมูล ranking'
       });
     }
     
     res.json({
       success: true,
+      message: 'อัปเดตข้อมูล ranking สำเร็จ',
       data: ranking
     });
   } catch (error) {
     console.error('Error updating ranking:', error);
     res.status(500).json({
       success: false,
-      message: 'เกิดข้อผิดพลาดในการอัปเดต ranking'
+      message: 'เกิดข้อผิดพลาดในการอัปเดตข้อมูล ranking'
     });
   }
 };
@@ -330,19 +416,19 @@ const deleteRanking = async (req, res) => {
     if (!ranking) {
       return res.status(404).json({
         success: false,
-        message: 'ไม่พบ ranking ที่ระบุ'
+        message: 'ไม่พบข้อมูล ranking'
       });
     }
     
     res.json({
       success: true,
-      message: 'ลบ ranking สำเร็จ'
+      message: 'ลบข้อมูล ranking สำเร็จ'
     });
   } catch (error) {
     console.error('Error deleting ranking:', error);
     res.status(500).json({
       success: false,
-      message: 'เกิดข้อผิดพลาดในการลบ ranking'
+      message: 'เกิดข้อผิดพลาดในการลบข้อมูล ranking'
     });
   }
 };
@@ -353,94 +439,98 @@ const uploadExcel = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: 'กรุณาอัปโหลดไฟล์ Excel'
+        message: 'กรุณาเลือกไฟล์ Excel'
       });
     }
     
-    const workbook = xlsx.readFile(req.file.path);
+    const filePath = req.file.path;
+    console.log('📁 Processing Excel file:', filePath);
+    
+    // Read Excel file
+    const workbook = xlsx.readFile(filePath);
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     const data = xlsx.utils.sheet_to_json(worksheet);
+    
+    console.log('📊 Excel data rows:', data.length);
     
     let successCount = 0;
     let errorCount = 0;
     const errors = [];
     
-    for (let i = 0; i < data.length; i++) {
+    for (const row of data) {
       try {
-        const row = data[i];
+        const { shopName, canteenName, revenue, evaluationStatus, overallStatus, notes } = row;
         
-        // Validate required fields
-        if (!row.shopName || !row.canteenName) {
-          errors.push(`แถว ${i + 2}: ขาดข้อมูลชื่อร้านค้าหรือชื่อโรงอาหาร`);
+        if (!shopName || !canteenName) {
+          errors.push(`แถว ${successCount + errorCount + 1}: ขาดข้อมูล shopName หรือ canteenName`);
           errorCount++;
           continue;
         }
         
-        // Find canteen by name
-        let canteen = await Canteen.findOne({ 
-          name: { $regex: row.canteenName.trim(), $options: 'i' } 
-        });
-        
-        // Create canteen if not exists
-        if (!canteen) {
-          canteen = new Canteen({
-            name: row.canteenName.trim()
-          });
-          await canteen.save();
-        }
-        
         // Check if ranking already exists
-        const existingRanking = await Ranking.findOne({
-          shopName: row.shopName.trim(),
-          canteenId: canteen._id
-        });
+        const existingRanking = await Ranking.findOne({ shopName, canteenName });
         
         if (existingRanking) {
           // Update existing ranking
-          existingRanking.revenue = parseFloat(row.revenue) || 0;
-          existingRanking.evaluationStatus = row.evaluationStatus || 'ไม่ผ่าน';
-          existingRanking.overallStatus = row.overallStatus || 'รอดำเนินการ';
-          existingRanking.notes = row.notes || '';
-          await existingRanking.save();
+          await Ranking.findByIdAndUpdate(existingRanking._id, {
+            revenue: revenue || 0,
+            evaluationStatus: evaluationStatus || 'ไม่ผ่าน',
+            overallStatus: overallStatus || 'รอดำเนินการ',
+            notes: notes || ''
+          });
         } else {
           // Create new ranking
           const ranking = new Ranking({
-            shopName: row.shopName.trim(),
-            canteenId: canteen._id,
-            canteenName: canteen.name,
-            revenue: parseFloat(row.revenue) || 0,
-            evaluationStatus: row.evaluationStatus || 'ไม่ผ่าน',
-            overallStatus: row.overallStatus || 'รอดำเนินการ',
-            notes: row.notes || ''
+            shopName,
+            canteenName,
+            revenue: revenue || 0,
+            evaluationStatus: evaluationStatus || 'ไม่ผ่าน',
+            overallStatus: overallStatus || 'รอดำเนินการ',
+            notes: notes || ''
           });
+          
           await ranking.save();
         }
         
         successCount++;
       } catch (error) {
-        errors.push(`แถว ${i + 2}: ${error.message}`);
+        console.error('Error processing row:', error);
+        errors.push(`แถว ${successCount + errorCount + 1}: ${error.message}`);
         errorCount++;
       }
     }
     
     // Clean up uploaded file
-    const fs = await import('fs');
-    if (fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+    try {
+      fs.unlinkSync(filePath);
+    } catch (cleanupError) {
+      console.error('Error cleaning up file:', cleanupError);
     }
     
     res.json({
       success: true,
+      message: `อัปโหลดไฟล์ Excel สำเร็จ`,
       data: {
-        totalProcessed: data.length,
+        totalRows: data.length,
         successCount,
         errorCount,
-        errors: errors.slice(0, 10) // Limit error messages
+        errors: errors.length > 0 ? errors : undefined
       }
     });
+    
   } catch (error) {
     console.error('Error uploading Excel:', error);
+    
+    // Clean up uploaded file
+    if (req.file) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (cleanupError) {
+        console.error('Error cleaning up file:', cleanupError);
+      }
+    }
+    
     res.status(500).json({
       success: false,
       message: 'เกิดข้อผิดพลาดในการอัปโหลดไฟล์ Excel'
@@ -457,4 +547,4 @@ export {
   updateRanking,
   deleteRanking,
   uploadExcel
-}; 
+};

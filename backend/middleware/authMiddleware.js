@@ -26,10 +26,19 @@ export const verifyToken = async (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
       console.log('✅ Found token in Authorization header:', token.substring(0, 20) + '...');
     }
-    // ตรวจสอบ token จาก cookies
+    // ตรวจสอบ token จาก cookies (รองรับทั้ง admin และ user)
+    else if (req.cookies.admin_token) {
+      token = req.cookies.admin_token;
+      console.log('✅ Found admin token in cookies:', token.substring(0, 20) + '...');
+    }
+    else if (req.cookies.user_token) {
+      token = req.cookies.user_token;
+      console.log('✅ Found user token in cookies:', token.substring(0, 20) + '...');
+    }
+    // รองรับ cookie เก่า (backward compatibility)
     else if (req.cookies.token) {
       token = req.cookies.token;
-      console.log('✅ Found token in cookies:', token.substring(0, 20) + '...');
+      console.log('✅ Found legacy token in cookies:', token.substring(0, 20) + '...');
     }
 
     if (!token) {
@@ -38,6 +47,10 @@ export const verifyToken = async (req, res, next) => {
     }
 
     console.log('Attempting to verify token...');
+    console.log('🔍 Token value:', token ? token.substring(0, 20) + '...' : 'null');
+    console.log('🔍 Token type:', typeof token);
+    console.log('🔍 Token length:', token ? token.length : 0);
+    
     const decoded = jwt.verify(token, JWT_SECRET);
     console.log('✅ Token verified successfully');
     console.log('Decoded token:', decoded);

@@ -129,7 +129,8 @@ export default {
         'bill': '🧾',
         'leave': '🗓️',
         'repair': '🛠️',
-        'admin_notification': '📢'
+        'admin_notification': '📢',
+        'monthly_ranking': '📊'
       }
       return icons[type] || '🔔'
     }
@@ -140,7 +141,8 @@ export default {
         'bill': '#e74c3c',
         'leave': '#3498db',
         'repair': '#f39c12',
-        'admin_notification': '#9b59b6'
+        'admin_notification': '#9b59b6',
+        'monthly_ranking': '#27ae60'
       }
       return colors[type] || '#95a5a6'
     }

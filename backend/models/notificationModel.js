@@ -4,16 +4,16 @@ const notificationSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false // เปลี่ยนเป็น false เพื่อรองรับ admin notifications
   },
   shopId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Shop',
-    required: true
+    required: false // เปลี่ยนเป็น false เพื่อรองรับ admin notifications
   },
   type: {
     type: String,
-    enum: ['bill', 'leave', 'repair', 'ranking_evaluation'],
+    enum: ['bill', 'leave', 'repair', 'ranking_evaluation', 'admin_notification', 'monthly_ranking'],
     required: true
   },
   title: {
@@ -26,7 +26,7 @@ const notificationSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    required: true
+    required: false // เปลี่ยนเป็น false เพื่อรองรับ admin notifications
   },
   isRead: {
     type: Boolean,
@@ -34,7 +34,7 @@ const notificationSchema = new mongoose.Schema({
   },
   relatedId: {
     type: mongoose.Schema.Types.ObjectId,
-    required: true
+    required: false // เปลี่ยนเป็น false เพื่อรองรับ admin notifications
   },
   billType: {
     type: String,
@@ -49,6 +49,58 @@ const notificationSchema = new mongoose.Schema({
     evaluationMonth: Number,
     evaluationYear: Number,
     evaluatedBy: String,
+    evaluatedAt: Date
+  },
+  // เพิ่มฟิลด์สำหรับ admin notifications
+  priority: {
+    type: String,
+    enum: ['low', 'medium', 'high'],
+    required: false
+  },
+  recipients: {
+    type: String,
+    enum: ['all', 'active', 'expired'],
+    required: false
+  },
+  recipientShopId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Shop',
+    required: false
+  },
+  sentBy: {
+    type: String,
+    required: false
+  },
+  sentAt: {
+    type: Date,
+    default: Date.now
+  },
+  deliveredTo: [{
+    shopId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Shop'
+    },
+    deliveredAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  // เพิ่มฟิลด์สำหรับ user-to-admin notifications
+  details: {
+    type: mongoose.Schema.Types.Mixed,
+    required: false
+  },
+  // เพิ่มฟิลด์สำหรับ monthly ranking notifications
+  monthlyRankingData: {
+    month: Number,
+    year: Number,
+    monthName: String,
+    revenue: Number,
+    score: Number,
+    rank: Number,
+    finalStatus: String,
+    totalShopsInCanteen: Number,
+    revenueUpdatedAt: Date,
     evaluatedAt: Date
   }
 }, {

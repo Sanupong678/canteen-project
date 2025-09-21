@@ -404,7 +404,14 @@ export default {
             console.error('Error creating shop:', createError)
             if (createError.response) {
               console.error('Server response:', createError.response.data)
-              alert(`เกิดข้อผิดพลาดในการบันทึกข้อมูล: ${createError.response.data.message || 'ไม่สามารถสร้างร้านค้าใหม่ได้'}`)
+              const errorData = createError.response.data
+              
+              // จัดการ error สำหรับ duplicate username
+              if (errorData.errorType === 'duplicate_username') {
+                alert(`ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว กรุณาเปลี่ยนชื่อใหม่`)
+              } else {
+                alert(`เกิดข้อผิดพลาดในการบันทึกข้อมูล: ${errorData.message || 'ไม่สามารถสร้างร้านค้าใหม่ได้'}`)
+              }
             } else {
               alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง')
             }
