@@ -59,12 +59,15 @@ const notificationSchema = new mongoose.Schema({
   },
   recipients: {
     type: String,
-    enum: ['all', 'active', 'expired'],
     required: false
   },
   recipientShopId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Shop',
+    required: false
+  },
+  recipientCanteenId: {
+    type: Number,
     required: false
   },
   sentBy: {

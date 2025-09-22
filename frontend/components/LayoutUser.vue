@@ -121,29 +121,63 @@
               </div>
               <div class="credential-item">
                 <label>รหัสผ่านปัจจุบัน:</label>
-                <span>{{ shopData.credentials?.password ? '••••••••' : 'ไม่ระบุ' }}</span>
+                <div class="current-password-wrapper">
+                  <span v-if="shopData.credentials?.password">
+                    {{ showCurrentPassword ? shopData.credentials.password : '••••••••' }}
+                  </span>
+                  <span v-else>ไม่ระบุ</span>
+                  <button 
+                    v-if="shopData.credentials?.password"
+                    type="button" 
+                    class="password-toggle-btn current-password-toggle" 
+                    @click="toggleCurrentPassword"
+                    :title="showCurrentPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'"
+                  >
+                    <i :class="showCurrentPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                  </button>
+                </div>
               </div>
             </div>
             <div class="password-section">
               <h4>เปลี่ยนรหัสผ่าน</h4>
               <div class="form-group">
                 <label>รหัสผ่านใหม่:</label>
-                <input 
-                  type="password" 
-                  v-model="passwordForm.newPassword" 
-                  placeholder="กรอกรหัสผ่านใหม่"
-                  :class="{ 'error': passwordError }"
-                >
+                <div class="password-input-wrapper">
+                  <input 
+                    :type="showNewPassword ? 'text' : 'password'" 
+                    v-model="passwordForm.newPassword" 
+                    placeholder="กรอกรหัสผ่านใหม่"
+                    :class="{ 'error': passwordError }"
+                  >
+                  <button 
+                    type="button" 
+                    class="password-toggle-btn" 
+                    @click="toggleNewPassword"
+                    :title="showNewPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'"
+                  >
+                    <i :class="showNewPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                  </button>
+                </div>
                 <small class="error-message" v-if="passwordError">{{ passwordError }}</small>
               </div>
               <div class="form-group">
                 <label>ยืนยันรหัสผ่าน:</label>
-                <input 
-                  type="password" 
-                  v-model="passwordForm.confirmPassword" 
-                  placeholder="กรอกรหัสผ่านใหม่อีกครั้ง"
-                  :class="{ 'error': confirmPasswordError }"
-                >
+                <div class="password-input-wrapper">
+                  <input 
+                    :type="showConfirmPassword ? 'text' : 'password'" 
+                    v-model="passwordForm.confirmPassword" 
+                    placeholder="กรอกรหัสผ่านใหม่อีกครั้ง"
+                    :class="{ 'error': confirmPasswordError }"
+                  >
+                  <button 
+                    type="button" 
+                    class="password-toggle-btn" 
+                    @click="toggleConfirmPassword"
+                    :title="showConfirmPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'"
+                  >
+                    <i :class="showConfirmPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                  </button>
+                </div>
                 <small class="error-message" v-if="confirmPasswordError">{{ confirmPasswordError }}</small>
               </div>
               <div class="password-requirements">
@@ -253,7 +287,10 @@ export default {
         confirmPassword: ''
       },
       passwordError: '',
-      confirmPasswordError: ''
+      confirmPasswordError: '',
+      showNewPassword: false,
+      showConfirmPassword: false,
+      showCurrentPassword: false
     }
   },
   async mounted() {
@@ -342,6 +379,9 @@ export default {
       }
       this.passwordError = ''
       this.confirmPasswordError = ''
+      this.showNewPassword = false
+      this.showConfirmPassword = false
+      this.showCurrentPassword = false
     },
     openDetailsModal() {
       this.showDetailsModal = true
@@ -522,6 +562,15 @@ export default {
         return this.displayName.charAt(0).toUpperCase()
       }
       return 'U'
+    },
+    toggleNewPassword() {
+      this.showNewPassword = !this.showNewPassword
+    },
+    toggleConfirmPassword() {
+      this.showConfirmPassword = !this.showConfirmPassword
+    },
+    toggleCurrentPassword() {
+      this.showCurrentPassword = !this.showCurrentPassword
     },
     isPasswordValid() {
       return (
@@ -1116,6 +1165,61 @@ export default {
 .save-btn {
   background-color: #28a745;
   color: white;
+}
+
+/* Password Input Wrapper */
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input-wrapper input {
+  width: 100%;
+  padding-right: 45px; /* Space for toggle button */
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #666;
+  padding: 5px;
+  border-radius: 3px;
+  transition: color 0.2s ease;
+  z-index: 1;
+}
+
+.password-toggle-btn:hover {
+  color: #333;
+  background-color: #f8f9fa;
+}
+
+.password-toggle-btn:focus {
+  outline: none;
+  background-color: #e9ecef;
+}
+
+.password-toggle-btn i {
+  font-size: 14px;
+}
+
+/* Current Password Wrapper */
+.current-password-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.current-password-toggle {
+  position: static !important;
+  transform: none !important;
+  margin-left: 5px;
 }
 
 .save-btn:disabled {

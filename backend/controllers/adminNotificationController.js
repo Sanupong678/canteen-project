@@ -8,7 +8,15 @@ export const sendAdminNotification = async (req, res) => {
     console.log('🔍 Admin notification request:', req.body);
     console.log('👤 User:', req.user);
     
-    const { recipients, recipientShopId, priority, title, message } = req.body;
+    const { recipients, recipientShopId, recipientCanteenId, priority, title, message } = req.body;
+    
+    console.log('📋 Notification parameters:');
+    console.log('  - recipients:', recipients);
+    console.log('  - recipientShopId:', recipientShopId);
+    console.log('  - recipientCanteenId:', recipientCanteenId);
+    console.log('  - priority:', priority);
+    console.log('  - title:', title);
+    console.log('  - message:', message);
     
     // หา user ID จาก database หรือใช้ username เป็น sentBy
     let sentBy;
@@ -59,6 +67,7 @@ export const sendAdminNotification = async (req, res) => {
       priority: priority,
       recipients: recipients,
       recipientShopId: recipientShopId,
+      recipientCanteenId: recipientCanteenId,
       sentBy: sentBy || req.user.username,
       sentAt: new Date(),
       isRead: false
@@ -77,18 +86,22 @@ export const sendAdminNotification = async (req, res) => {
       if (recipients === 'all') {
         targetShops = await Shop.find({});
         console.log('📊 Found all shops:', targetShops.length);
-      } else if (recipients === 'active') {
-        targetShops = await Shop.find({ 'credentials.status': 'active' });
-        console.log('📊 Found active shops:', targetShops.length);
-      } else if (recipients === 'expired') {
-        targetShops = await Shop.find({ 'credentials.status': 'expired' });
-        console.log('📊 Found expired shops:', targetShops.length);
       } else if (recipientShopId) {
+        console.log('🔍 Looking for specific shop with ID:', recipientShopId);
         const specificShop = await Shop.findById(recipientShopId);
         if (specificShop) {
           targetShops = [specificShop];
-          console.log('📊 Found specific shop:', specificShop.name);
+          console.log('📊 Found specific shop:', specificShop.name, 'ID:', specificShop._id);
+        } else {
+          console.log('❌ Specific shop not found with ID:', recipientShopId);
         }
+      } else if (recipientCanteenId) {
+        console.log('🔍 Looking for shops in canteen ID:', recipientCanteenId);
+        targetShops = await Shop.find({ canteenId: parseInt(recipientCanteenId) });
+        console.log('📊 Found shops in canteen:', targetShops.length);
+        console.log('📊 Shop names:', targetShops.map(shop => shop.name));
+      } else {
+        console.log('⚠️ No valid recipients, recipientShopId, or recipientCanteenId provided');
       }
     } catch (shopError) {
       console.error('❌ Error finding shops:', shopError);

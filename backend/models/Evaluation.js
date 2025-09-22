@@ -15,6 +15,10 @@ const evaluationSchema = new mongoose.Schema({
     title: String,
     description: String,
     maxScore: Number,
+    order: {
+      type: Number,
+      default: 0
+    },
     status: {
       type: String,
       enum: ['ผ่าน', 'ไม่ผ่าน', ''],

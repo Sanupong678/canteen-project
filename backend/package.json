@@ -12,7 +12,13 @@
     "reset-bills": "node scripts/resetBills.js",
     "seed-canteens": "node scripts/seedCanteens.js",
     "seed-rankings": "node scripts/seedRankings.js",
-    "update-canteen-images": "node scripts/updateCanteenImages.js"
+    "update-canteen-images": "node scripts/updateCanteenImages.js",
+    "customid-preview": "node scripts/updateCustomId.js preview",
+    "customid-update": "node scripts/updateCustomId.js update",
+    "eval-order-preview": "node scripts/updateEvaluationItemsOrder.js preview",
+    "eval-order-update": "node scripts/updateEvaluationItemsOrder.js update",
+    "eval-item-order-preview": "node scripts/updateEvaluationItemOrder.js preview",
+    "eval-item-order-update": "node scripts/updateEvaluationItemOrder.js update"
   },
   "keywords": [],
   "engines": {

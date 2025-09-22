@@ -104,23 +104,6 @@
             </select>
           </div>
           
-          <div class="filter-group">
-            <label>ปี</label>
-            <select v-model="selectedYear" @change="onFilterChange">
-              <option value="">ทั้งหมด</option>
-              <option v-for="year in availableYears" :key="year" :value="year">{{ year }}</option>
-            </select>
-          </div>
-          
-          <div class="filter-group">
-            <label>เดือน</label>
-            <select v-model="selectedMonth" @change="onFilterChange">
-              <option value="">ทั้งหมด</option>
-              <option v-for="(month, index) in monthNames" :key="index" :value="index + 1">
-                {{ month }}
-              </option>
-            </select>
-          </div>
 
           <!-- Dropdown สำหรับหน้า ตัวควบคุมแบบประเมิน -->
           <div class="filter-group" v-if="activeMenu === 'control'">
@@ -164,29 +147,27 @@
 
 
           <!-- ส่วนควบคุม - แสดงเฉพาะในหน้า ตัวควบคุมแบบประเมิน -->
-          <div class="filter-group" v-if="activeMenu === 'control'">
+          <div class="filter-group control-group" v-if="activeMenu === 'control'">
             <label>ควบคุม</label>
-            <div class="control-switch-container">
-              <label class="switch">
-                <input 
-                  type="checkbox" 
-                  v-model="evaluationSystemEnabled"
-                  @change="toggleEvaluationSystem"
-                >
-                <span class="slider round"></span>
-              </label>
-              <span class="switch-text">
-                {{ evaluationSystemEnabled ? 'เปิดระบบประเมิน' : 'ปิดระบบประเมิน' }}
-              </span>
+            <div class="control-container">
+              <div class="control-switch-container">
+                <label class="switch">
+                  <input 
+                    type="checkbox" 
+                    v-model="evaluationSystemEnabled"
+                    @change="toggleEvaluationSystem"
+                  >
+                  <span class="slider round"></span>
+                </label>
+                <span class="switch-text">
+                  {{ evaluationSystemEnabled ? 'เปิดระบบประเมิน' : 'ปิดระบบประเมิน' }}
+                </span>
+              </div>
+              <button class="reset-btn" @click="resetScores">
+                <i class="fas fa-redo"></i>
+                Reset คะแนน
+              </button>
             </div>
-          </div>
-
-          <div class="filter-group reset-group" v-if="activeMenu === 'control'">
-            <label>&nbsp;</label>
-            <button class="reset-btn" @click="resetScores">
-              <i class="fas fa-redo"></i>
-              Reset คะแนน
-            </button>
           </div>
         </div>
         
@@ -217,8 +198,35 @@
           </div>
         </div>
 
-        <!-- Stats Section for other menus (excluding history) -->
-        <div class="stats-section" v-if="activeMenu !== 'view-topic' && activeMenu !== 'history'">
+        <!-- Stats Section for evaluation menu -->
+        <div class="stats-section" v-if="activeMenu === 'evaluation'">
+          <div class="stat-item">
+            <div class="stat-icon">
+              <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-label">สถานะผ่าน</div>
+            <div class="stat-value">{{ passedShopsCount }}</div>
+        </div>
+        
+          <div class="stat-item">
+            <div class="stat-icon">
+              <i class="fas fa-times-circle"></i>
+            </div>
+            <div class="stat-label">สถานะไม่ผ่าน</div>
+            <div class="stat-value">{{ failedShopsCount }}</div>
+        </div>
+        
+          <div class="stat-item">
+            <div class="stat-icon">
+              <i class="fas fa-store"></i>
+            </div>
+            <div class="stat-label">จำนวนร้านค้า</div>
+            <div class="stat-value">{{ totalShops }}</div>
+          </div>
+        </div>
+
+        <!-- Stats Section for other menus (excluding history and evaluation) -->
+        <div class="stats-section" v-if="activeMenu !== 'view-topic' && activeMenu !== 'history' && activeMenu !== 'evaluation'">
           <div class="stat-item">
             <div class="stat-icon">
               <i class="fas fa-money-bill-wave"></i>
@@ -271,7 +279,7 @@
         
         <div v-for="(shop, index) in paginatedShops" :key="shop._id" class="table-row">
           <div class="cell">{{ startItem + index }}</div>
-            <div class="cell">{{ shop.customId || shop._id }}</div>
+            <div class="cell">{{ formatCustomId(shop.customId || shop._id) }}</div>
           <div class="cell">{{ shop.name }}</div>
           <div class="cell">{{ getCategoryName(shop.type) }}</div>
           <div class="cell">{{ getCanteenName(shop.canteenId) }}</div>
@@ -383,7 +391,7 @@
               
               <div v-for="(evaluation, index) in filteredShops" :key="evaluation._id" class="table-row">
                 <div class="cell">{{ index + 1 }}</div>
-                <div class="cell">{{ evaluation.customId || evaluation.shopId?.customId || evaluation.shopId?._id || '-' }}</div>
+                <div class="cell">{{ formatCustomId(evaluation.customId || evaluation.shopId?.customId || evaluation.shopId?._id) }}</div>
                 <div class="cell">{{ evaluation.shopName || evaluation.shopId?.name || '-' }}</div>
                 <div class="cell">{{ getCategoryName(evaluation.type) }}</div>
                 <div class="cell">{{ evaluation.canteenName || '-' }}</div>
@@ -588,7 +596,7 @@
                   <tr v-for="(item, index) in currentEvaluationDetails.items" :key="index" class="evaluation-row">
                     <!-- ลำดับ -->
                     <td class="col-order">
-                      <div class="order-number">{{ index + 1 }}</div>
+                      <div class="order-number">{{ item.order || (index + 1) }}</div>
                     </td>
                     
                     <!-- หัวข้อ -->
@@ -662,6 +670,7 @@
 import LayoutAdmin from '../../components/LayoutAdmin.vue'
 import EvaluationModal from '../../components/EvaluationModal.vue'
 import axios from 'axios'
+import { formatCustomId } from '../../utils/customIdUtils.js'
 
 export default {
   components: { LayoutAdmin, EvaluationModal },
@@ -696,7 +705,6 @@ export default {
       showExpiredShops: false,
       // Evaluation Details Modal
       showEvaluationDetailsModal: false,
-      selectedEvaluation: null,
       currentEvaluationDetails: null,
       selectedRound: 1,
       availableRounds: [],
@@ -750,6 +758,20 @@ export default {
     },
     totalMaxScore() {
       return this.evaluationTopics.reduce((sum, topic) => sum + (topic.maxScore || 0), 0)
+    },
+    passedShopsCount() {
+      // นับจำนวนร้านค้าที่ผ่านการประเมิน
+      return this.filteredShops.filter(shop => {
+        const status = this.getEvaluationStatusText(shop)
+        return status === 'ผ่าน'
+      }).length
+    },
+    failedShopsCount() {
+      // นับจำนวนร้านค้าที่ไม่ผ่านการประเมิน
+      return this.filteredShops.filter(shop => {
+        const status = this.getEvaluationStatusText(shop)
+        return status === 'ไม่ผ่าน'
+      }).length
     },
     
     // เรียงลำดับร้านค้าตามโรงอาหาร (เฉพาะเมื่อไม่ได้เรียงตามคะแนน)
@@ -810,6 +832,7 @@ export default {
         this.filteredShops = this.shops
   },
   methods: {
+    formatCustomId,
     async setActiveMenu(menu) {
       this.activeMenu = menu
       if (menu === 'control' || menu === 'history' || menu === 'evaluation') {
@@ -1342,10 +1365,10 @@ export default {
     isShopEvaluated(shop) {
       // สำหรับหน้า "ทำแบบประเมิน" ใช้ evaluationSent
       if (this.activeMenu === 'evaluation') {
-        if (shop.evaluationSent !== undefined) {
-          return shop.evaluationSent
-        } else if (shop.evaluation && shop.evaluation.evaluationSent !== undefined) {
-          return shop.evaluation.evaluationSent
+        if (shop.evaluationSent === true) {
+          return true
+        } else if (shop.evaluation && shop.evaluation.evaluationSent === true) {
+          return true
         }
         return false
       }
@@ -1529,6 +1552,11 @@ export default {
 
     async importExcel(file) {
       try {
+        // เพิ่มการ confirm ก่อนอัปโหลด
+        if (!confirm('คุณต้องการยืนยันการอัปโหลดไฟล์ Excel หรือไม่?')) {
+          return
+        }
+        
         this.isLoading = true
         
         // สร้าง FormData สำหรับส่งไฟล์
@@ -1746,12 +1774,15 @@ export default {
   background: #f8f9fa;
   border-radius: 6px;
   flex-wrap: wrap;
+  align-items: flex-start;
 }
 
 .filter-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1;
+  min-width: 120px;
 }
 
 .filter-group label {
@@ -1765,6 +1796,7 @@ export default {
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 13px;
+  width: 100%;
   min-width: 130px;
 }
 
@@ -1773,6 +1805,7 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 2;
   min-width: 250px;
 }
 
@@ -1820,21 +1853,26 @@ export default {
   background: #dc3545;
   color: white;
   border: none;
-  padding: 8px 14px;
+  padding: 10px 20px;
   border-radius: 4px;
   font-size: 13px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.3s ease;
+  min-width: 190px;
+  justify-content: center;
 }
 
 .reset-btn:hover {
   background: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
 }
 
-.reset-group {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  align-items: flex-start;
+.reset-btn i {
+  font-size: 12px;
 }
 
 
@@ -1862,6 +1900,14 @@ export default {
   font-size: 24px;
   color: #3b82f6;
   margin-bottom: 5px;
+}
+
+.stat-icon .fa-check-circle {
+  color: #10b981;
+}
+
+.stat-icon .fa-times-circle {
+  color: #ef4444;
 }
 
 .stat-label {
@@ -2133,11 +2179,19 @@ export default {
 }
 
 /* Control Switch in Filters */
+.control-container {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 8px 0;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
 .control-switch-container {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 0;
 }
 
 .switch {
@@ -2605,6 +2659,12 @@ input:checked + .slider:before {
   .evaluate-btn {
     padding: 6px 12px;
     font-size: 11px;
+  }
+
+  .control-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
   }
 
   .control-switch-container {

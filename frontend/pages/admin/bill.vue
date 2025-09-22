@@ -48,6 +48,7 @@
                   prepend-inner-icon="mdi-check-circle-outline"
                 />
                 <v-select
+                  v-if="showHistoryView"
                   v-model="selectedMonth"
                   :items="monthTypes"
                   label="เดือน"
@@ -58,6 +59,7 @@
                   prepend-inner-icon="mdi-calendar-month-outline"
                 />
                 <v-select
+                  v-if="showHistoryView"
                   v-model="selectedYear"
                   :items="yearOptions"
                   label="ปี"
@@ -90,13 +92,50 @@
               <v-icon left>mdi-cloud-upload</v-icon>อัปโหลด
             </v-btn>
           </div>
-          <div>
+          <div class="d-flex align-center gap-3">
+            <v-btn 
+              color="info" 
+              variant="outlined"
+              @click="toggleHistoryView"
+              :class="{ 'active-history': showHistoryView }"
+            >
+              <v-icon left>mdi-history</v-icon>
+              {{ showHistoryView ? 'ข้อมูลปัจจุบัน' : 'ประวัติ' }}
+            </v-btn>
             <v-btn-toggle v-model="selectedBillType" mandatory>
               <v-btn value="electricity">ค่าไฟ</v-btn>
               <v-btn value="water">ค่าน้ำ</v-btn>
               <v-btn value="utilities">รวม (Utilities)</v-btn>
             </v-btn-toggle>
           </div>
+        </div>
+
+        <!-- Current Month Info -->
+        <div v-if="!showHistoryView" class="current-month-info">
+          <v-alert
+            type="info"
+            variant="tonal"
+            class="mb-4"
+            :text="`กำลังแสดงข้อมูลบิลของเดือน ${getCurrentMonthName()} ${new Date().getFullYear()}`"
+          >
+            <template v-slot:prepend>
+              <v-icon>mdi-information</v-icon>
+            </template>
+          </v-alert>
+        </div>
+
+        <!-- History Info -->
+        <div v-if="showHistoryView" class="history-info">
+          <v-alert
+            type="warning"
+            variant="tonal"
+            class="mb-4"
+            :text="`กำลังแสดงข้อมูลประวัติบิลของเดือน ${selectedMonth} ${selectedYear} (ไม่รวมข้อมูลเดือนปัจจุบัน)`"
+          >
+            <template v-slot:prepend>
+              <v-icon>mdi-history</v-icon>
+            </template>
+          </v-alert>
         </div>
 
         <!-- Data Table -->
@@ -132,7 +171,7 @@
 
           <!-- ID Shop -->
           <template v-slot:item.shopId="{ item }">
-            {{ item.shopId }}
+            {{ formatCustomId(item.shopId) }}
           </template>
 
           <!-- Guest Information -->
@@ -213,7 +252,7 @@
                 :disabled="!(item.image || item.slip || item.electricityImage || item.waterImage)"
                 @click="openImagePreview(item.image || item.slip || item.electricityImage || item.waterImage, item)"
               >
-                แสดงบิล
+                แสดงสลิป
               </v-btn>
             </div>
           </template>
@@ -292,6 +331,7 @@ import { useNuxtApp } from '#app'
 import LayoutAdmin from '@/components/LayoutAdmin.vue'
 import { format, addDays } from 'date-fns'
 import { th } from 'date-fns/locale'
+import { formatCustomId } from '@/utils/customIdUtils.js'
 
 export default {
   name: 'BillAdmin',
@@ -347,9 +387,8 @@ export default {
 
     const statusTypes = [
       'ทั้งหมด',
-      'รอตรวจสอบ',
-      'ยืนยันแล้ว',
-      'เลยกำหนดชำระ'
+      'รอดำเนินการ',
+      'เสร็จสิ้น'
     ]
 
     const canteenTypes = Object.values(canteenMap)
@@ -477,9 +516,7 @@ export default {
         if (selectedStatus.value && selectedStatus.value !== 'ทั้งหมด') {
           const statusMap = {
             'รอดำเนินการ': 'pending',
-            'รอตรวจสอบ': 'waiting',
-            'ยืนยันแล้ว': 'confirmed',
-            'เลยกำหนดชำระ': 'rejected'
+            'เสร็จสิ้น': 'confirmed'
           }
           query.append('status', statusMap[selectedStatus.value])
         }
@@ -487,11 +524,21 @@ export default {
           const canteenId = Object.keys(canteenMap).find(key => canteenMap[key] === selectedCanteen.value)
           if (canteenId) query.append('canteenId', canteenId)
         }
-        if (selectedMonth.value && selectedMonth.value !== 'ทั้งหมด') {
-          query.append('month', monthToNumber[selectedMonth.value])
-        }
-        if (selectedYear.value && selectedYear.value !== 'ทั้งหมด') {
-          query.append('year', selectedYear.value)
+        if (showHistoryView.value) {
+          // โหมดประวัติ: ใช้เดือนและปีที่เลือก และไม่แสดงข้อมูลเดือนปัจจุบัน
+          if (selectedMonth.value && selectedMonth.value !== 'ทั้งหมด') {
+            query.append('month', monthToNumber[selectedMonth.value])
+          }
+          if (selectedYear.value && selectedYear.value !== 'ทั้งหมด') {
+            query.append('year', selectedYear.value)
+          }
+          // เพิ่มพารามิเตอร์เพื่อไม่แสดงข้อมูลเดือนปัจจุบัน
+          query.append('excludeCurrentMonth', 'true')
+        } else {
+          // โหมดข้อมูลปัจจุบัน: ใช้เดือนและปีปัจจุบัน
+          const currentDate = new Date()
+          query.append('month', (currentDate.getMonth() + 1).toString())
+          query.append('year', currentDate.getFullYear().toString())
         }
         if (searchShopName.value && searchShopName.value.trim()) {
           query.append('shopName', searchShopName.value.trim())
@@ -611,6 +658,7 @@ export default {
     const selectedFile = ref(null)
     const fileName = ref("")
     const fileInput = ref(null)
+    const showHistoryView = ref(false)
 
     const onFileChange = (e) => {
       const file = e.target.files[0]
@@ -620,6 +668,12 @@ export default {
 
     const uploadFile = async () => {
       if (!selectedFile.value) return
+      
+      // เพิ่มการ confirm ก่อนอัปโหลด
+      if (!confirm('คุณต้องการยืนยันการอัปโหลดไฟล์ Excel หรือไม่?')) {
+        return
+      }
+      
       const formData = new FormData()
       formData.append('file', selectedFile.value)
       await $axios.post('/api/bills/admin/import-excel', formData)
@@ -675,6 +729,30 @@ export default {
       fetchBills()
     }
 
+    const toggleHistoryView = () => {
+      showHistoryView.value = !showHistoryView.value
+      if (!showHistoryView.value) {
+        // เมื่อกลับไปโหมดข้อมูลปัจจุบัน ให้รีเซ็ตเดือนและปีเป็นเดือนปัจจุบัน
+        const currentDate = new Date()
+        selectedMonth.value = numberToMonth[currentDate.getMonth() + 1] || 'ทั้งหมด'
+        selectedYear.value = currentDate.getFullYear().toString()
+      } else {
+        // เมื่อเข้าสู่โหมดประวัติ ให้ตั้งค่าเป็นเดือนก่อนหน้า
+        const currentDate = new Date()
+        const previousMonth = currentDate.getMonth() === 0 ? 12 : currentDate.getMonth()
+        const previousYear = currentDate.getMonth() === 0 ? currentDate.getFullYear() - 1 : currentDate.getFullYear()
+        
+        selectedMonth.value = numberToMonth[previousMonth] || 'ทั้งหมด'
+        selectedYear.value = previousYear.toString()
+      }
+      fetchBills()
+    }
+
+    const getCurrentMonthName = () => {
+      const currentDate = new Date()
+      return numberToMonth[currentDate.getMonth() + 1] || 'ไม่ระบุ'
+    }
+
     return {
       bills,
       loading,
@@ -725,7 +803,13 @@ export default {
       goToPage,
       nextPage,
       startIndexDisplay,
-      endIndexDisplay
+      endIndexDisplay,
+      // history view
+      showHistoryView,
+      toggleHistoryView,
+      getCurrentMonthName,
+      // utility functions
+      formatCustomId
     }
   }
 }
@@ -795,7 +879,7 @@ export default {
 
 /* Keep label centered like a placeholder (no floating) */
 .pill-select :deep(.v-field-label) {
-  top: 50% !important;
+  top: 28% !important;
   transform: translateY(-50%) scale(1) !important;
   opacity: 1 !important;
 }
@@ -805,6 +889,8 @@ export default {
 .pill-select :deep(.v-select__selection) {
   display: flex !important;
   align-items: center !important;
+  font-size: 13px !important;
+  margin-top: -2px !important;
 }
 
 /* Right arrow vertical centering */
@@ -973,6 +1059,16 @@ export default {
 .v-btn:hover {
   transform: translateY(-2px) !important;
   box-shadow: 0 4px 12px rgba(231, 76, 60, 0.15) !important;
+}
+
+.active-history {
+  background-color: #2196f3 !important;
+  color: white !important;
+  border-color: #2196f3 !important;
+}
+
+.gap-3 {
+  gap: 12px;
 }
 
 .preview-image {

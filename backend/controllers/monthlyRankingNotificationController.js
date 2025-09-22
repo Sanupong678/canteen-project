@@ -168,8 +168,8 @@ const createMonthlyRankingNotification = async (shop, rankingData, month, year) 
   ];
   
   const monthName = monthNames[month];
-  const title = 'แจ้งเตือนผลการประเมินประจำเดือน';
-  const message = `สามารถเช็คคะแนนประเมินและลำดับประจำเดือน ${monthName} ${year} ได้แล้ว\nคะแนน: ${rankingData.score}/100\nลำดับ: อันดับที่ ${rankingData.rank}\nรายได้: ${rankingData.revenue.toLocaleString()} บาท`;
+  const title = 'มีการอัปเดตข้อมูล Ranking';
+  const message = `ข้อมูลการจัดอันดับประจำเดือน ${monthName} ${year} ได้รับการอัปเดตแล้ว\nกรุณาเช็คข้อมูลในหน้า Ranking เพื่อดูรายละเอียด`;
   
   const notification = new Notification({
     userId: shop._id,

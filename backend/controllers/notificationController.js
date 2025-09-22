@@ -13,6 +13,13 @@ export const getUserNotifications = async (req, res) => {
     console.log('🔍 Fetching notifications for shopId:', req.user.shopId);
     console.log('🔍 User object:', req.user);
     
+    // คำนวณวันที่ 1 เดือนที่แล้ว
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    
+    console.log('📅 Filtering notifications from:', oneMonthAgo.toISOString());
+    console.log('📅 Current date:', new Date().toISOString());
+    
     // ตรวจสอบข้อมูลผู้ใช้
     if (!req.user) {
       console.error('❌ Missing user information:', req.user);
@@ -76,11 +83,17 @@ export const getUserNotifications = async (req, res) => {
     }
 
     console.log('🔍 Searching for bills with shopId:', shopId);
-    // ดึงข้อมูล Bill ล่าสุด
-    const billQuery = (shopId && shopId !== 'admin') ? { shopId } : {};
-    const latestBills = await Bill.find(billQuery)
-      .sort({ updatedAt: -1 })
-      .limit(5);
+    // ดึงข้อมูล Bill ล่าสุด - เฉพาะสำหรับ user ที่มี shopId และไม่เก่ากว่า 1 เดือน
+    let latestBills = [];
+    if (shopId && shopId !== 'admin') {
+      const billQuery = { 
+        shopId,
+        updatedAt: { $gte: oneMonthAgo } // เฉพาะข้อมูลที่อัปเดตภายใน 1 เดือนที่แล้ว
+      };
+      latestBills = await Bill.find(billQuery)
+        .sort({ updatedAt: -1 })
+        .limit(10); // เพิ่มจำนวนให้มากขึ้นเพื่อให้มีข้อมูลเพียงพอ
+    }
     
     console.log('📋 Found bills:', latestBills.length);
     console.log('📋 Bill IDs:', latestBills.map(b => b._id));
@@ -93,35 +106,44 @@ export const getUserNotifications = async (req, res) => {
         updatedAt: bill.updatedAt
       });
       if (bill.status && bill.status !== 'รอดำเนินการ') {
-        // ตรวจสอบว่าผู้ใช้เคยอ่านแล้วหรือไม่
-        const isRead = userReadStatus.readBills.includes(bill._id.toString());
-        
-        notifications.push({
-          _id: `bill_${bill._id}`,
-          type: 'bill',
-          title: 'บิลค่าบริการ',
-          message: `บิล${bill.billType === 'electricity' ? 'ค่าไฟ' : 'ค่าน้ำ'} - ${getStatusText(bill.status)}`,
-          status: bill.status,
-          createdAt: bill.updatedAt, // ใช้เวลาที่อัปเดต status
-          isRead: isRead,
-          details: {
-            billType: bill.billType,
-            amount: bill.amount,
-            billMonth: bill.month,
-            billYear: bill.year,
-            dueDate: bill.dueDate,
-            image: bill.image
-          }
-        });
+        // ตรวจสอบเพิ่มเติมว่า bill นี้เป็นของ shopId นี้จริงหรือไม่
+        if (bill.shopId && bill.shopId.toString() === shopId.toString()) {
+          // ตรวจสอบว่าผู้ใช้เคยอ่านแล้วหรือไม่
+          const isRead = userReadStatus.readBills.includes(bill._id.toString());
+          
+          notifications.push({
+            _id: `bill_${bill._id}`,
+            type: 'bill',
+            title: 'บิลค่าบริการ',
+            message: `บิล${bill.billType === 'electricity' ? 'ค่าไฟ' : 'ค่าน้ำ'} - ${getStatusText(bill.status)}`,
+            status: bill.status,
+            createdAt: bill.updatedAt, // ใช้เวลาที่อัปเดต status
+            isRead: isRead,
+            details: {
+              billType: bill.billType,
+              amount: bill.amount,
+              billMonth: bill.month,
+              billYear: bill.year,
+              dueDate: bill.dueDate,
+              image: bill.image
+            }
+          });
+        }
       }
     }
 
     console.log('🔍 Searching for leaves with shopId:', shopId);
-    // ดึงข้อมูล Leave ล่าสุด
-    const leaveQuery = (shopId && shopId !== 'admin') ? { shopId } : {};
-    const latestLeaves = await Leave.find(leaveQuery)
-      .sort({ updatedAt: -1 })
-      .limit(5);
+    // ดึงข้อมูล Leave ล่าสุด - เฉพาะสำหรับ user ที่มี shopId และไม่เก่ากว่า 1 เดือน
+    let latestLeaves = [];
+    if (shopId && shopId !== 'admin') {
+      const leaveQuery = { 
+        shopId,
+        updatedAt: { $gte: oneMonthAgo } // เฉพาะข้อมูลที่อัปเดตภายใน 1 เดือนที่แล้ว
+      };
+      latestLeaves = await Leave.find(leaveQuery)
+        .sort({ updatedAt: -1 })
+        .limit(10); // เพิ่มจำนวนให้มากขึ้นเพื่อให้มีข้อมูลเพียงพอ
+    }
     
     console.log('📋 Found leaves:', latestLeaves.length);
     console.log('📋 Leave IDs:', latestLeaves.map(l => l._id));
@@ -133,32 +155,41 @@ export const getUserNotifications = async (req, res) => {
         updatedAt: leave.updatedAt
       });
       if (leave.status && leave.status !== 'pending') {
-        // ตรวจสอบว่าผู้ใช้เคยอ่านแล้วหรือไม่
-        const isRead = userReadStatus.readLeaves.includes(leave._id.toString());
-        
-        notifications.push({
-          _id: `leave_${leave._id}`,
-          type: 'leave',
-          title: 'การแจ้งลา',
-          message: `คำขอแจ้งลา - ${getStatusText(leave.status)}`,
-          status: leave.status,
-          createdAt: leave.updatedAt, // ใช้เวลาที่อัปเดต status
-          isRead: isRead,
-          details: {
-            startDate: leave.startDate,
-            endDate: leave.endDate,
-            issue: leave.issue
-          }
-        });
+        // ตรวจสอบเพิ่มเติมว่า leave นี้เป็นของ shopId นี้จริงหรือไม่
+        if (leave.shopId && leave.shopId.toString() === shopId.toString()) {
+          // ตรวจสอบว่าผู้ใช้เคยอ่านแล้วหรือไม่
+          const isRead = userReadStatus.readLeaves.includes(leave._id.toString());
+          
+          notifications.push({
+            _id: `leave_${leave._id}`,
+            type: 'leave',
+            title: 'การแจ้งลา',
+            message: `คำขอแจ้งลา - ${getStatusText(leave.status)}`,
+            status: leave.status,
+            createdAt: leave.updatedAt, // ใช้เวลาที่อัปเดต status
+            isRead: isRead,
+            details: {
+              startDate: leave.startDate,
+              endDate: leave.endDate,
+              issue: leave.issue
+            }
+          });
+        }
       }
     }
 
     console.log('🔍 Searching for repairs with shopId:', shopId);
-    // ดึงข้อมูล Repair ล่าสุด
-    const repairQuery = (shopId && shopId !== 'admin') ? { shopId } : {};
-    const latestRepairs = await Repair.find(repairQuery)
-      .sort({ updatedAt: -1 })
-      .limit(5);
+    // ดึงข้อมูล Repair ล่าสุด - เฉพาะสำหรับ user ที่มี shopId และไม่เก่ากว่า 1 เดือน
+    let latestRepairs = [];
+    if (shopId && shopId !== 'admin') {
+      const repairQuery = { 
+        shopId,
+        updatedAt: { $gte: oneMonthAgo } // เฉพาะข้อมูลที่อัปเดตภายใน 1 เดือนที่แล้ว
+      };
+      latestRepairs = await Repair.find(repairQuery)
+        .sort({ updatedAt: -1 })
+        .limit(10); // เพิ่มจำนวนให้มากขึ้นเพื่อให้มีข้อมูลเพียงพอ
+    }
     
     console.log('📋 Found repairs:', latestRepairs.length);
     console.log('📋 Repair IDs:', latestRepairs.map(r => r._id));
@@ -170,32 +201,56 @@ export const getUserNotifications = async (req, res) => {
         updatedAt: repair.updatedAt
       });
       if (repair.status && repair.status !== 'pending') {
-        // ตรวจสอบว่าผู้ใช้เคยอ่านแล้วหรือไม่
-        const isRead = userReadStatus.readRepairs.includes(repair._id.toString());
-        
-        notifications.push({
-          _id: `repair_${repair._id}`,
-          type: 'repair',
-          title: 'การแจ้งซ่อม',
-          message: `คำขอแจ้งซ่อม - ${getStatusText(repair.status)}`,
-          status: repair.status,
-          createdAt: repair.updatedAt, // ใช้เวลาที่อัปเดต status
-          isRead: isRead,
-          details: {
-            category: repair.category,
-            issue: repair.issue,
-            reportDate: repair.report_date
-          }
-        });
+        // ตรวจสอบเพิ่มเติมว่า repair นี้เป็นของ shopId นี้จริงหรือไม่
+        if (repair.shopId && repair.shopId.toString() === shopId.toString()) {
+          // ตรวจสอบว่าผู้ใช้เคยอ่านแล้วหรือไม่
+          const isRead = userReadStatus.readRepairs.includes(repair._id.toString());
+          
+          notifications.push({
+            _id: `repair_${repair._id}`,
+            type: 'repair',
+            title: 'การแจ้งซ่อม',
+            message: `คำขอแจ้งซ่อม - ${getStatusText(repair.status)}`,
+            status: repair.status,
+            createdAt: repair.updatedAt, // ใช้เวลาที่อัปเดต status
+            isRead: isRead,
+            details: {
+              category: repair.category,
+              issue: repair.issue,
+              reportDate: repair.report_date
+            }
+          });
+        }
       }
     }
 
-    // ดึงข้อมูล Monthly Ranking notifications ล่าสุด
+    // ดึงข้อมูล Monthly Ranking notifications ล่าสุด - เฉพาะสำหรับ user ที่มี shopId และไม่เก่ากว่า 1 เดือน
     console.log('🔍 Searching for monthly ranking notifications with shopId:', shopId);
-    const monthlyRankingQuery = (shopId && shopId !== 'admin') ? { shopId, type: 'monthly_ranking' } : { type: 'monthly_ranking' };
-    const latestMonthlyRankingNotifications = await Notification.find(monthlyRankingQuery)
-      .sort({ isRead: 1, createdAt: -1 }) // ยังไม่อ่านขึ้นก่อน, แล้วเรียงตามวันที่ใหม่สุด
-      .limit(5);
+    let latestMonthlyRankingNotifications = [];
+    if (shopId && shopId !== 'admin') {
+      const monthlyRankingQuery = { 
+        shopId, 
+        type: 'monthly_ranking',
+        createdAt: { $gte: oneMonthAgo } // เฉพาะข้อมูลที่สร้างภายใน 1 เดือนที่แล้ว
+      };
+      latestMonthlyRankingNotifications = await Notification.find(monthlyRankingQuery)
+        .sort({ isRead: 1, createdAt: -1 }) // ยังไม่อ่านขึ้นก่อน, แล้วเรียงตามวันที่ใหม่สุด
+        .limit(10); // เพิ่มจำนวนให้มากขึ้นเพื่อให้มีข้อมูลเพียงพอ
+    }
+    
+    // ดึงข้อมูล Ranking Evaluation notifications ล่าสุด - เฉพาะสำหรับ user ที่มี shopId และไม่เก่ากว่า 1 เดือน
+    console.log('🔍 Searching for ranking evaluation notifications with shopId:', shopId);
+    let latestRankingEvaluationNotifications = [];
+    if (shopId && shopId !== 'admin') {
+      const rankingEvaluationQuery = { 
+        shopId, 
+        type: 'ranking_evaluation',
+        createdAt: { $gte: oneMonthAgo } // เฉพาะข้อมูลที่สร้างภายใน 1 เดือนที่แล้ว
+      };
+      latestRankingEvaluationNotifications = await Notification.find(rankingEvaluationQuery)
+        .sort({ isRead: 1, createdAt: -1 }) // ยังไม่อ่านขึ้นก่อน, แล้วเรียงตามวันที่ใหม่สุด
+        .limit(10); // เพิ่มจำนวนให้มากขึ้นเพื่อให้มีข้อมูลเพียงพอ
+    }
     
     console.log('📋 Found monthly ranking notifications:', latestMonthlyRankingNotifications.length);
     for (const monthlyRankingNotification of latestMonthlyRankingNotifications) {
@@ -206,57 +261,113 @@ export const getUserNotifications = async (req, res) => {
         isRead: monthlyRankingNotification.isRead
       });
       
-      notifications.push({
-        _id: `monthly_ranking_${monthlyRankingNotification._id}`,
-        type: 'monthly_ranking',
-        title: monthlyRankingNotification.title,
-        message: monthlyRankingNotification.message,
-        status: monthlyRankingNotification.status,
-        createdAt: monthlyRankingNotification.createdAt,
-        isRead: monthlyRankingNotification.isRead,
-        details: {
-          monthlyRankingData: monthlyRankingNotification.monthlyRankingData
-        }
+      // ตรวจสอบเพิ่มเติมว่า monthly ranking notification นี้เป็นของ shopId นี้จริงหรือไม่
+      if (monthlyRankingNotification.shopId && 
+          monthlyRankingNotification.shopId.toString() === shopId.toString()) {
+        notifications.push({
+          _id: `monthly_ranking_${monthlyRankingNotification._id}`,
+          type: 'monthly_ranking',
+          title: monthlyRankingNotification.title,
+          message: monthlyRankingNotification.message,
+          status: monthlyRankingNotification.status,
+          createdAt: monthlyRankingNotification.createdAt,
+          isRead: monthlyRankingNotification.isRead,
+          details: {
+            monthlyRankingData: monthlyRankingNotification.monthlyRankingData
+          }
+        });
+      }
+    }
+    
+    console.log('📋 Found ranking evaluation notifications:', latestRankingEvaluationNotifications.length);
+    for (const rankingEvaluationNotification of latestRankingEvaluationNotifications) {
+      console.log('📋 Ranking evaluation notification:', {
+        id: rankingEvaluationNotification._id,
+        message: rankingEvaluationNotification.message,
+        createdAt: rankingEvaluationNotification.createdAt,
+        isRead: rankingEvaluationNotification.isRead
       });
+      
+      // ตรวจสอบเพิ่มเติมว่า ranking evaluation notification นี้เป็นของ shopId นี้จริงหรือไม่
+      if (rankingEvaluationNotification.shopId && 
+          rankingEvaluationNotification.shopId.toString() === shopId.toString()) {
+        notifications.push({
+          _id: `ranking_evaluation_${rankingEvaluationNotification._id}`,
+          type: 'ranking_evaluation',
+          title: rankingEvaluationNotification.title,
+          message: rankingEvaluationNotification.message,
+          status: rankingEvaluationNotification.status,
+          createdAt: rankingEvaluationNotification.createdAt,
+          isRead: rankingEvaluationNotification.isRead,
+          details: {
+            rankingEvaluationData: rankingEvaluationNotification.rankingEvaluationData
+          }
+        });
+      }
     }
 
     // ดึง admin notifications สำหรับร้านค้านี้ (ไม่แสดงให้ admin เอง)
     if (req.user.role !== 'admin') {
       console.log('🔍 Fetching admin notifications for shopId:', shopId);
-      const adminNotifications = await Notification.find({
-        type: 'admin_notification',
-        $or: [
-          { recipients: 'all' },
-          { recipients: 'active' },
-          { recipients: 'expired' },
-          { recipientShopId: shopId }
-        ]
-      }).sort({ isRead: 1, createdAt: -1 }); // ยังไม่อ่านขึ้นก่อน, แล้วเรียงตามวันที่ใหม่สุด
+      
+      // แสดงเฉพาะ admin notifications ที่เกี่ยวข้องกับ shopId นี้เท่านั้น และไม่เก่ากว่า 1 เดือน
+      let adminNotifications = [];
+      if (shopId && shopId !== 'admin') {
+        const adminNotificationQuery = {
+          type: 'admin_notification',
+          createdAt: { $gte: oneMonthAgo }, // เฉพาะข้อมูลที่สร้างภายใน 1 เดือนที่แล้ว
+          $or: [
+            { recipients: 'all' },
+            { recipients: 'active' },
+            { recipients: 'expired' },
+            { recipientShopId: shopId }
+          ]
+        };
+        
+        adminNotifications = await Notification.find(adminNotificationQuery)
+          .sort({ isRead: 1, createdAt: -1 }) // ยังไม่อ่านขึ้นก่อน, แล้วเรียงตามวันที่ใหม่สุด
+          .limit(15); // เพิ่มจำนวนให้มากขึ้นเพื่อให้มีข้อมูลเพียงพอ
+      }
+      // ถ้า user ไม่มี shopId หรือเป็น admin จะไม่แสดง admin notifications
 
       console.log('📋 Found admin notifications:', adminNotifications.length);
 
-      // เพิ่ม admin notifications เข้าไปในรายการ
+      // เพิ่ม admin notifications เข้าไปในรายการ (เฉพาะที่เกี่ยวข้องกับ shopId นี้)
       for (const adminNotification of adminNotifications) {
-        notifications.push({
-          _id: `admin_${adminNotification._id}`,
-          type: 'admin_notification',
-          title: adminNotification.title,
-          message: adminNotification.message,
-          status: 'new',
-          createdAt: adminNotification.createdAt,
-          isRead: adminNotification.isRead || false, // ใช้ค่า isRead จาก database
-          priority: adminNotification.priority, // เพิ่ม priority ตรงนี้
-          sentBy: adminNotification.sentBy,
-          details: {
+        // ตรวจสอบเพิ่มเติมว่า notification นี้เกี่ยวข้องกับ shopId นี้จริงหรือไม่
+        let shouldShow = false;
+        
+        if (adminNotification.recipients === 'all' || 
+            adminNotification.recipients === 'active' || 
+            adminNotification.recipients === 'expired') {
+          shouldShow = true;
+        } else if (adminNotification.recipientShopId && 
+                   adminNotification.recipientShopId.toString() === shopId.toString()) {
+          shouldShow = true;
+        }
+        
+        if (shouldShow) {
+          notifications.push({
+            _id: `admin_${adminNotification._id}`,
+            type: 'admin_notification',
+            title: adminNotification.title,
+            message: adminNotification.message,
+            status: 'new',
+            createdAt: adminNotification.createdAt,
+            isRead: adminNotification.isRead || false,
             priority: adminNotification.priority,
             sentBy: adminNotification.sentBy,
-            adminNotificationData: {
+            details: {
               priority: adminNotification.priority,
               sentBy: adminNotification.sentBy,
-              sentAt: adminNotification.sentAt
+              adminNotificationData: {
+                priority: adminNotification.priority,
+                sentBy: adminNotification.sentBy,
+                sentAt: adminNotification.sentAt
+              }
             }
-          }
-        });
+          });
+        }
       }
     } else {
       console.log('🔍 Admin user - skipping admin notifications');
@@ -275,7 +386,9 @@ export const getUserNotifications = async (req, res) => {
       return dateB - dateA // เรียงจากใหม่ไปเก่า
     });
 
-    console.log('📋 Total notifications found (including admin):', notifications.length);
+    console.log('📋 Total notifications found (filtered by shopId and date):', notifications.length);
+    console.log('📋 ShopId being filtered:', shopId);
+    console.log('📋 Date filter (from):', oneMonthAgo.toISOString());
     console.log('📋 Notifications (sorted by date, newest first):', notifications.map(n => ({ 
       type: n.type, 
       status: n.status, 
@@ -285,9 +398,20 @@ export const getUserNotifications = async (req, res) => {
       updatedTime: new Date(n.createdAt).toLocaleString('th-TH')
     })));
 
+    // จำกัดจำนวน notification ที่แสดงใน popup (สูงสุด 20 รายการ)
+    const limitedNotifications = notifications.slice(0, 20);
+    
+    console.log('📋 Final notifications to display:', limitedNotifications.length);
+
     res.status(200).json({
       success: true,
-      data: notifications
+      data: limitedNotifications,
+      meta: {
+        total: notifications.length,
+        displayed: limitedNotifications.length,
+        dateFilter: oneMonthAgo.toISOString(),
+        shopId: shopId
+      }
     });
   } catch (error) {
     console.error('❌ Error getting user notifications:', error);
@@ -577,8 +701,8 @@ export const createRepairNotification = async (repair, status) => {
 // Create ranking evaluation notification
 export const createRankingEvaluationNotification = async (evaluation, evaluatorName) => {
   try {
-    const title = 'แจ้งเตือนผลการประเมิน Ranking';
-    const message = `คะแนน ranking ในเดือน ${evaluation.evaluationMonth}/${evaluation.evaluationYear} ของคุณถูกประเมินแล้ว\nคะแนน: ${evaluation.totalScore}/100\nสถานะ: ${evaluation.finalStatus}\nตรวจสอบรายละเอียดในระบบได้เลยค่ะ`;
+    const title = 'มีการอัปเดตข้อมูล Ranking';
+    const message = `ข้อมูลการจัดอันดับในเดือน ${evaluation.evaluationMonth}/${evaluation.evaluationYear} ได้รับการอัปเดตแล้ว\nกรุณาเช็คข้อมูลในหน้า Ranking เพื่อดูรายละเอียด`;
     
     // คำนวณลำดับในโรงอาหารเดียวกัน
     const allEvaluations = await Evaluation.find({
@@ -612,6 +736,24 @@ export const createRankingEvaluationNotification = async (evaluation, evaluatorN
 
     await notification.save();
     console.log(`✅ Ranking evaluation notification created for shop ${evaluation.shopName}: Score ${evaluation.totalScore}, Rank ${rank}`);
+    
+    // ส่ง socket notification ให้ user
+    try {
+      if (evaluation.shopId) {
+        emitToShop(evaluation.shopId, 'user:notification:new', { 
+          type: 'ranking_evaluation', 
+          title: title, 
+          message: message, 
+          status: 'ประเมินแล้ว', 
+          relatedId: evaluation._id 
+        });
+        console.log(`🔔 Socket notification sent for ranking evaluation to shop ${evaluation.shopId}`);
+      }
+    } catch (socketError) {
+      console.error('Error sending socket notification:', socketError);
+      // ไม่ส่ง error กลับไปเพราะ notification ถูกสร้างแล้ว
+    }
+    
     return notification;
   } catch (error) {
     console.error('Error creating ranking evaluation notification:', error);

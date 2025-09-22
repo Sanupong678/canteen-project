@@ -32,7 +32,7 @@
             'unread': !notification.isRead,
             'new-notification': isNewNotification(notification.createdAt)
           }"
-          @click="markAsRead(notification._id)"
+          @click="handleNotificationClick(notification)"
         >
           <div class="notification-icon-wrapper">
             <span 
@@ -116,6 +116,30 @@ export default {
     // Mark notification as read
     const markAsRead = async (notificationId) => {
       await notificationStore.markAsRead(notificationId)
+    }
+
+    // Handle notification click with navigation
+    const handleNotificationClick = async (notification) => {
+      // Mark as read first
+      await markAsRead(notification._id)
+      
+      // Navigate based on notification type
+      if (notification.type === 'monthly_ranking' || notification.type === 'ranking_evaluation') {
+        // Navigate to ranking page
+        await navigateTo('/user/ranking')
+      } else if (notification.type === 'bill') {
+        // Navigate to bill page
+        await navigateTo('/user/bill')
+      } else if (notification.type === 'leave') {
+        // Navigate to leave page
+        await navigateTo('/user/leave')
+      } else if (notification.type === 'repair') {
+        // Navigate to repair page
+        await navigateTo('/user/repair')
+      }
+      
+      // Close dropdown
+      showDropdown.value = false
     }
 
     // Mark all as read
@@ -272,6 +296,7 @@ export default {
       toggleDropdown,
       markAsRead,
       markAllAsRead,
+      handleNotificationClick,
       getNotificationIcon,
       getNotificationIconColor,
       getNotificationTitle,

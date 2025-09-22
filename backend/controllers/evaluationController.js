@@ -29,8 +29,8 @@ export const checkNewTopics = async (req, res) => {
       });
 
       if (!evaluation) {
-        // Create new evaluation for current month
-        evaluation = new Evaluation({
+        // Create new evaluation for current month using upsert
+        const evaluationData = {
           shopId: shop._id,
           shopName: shop.name,
           canteenName: `โรงอาหาร ${shop.canteenId}`,
@@ -38,15 +38,38 @@ export const checkNewTopics = async (req, res) => {
           items: currentItems.map(item => ({
             id: item._id,
             title: item.title,
+            description: item.description || '',
+            maxScore: item.maxScore,
+            order: item.order || 0,
             status: ''
           })),
           totalScore: 100,
           finalStatus: 'ไม่ผ่าน',
           evaluationMonth: currentMonth,
           evaluationYear: currentYear,
-          evaluatedAt: new Date()
+          evaluatedAt: new Date(),
+          isActive: true
+        };
+        
+        // หา evaluation ที่มีอยู่แล้ว
+        let existingEvaluation = await Evaluation.findOne({
+          shopId: shop._id,
+          evaluationMonth: currentMonth,
+          evaluationYear: currentYear
         });
-        await evaluation.save();
+        
+        if (existingEvaluation) {
+          // อัปเดตข้อมูลที่มีอยู่แล้ว
+          existingEvaluation.items = evaluationData.items;
+          existingEvaluation.totalScore = evaluationData.totalScore;
+          existingEvaluation.finalStatus = evaluationData.finalStatus;
+          existingEvaluation.updatedAt = new Date();
+          evaluation = await existingEvaluation.save();
+        } else {
+          // สร้างใหม่
+          evaluation = new Evaluation(evaluationData);
+          evaluation = await evaluation.save();
+        }
         newEvaluationCount++;
       } else {
         // Check if evaluation has all current items

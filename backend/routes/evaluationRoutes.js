@@ -150,7 +150,7 @@ router.get('/shops', async (req, res) => {
       if (!evaluation) {
         const evaluationRound = await getCurrentEvaluationRound(shop._id, currentMonth, currentYear, currentResetId);
         
-        const newEvaluation = new Evaluation({
+        const evaluationData = {
           shopId: shop._id,
           revenue: 0,
           items: evaluationItems.map(item => ({
@@ -158,6 +158,7 @@ router.get('/shops', async (req, res) => {
             title: item.title,
             description: item.description || '',
             maxScore: item.maxScore,
+            order: item.order || 0,
             status: '',
             suggestion: '',
             driveLink: ''
@@ -171,10 +172,29 @@ router.get('/shops', async (req, res) => {
           evaluatedAt: new Date(),
           isActive: true,
           evaluationSent: false
-        });
+        };
 
-        evaluation = await newEvaluation.save();
-        console.log(`Created new evaluation for shop: ${shop.name} with resetId: ${currentResetId}`);
+        // หา evaluation ที่มีอยู่แล้ว
+        let existingEvaluation = await Evaluation.findOne({
+          shopId: shop._id,
+          evaluationMonth: currentMonth,
+          evaluationYear: currentYear,
+          resetId: currentResetId
+        });
+        
+        if (existingEvaluation) {
+          // อัปเดตข้อมูลที่มีอยู่แล้ว
+          existingEvaluation.items = evaluationData.items;
+          existingEvaluation.totalScore = evaluationData.totalScore;
+          existingEvaluation.finalStatus = evaluationData.finalStatus;
+          existingEvaluation.updatedAt = new Date();
+          evaluation = await existingEvaluation.save();
+        } else {
+          // สร้างใหม่
+          evaluation = new Evaluation(evaluationData);
+          evaluation = await evaluation.save();
+        }
+        console.log(`Created/Updated evaluation for shop: ${shop.name} with resetId: ${currentResetId}`);
       }
 
       // เพิ่มข้อมูลร้านค้าและ evaluation
@@ -685,6 +705,7 @@ router.post('/items', async (req, res) => {
         title: savedItem.title,
         description: savedItem.description || '',
         maxScore: savedItem.maxScore,
+        order: savedItem.order || 0,
         status: '' // ยังไม่มีการประเมิน
       });
       
@@ -843,15 +864,6 @@ router.post('/', async (req, res) => {
     // หารอบประเมินปัจจุบัน
     const currentRound = await getCurrentEvaluationRound(shopId, currentMonth, currentYear, currentResetId);
     
-    // ตรวจสอบว่าประเมินซ้ำในเดือนเดียวกันและรอบเดียวกันหรือไม่
-    const existingEvaluation = await Evaluation.findOne({
-      shopId,
-      evaluationMonth: currentMonth,
-      evaluationYear: currentYear,
-      evaluationRound: currentRound,
-      resetId: currentResetId
-    });
-
     // ดึงข้อมูลร้านค้า
     const shop = await Shop.findById(shopId);
     if (!shop) {
@@ -895,24 +907,44 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'คะแนนเต็มต้องมากกว่า 0' });
     }
 
+    // หา evaluation ที่มีอยู่แล้วสำหรับร้านค้านี้ในเดือนนี้
+    const existingEvaluation = await Evaluation.findOne({
+      shopId,
+      evaluationMonth: currentMonth,
+      evaluationYear: currentYear,
+      resetId: currentResetId
+    });
+    
     if (existingEvaluation) {
+      // อัปเดตข้อมูลที่มีอยู่แล้ว
       console.log('Updating existing evaluation:', existingEvaluation._id);
       
-      // อัปเดตการประเมินที่มีอยู่
       existingEvaluation.items = items;
-      existingEvaluation.totalScore = earnedScore; // เก็บคะแนนที่ได้จริง
+      existingEvaluation.totalScore = earnedScore;
       existingEvaluation.finalStatus = finalStatus;
       existingEvaluation.evaluatedAt = evaluatedAt || new Date();
-      existingEvaluation.evaluationSent = true; // ตั้งค่าเป็นส่งแล้ว
+      existingEvaluation.evaluationSent = true;
       existingEvaluation.sentAt = new Date();
       existingEvaluation.updatedAt = new Date();
       
       const updatedEvaluation = await existingEvaluation.save();
       console.log('Updated evaluation:', updatedEvaluation);
-
+      
+      // สร้าง notification เมื่อ admin อัปเดตการประเมิน ranking
+      try {
+        const evaluatorName = req.user?.name || req.user?.username || 'Admin';
+        await createRankingEvaluationNotification(updatedEvaluation, evaluatorName);
+        console.log(`📊 Ranking evaluation notification sent for shop ${shop.name}`);
+      } catch (notificationError) {
+        console.error('Error creating ranking evaluation notification:', notificationError);
+        // ไม่ส่ง error กลับไปเพราะการประเมินสำเร็จแล้ว
+      }
+      
       return res.status(200).json(updatedEvaluation);
     } else {
-      // สร้างการประเมินใหม่
+      // ถ้าไม่มี evaluation สำหรับร้านค้านี้ในเดือนนี้ ให้สร้างใหม่
+      console.log('Creating new evaluation for shop:', shopId);
+      
       const evaluationData = {
         shopId,
         revenue: shop.revenue || 0,
@@ -924,16 +956,14 @@ router.post('/', async (req, res) => {
         evaluationRound: currentRound,
         resetId: currentResetId,
         evaluatedAt: evaluatedAt || new Date(),
-        evaluationSent: true, // ตั้งค่าเป็นส่งแล้ว
-        sentAt: new Date()
+        evaluationSent: true,
+        sentAt: new Date(),
+        isActive: true
       };
       
-      console.log('Creating new evaluation with data:', evaluationData);
-      
-      const evaluation = new Evaluation(evaluationData);
-    
-      const savedEvaluation = await evaluation.save();
-      console.log('Saved evaluation:', savedEvaluation);
+      const newEvaluation = new Evaluation(evaluationData);
+      const savedEvaluation = await newEvaluation.save();
+      console.log('Created new evaluation:', savedEvaluation);
       
       // สร้าง notification เมื่อ admin ประเมิน ranking
       try {
@@ -1402,7 +1432,9 @@ router.get('/details', async (req, res) => {
       });
     }
     
-    // Transform data
+    // Transform data และเรียงลำดับ items ตาม order
+    const sortedItems = (evaluation.items || []).sort((a, b) => (a.order || 0) - (b.order || 0));
+    
     const transformedEvaluation = {
       _id: evaluation._id,
       shopId: evaluation.shopId,
@@ -1411,7 +1443,7 @@ router.get('/details', async (req, res) => {
       canteenName: getCanteenName(evaluation.shopId?.canteenId),
       type: evaluation.shopId?.type,
       revenue: evaluation.revenue || 0,
-      items: evaluation.items || [],
+      items: sortedItems,
       totalScore: evaluation.totalScore || 0,
       finalStatus: evaluation.finalStatus || 'รอดำเนินการ',
       evaluationMonth: evaluation.evaluationMonth,
@@ -1451,7 +1483,9 @@ router.get('/details/:evaluationId', async (req, res) => {
       });
     }
     
-    // Transform data
+    // Transform data และเรียงลำดับ items ตาม order
+    const sortedItems = (evaluation.items || []).sort((a, b) => (a.order || 0) - (b.order || 0));
+    
     const transformedEvaluation = {
       _id: evaluation._id,
       shopId: evaluation.shopId,
@@ -1460,7 +1494,7 @@ router.get('/details/:evaluationId', async (req, res) => {
       canteenName: getCanteenName(evaluation.shopId?.canteenId),
       type: evaluation.shopId?.type,
       revenue: evaluation.revenue || 0,
-      items: evaluation.items || [],
+      items: sortedItems,
       totalScore: evaluation.totalScore || 0,
       finalStatus: evaluation.finalStatus || 'รอดำเนินการ',
       evaluationMonth: evaluation.evaluationMonth,
@@ -1516,7 +1550,9 @@ router.get('/details/:evaluationId/round/:round', async (req, res) => {
       });
     }
     
-    // Transform data
+    // Transform data และเรียงลำดับ items ตาม order
+    const sortedItems = (evaluation.items || []).sort((a, b) => (a.order || 0) - (b.order || 0));
+    
     const transformedEvaluation = {
       _id: evaluation._id,
       shopId: evaluation.shopId,
@@ -1525,7 +1561,7 @@ router.get('/details/:evaluationId/round/:round', async (req, res) => {
       canteenName: getCanteenName(evaluation.shopId?.canteenId),
       type: evaluation.shopId?.type,
       revenue: evaluation.revenue || 0,
-      items: evaluation.items || [],
+      items: sortedItems,
       totalScore: evaluation.totalScore || 0,
       finalStatus: evaluation.finalStatus || 'รอดำเนินการ',
       evaluationMonth: evaluation.evaluationMonth,

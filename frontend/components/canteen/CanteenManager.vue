@@ -49,7 +49,6 @@
                 <div class="header-item">การแจ้งเตือน</div>
                 <div class="header-item">รายละเอียด</div>
                 <div class="header-item">แก้ไข</div>
-                <div class="header-item">เปลี่ยนรหัสผ่าน</div>
               </div>
 
               <div class="shop-row" v-for="(shop, index) in filteredActiveShops" :key="shop.id">
@@ -62,25 +61,21 @@
                   </span>
                 </div>
                 <div class="row-item">
-                  <span class="notification-link" @click="handleShowNotification(shop)">แจ้งเตือน</span>
+                  <button class="action-btn notification-btn" @click="handleShowNotification(shop)">
+                    <i class="fas fa-bell"></i>
+                    <span>แจ้งเตือน</span>
+                  </button>
                 </div>
                 <div class="row-item">
                   <button class="action-btn details-btn" @click="handleViewDetails(shop)">
                     <i class="fas fa-info-circle"></i>
-                    <span>รายละเอียด
-                    </span>
+                    <span>รายละเอียด</span>
                   </button>
                 </div>
                 <div class="row-item">
                   <button class="action-btn edit-btn" @click="handleEditShop(shop)">
                     <i class="fas fa-edit"></i>
                     <span>แก้ไข</span>
-                  </button>
-                </div>
-                <div class="row-item">
-                  <button class="action-btn qr-btn" @click="handleGenerateCredentials(shop)">
-                    <i class="fas fa-qrcode"></i>
-                    <span>เปลี่ยนรหัส</span>
                   </button>
                 </div>
               </div>
@@ -101,7 +96,6 @@
                 <div class="header-item">การแจ้งเตือน</div>
                 <div class="header-item">รายละเอียด</div>
                 <div class="header-item">แก้ไข</div>
-                <div class="header-item">เปลี่ยนรหัสผ่าน</div>
               </div>
 
               <div class="shop-row expired" v-for="(shop, index) in filteredExpiredShops" :key="shop.id">
@@ -114,7 +108,10 @@
                   </span>
                 </div>
                 <div class="row-item">
-                  <span class="notification-link" @click="handleExpiredNotification(shop)">แจ้งเตือน</span>
+                  <button class="action-btn notification-btn" @click="handleExpiredNotification(shop)">
+                    <i class="fas fa-bell"></i>
+                    <span>แจ้งเตือน</span>
+                  </button>
                 </div>
                 <div class="row-item">
                   <button class="action-btn details-btn" @click="handleViewDetails(shop)">
@@ -126,12 +123,6 @@
                   <button class="action-btn edit-btn" @click="handleEditShop(shop)">
                     <i class="fas fa-edit"></i>
                     <span>แก้ไข</span>
-                  </button>
-                </div>
-                <div class="row-item">
-                  <button class="action-btn qr-btn" @click="handleGenerateCredentials(shop)">
-                    <i class="fas fa-qrcode"></i>
-                    <span>เปลี่ยนรหัส</span>
                   </button>
                 </div>
               </div>
@@ -180,7 +171,9 @@
       :shops="shops"
       :selected-shop="selectedShop"
       @close="showNotificationModal = false"
-      @send-notification="handleSendNotification"
+      @submit="handleSendNotification"
+      @success="handleNotificationSuccess"
+      @error="handleNotificationError"
     />
   </div>
 </template>
@@ -458,16 +451,36 @@ export default {
       try {
         console.log('Sending notification:', notificationData)
         this.showNotificationModal = false
-        this.handleShowNotification({
-          type: 'success',
-          message: 'ส่งการแจ้งเตือนเรียบร้อยแล้ว'
-        })
       } catch (error) {
         console.error('Error sending notification:', error)
-        this.handleShowNotification({
-          type: 'error',
-          message: 'ไม่สามารถส่งการแจ้งเตือนได้'
-        })
+      }
+    },
+    handleNotificationSuccess(successData) {
+      console.log('Notification sent successfully:', successData.message)
+      // แสดงข้อความสำเร็จ
+      this.showNotification({
+        type: 'success',
+        message: successData.message
+      })
+    },
+    handleNotificationError(errorData) {
+      console.error('Notification error:', errorData.message)
+      // แสดงข้อความผิดพลาด
+      this.showNotification({
+        type: 'error',
+        message: errorData.message
+      })
+    },
+    showNotification(notification) {
+      // แสดงข้อความแจ้งเตือน (สามารถใช้ toast library หรือ alert)
+      if (this.$toast) {
+        if (notification.type === 'success') {
+          this.$toast.success(notification.message)
+        } else {
+          this.$toast.error(notification.message)
+        }
+      } else {
+        alert(notification.message)
       }
     },
     startRealtimeUpdate() {
@@ -645,7 +658,7 @@ h2 {
 
 .table-header {
   display: grid;
-  grid-template-columns: 0.5fr 2fr 1fr 1.5fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: 0.5fr 2fr 1fr 1.5fr 1fr 1fr 1fr;
   padding: 15px;
   background-color: #f8f9fa;
   font-weight: bold;
@@ -654,7 +667,7 @@ h2 {
 
 .shop-row {
   display: grid;
-  grid-template-columns: 0.5fr 2fr 1fr 1.5fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: 0.5fr 2fr 1fr 1.5fr 1fr 1fr 1fr;
   padding: 15px;
   align-items: center;
   border-bottom: 1px solid #e9ecef;
@@ -714,14 +727,9 @@ h2 {
   margin-right: 6px;
 }
 
-.notification-link {
-  color: #1976d2;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.notification-link:hover {
-  color: #1565c0;
+.notification-btn {
+  background-color: #f3e5f5;
+  color: #7b1fa2;
 }
 
 .action-btn {
@@ -735,7 +743,7 @@ h2 {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  width: 100px;
+  width: 120px;
   margin: 0 auto;
 }
 
@@ -753,10 +761,6 @@ h2 {
   color: #f57c00;
 }
 
-.qr-btn {
-  background-color: #e8f5e9;
-  color: #388e3c;
-}
 
 .action-btn:hover {
   opacity: 0.9;
@@ -793,7 +797,7 @@ h2 {
 
   .table-header,
   .shop-row {
-    grid-template-columns: 40px 2fr 1fr 1.5fr 1fr 1fr 1fr 1fr;
+    grid-template-columns: 40px 2fr 1fr 1.5fr 1fr 1fr 1fr;
     padding: 8px 12px;
     font-size: 0.9rem;
   }

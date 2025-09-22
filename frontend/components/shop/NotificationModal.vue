@@ -12,10 +12,9 @@
           <div class="form-group">
             <label>ผู้รับการแจ้งเตือน:</label>
             <select v-model="formData.recipients" class="form-control">
-              <option value="all">ทุกร้านค้า</option>
-              <option value="active">ร้านค้าที่มีสัญญา</option>
-              <option value="expired">ร้านค้าที่หมดสัญญา</option>
-              <option v-if="selectedShop" :value="selectedShop.id">{{ selectedShop.name }}</option>
+              <option v-if="selectedShop" :value="selectedShop._id">{{ selectedShop.name }}</option>
+              <option v-if="selectedShop" :value="`canteen_${selectedShop.canteenId}`">ร้านค้าเฉพาะโรงอาหาร ({{ getCanteenName(selectedShop.canteenId) }})</option>
+              <option value="all">ทุกร้าน</option>
             </select>
           </div>
 
@@ -86,6 +85,20 @@ export default {
     }
   },
   methods: {
+    getCanteenName(canteenId) {
+      const canteenMap = {
+        1: 'C5',
+        2: 'D1',
+        3: 'Dormitory',
+        4: 'E1',
+        5: 'E2',
+        6: 'Epark',
+        7: 'Msquare',
+        8: 'Ruemrim',
+        9: 'S2'
+      };
+      return canteenMap[canteenId] || 'ไม่ระบุ';
+    },
     async handleSubmit() {
       if (this.isFormValid) {
         try {
@@ -93,7 +106,8 @@ export default {
           
           const requestData = {
             recipients: this.formData.recipients,
-            recipientShopId: this.formData.recipients !== 'all' && this.formData.recipients !== 'active' && this.formData.recipients !== 'expired' ? this.formData.recipients : null,
+            recipientShopId: this.formData.recipients !== 'all' && !this.formData.recipients.startsWith('canteen_') ? this.formData.recipients : null,
+            recipientCanteenId: this.formData.recipients.startsWith('canteen_') ? this.formData.recipients.replace('canteen_', '') : null,
             priority: this.formData.priority,
             title: this.formData.title,
             message: this.formData.message
@@ -105,13 +119,14 @@ export default {
           const response = await this.$axios.post('/api/admin-notifications/send', requestData);
 
           if (response.data.success) {
+            // แสดงข้อความสำเร็จก่อน
+            this.$emit('success', {
+              message: 'ส่งข้อความแล้ว'
+            });
+            
+            // ปิด modal และส่งข้อมูล
             this.$emit('submit', { ...this.formData });
             this.$emit('close');
-            
-            // แสดงข้อความสำเร็จ
-            this.$emit('success', {
-              message: `ส่งการแจ้งเตือนสำเร็จ (${response.data.data.deliveredTo} ร้านค้า)`
-            });
           } else {
             throw new Error(response.data.message || 'ไม่สามารถส่งการแจ้งเตือนได้');
           }

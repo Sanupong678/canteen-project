@@ -1,12 +1,79 @@
 import Shop from '../models/shopModel.js';
 import Bill from '../models/billModel.js';
+import Canteen from '../models/canteenModel.js';
+
+// Mapping table สำหรับชื่อย่อโรงอาหาร
+const canteenAbbreviations = {
+  'โรงอาหาร C5': 'C5',
+  'โรงอาหาร D1': 'D1', 
+  'โรงอาหาร Dormity': 'D',
+  'โรงอาหาร E1': 'E1',
+  'โรงอาหาร E2': 'E2',
+  'โรงอาหาร Epark': 'EP',
+  'โรงอาหาร Msquare': 'MQ',
+  'โรงอาหาร RuemRim': 'RRN',
+  'โรงอาหาร S2': 'S2'
+};
+
+// Function สำหรับสร้าง customId ใหม่
+async function generateNewCustomId(canteenId) {
+  try {
+    // ดึงข้อมูลโรงอาหาร
+    const canteen = await Canteen.findOne({ canteenId });
+    if (!canteen) {
+      throw new Error(`ไม่พบโรงอาหารที่มี canteenId: ${canteenId}`);
+    }
+    
+    const canteenName = canteen.name;
+    const abbreviation = canteenAbbreviations[canteenName];
+    
+    if (!abbreviation) {
+      throw new Error(`ไม่พบชื่อย่อสำหรับโรงอาหาร: ${canteenName}`);
+    }
+    
+    // หาเลขลำดับถัดไป
+    let nextNumber = 1;
+    const pattern = new RegExp(`^${abbreviation}(\\d{3})$`);
+    
+    // หาเลขสูงสุดที่มีอยู่แล้ว
+    const existingShops = await Shop.find({
+      customId: { $regex: pattern }
+    });
+    
+    if (existingShops.length > 0) {
+      const existingNumbers = existingShops
+        .map(shop => {
+          const match = shop.customId.match(pattern);
+          return match ? parseInt(match[1]) : 0;
+        })
+        .sort((a, b) => b - a);
+      
+      nextNumber = existingNumbers[0] + 1;
+    }
+    
+    // สร้าง customId ใหม่ (3 หลัก)
+    return `${abbreviation}${nextNumber.toString().padStart(3, '0')}`;
+  } catch (error) {
+    console.error('Error generating customId:', error);
+    throw error;
+  }
+}
 
 // Create shop and bill
 export const createShop = async (req, res) => {
   try {
+    // สร้าง customId ใหม่ตามรูปแบบที่กำหนด
+    const newCustomId = await generateNewCustomId(req.body.canteenId);
+    
     // 1. Create shop
-    const shop = new Shop(req.body);
+    const shopData = {
+      ...req.body,
+      customId: newCustomId
+    };
+    const shop = new Shop(shopData);
     await shop.save();
+    
+    console.log(`✅ สร้างร้านค้าใหม่: ${shop.name} (${newCustomId})`);
 
     // 2. Create water bill
     const waterBill = new Bill({
