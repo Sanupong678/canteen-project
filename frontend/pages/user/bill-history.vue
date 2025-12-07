@@ -8,6 +8,10 @@
             <p class="page-subtitle">รายการบิลที่ชำระเสร็จสิ้นแล้ว</p>
           </div>
           <div class="header-actions">
+            <select id="paymentTypeSelect" v-model="selectedType" class="header-select-type">
+              <option value="water">ค่าน้ำ</option>
+              <option value="electricity">ค่าไฟ</option>
+            </select>
             <router-link to="/user/bill" class="back-button">
               <i class="fas fa-arrow-left"></i>
               กลับไปหน้ารายการปัจจุบัน
@@ -16,15 +20,6 @@
         </div>
 
         <div class="bill-container">
-          <!-- Payment Type Buttons -->
-          <div class="payment-type-dropdown">
-            <select id="paymentTypeSelect" v-model="selectedType" class="select-type">
-              <option value="water">ค่าน้ำ</option>
-              <option value="electricity">ค่าไฟ</option>
-              <option value="utilities">รวม (ค่าน้ำ+ค่าไฟ)</option>
-            </select>
-            <label for="paymentTypeSelect" class="select-label">เลือกประเภท</label>
-          </div>
 
           <!-- Bill List -->
           <div class="bills-list">
@@ -145,7 +140,6 @@ export default {
     const getBillTypeText = (type) => {
       if (type === 'water') return 'ค่าน้ำ'
       if (type === 'electricity') return 'ค่าไฟ'
-      if (type === 'utilities') return 'รวม (ค่าน้ำ+ค่าไฟ)'
       return type
     }
 
@@ -286,6 +280,33 @@ export default {
 .header-actions {
   display: flex;
   gap: 12px;
+  align-items: center;
+}
+
+.header-select-type {
+  padding: 12px 20px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  min-width: 150px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  transition: all 0.3s ease;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
+}
+
+.header-select-type:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+}
+
+.header-select-type option {
+  background: #27ae60;
+  color: white;
 }
 
 .back-button {
@@ -299,6 +320,7 @@ export default {
   display: flex;
   align-items: center;
   gap: 8px;
+  backdrop-filter: blur(10px);
 }
 
 .back-button:hover {
@@ -310,43 +332,6 @@ export default {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0;
-}
-
-.payment-type-dropdown {
-  background: #ffffff;
-  padding: 20px;
-  border-radius: 12px;
-  margin-bottom: 24px;
-  box-shadow: 0 4px 20px rgba(39, 174, 96, 0.1);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-
-.select-type {
-  padding: 12px 24px;
-  font-size: 16px;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  min-width: 200px;
-  cursor: pointer;
-  background: white;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(39, 174, 96, 0.1);
-}
-
-.select-type:focus {
-  outline: none;
-  border-color: #27ae60;
-  box-shadow: 0 0 0 3px rgba(39, 174, 96, 0.1);
-}
-
-.select-label {
-  font-size: 14px;
-  color: #4a5568;
-  font-weight: 600;
-  user-select: none;
 }
 
 .bills-list {
@@ -586,6 +571,18 @@ export default {
 
   .header-actions {
     width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .header-select-type {
+    width: 100%;
+    max-width: 200px;
+  }
+
+  .back-button {
+    width: 100%;
+    max-width: 200px;
     justify-content: center;
   }
 

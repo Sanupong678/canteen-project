@@ -1,9 +1,21 @@
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
 
+console.log('🔄 Loading socket.io heartbeat module');
+
 let ioInstance = null;
 
-const getJwtSecret = () => process.env.JWT_SECRET || 'your-super-secret-jwt-key-2024';
+const HEARTBEAT_INTERVAL_MS = 20000;
+const HEARTBEAT_TIMEOUT_MS = 60000;
+
+// JWT_SECRET with fallback for development mode
+const getJwtSecret = () => {
+  const secret = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? null : 'your-super-secret-jwt-key-2024-dev-only');
+  if (!secret) {
+    throw new Error('JWT_SECRET is required in production mode');
+  }
+  return secret;
+};
 
 export const initSocket = (server) => {
   if (ioInstance) return ioInstance;
@@ -18,9 +30,19 @@ export const initSocket = (server) => {
   const io = new Server(server, {
     cors: { origin: corsOrigins, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], credentials: true },
     transports: ['websocket', 'polling'],
-    pingInterval: 25000,
-    pingTimeout: 60000,
-    allowEIO3: false
+    pingInterval: 25000, // ส่ง ping ทุก 25 วินาที
+    pingTimeout: 60000, // รอ 60 วินาทีก่อนตัดว่า disconnect
+    allowEIO3: false,
+    // เพิ่ม options สำหรับความเสถียร
+    connectionStateRecovery: {
+      // เปิดใช้งาน connection state recovery เพื่อ restore session หลังจาก reconnect
+      maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes
+      skipMiddlewares: true
+    },
+    // เพิ่ม timeout settings
+    connectTimeout: 60000, // 60 seconds
+    // เพิ่ม maxHttpBufferSize สำหรับ large payloads
+    maxHttpBufferSize: 1e8 // 100MB
   });
 
   io.use((socket, next) => {
@@ -54,8 +76,40 @@ export const initSocket = (server) => {
     const shopId = socket.user?.shopId || 'none';
     console.log(`🔌 Socket connected: ${id} role=${role} shopId=${shopId}`);
 
+    // เพิ่ม error handler
+    socket.on('error', (error) => {
+      console.error(`❌ Socket error for ${id}:`, error);
+    });
+
+    // Heartbeat watchdog สำหรับ socket.io v4 (ไม่ใช้ transport socket โดยตรง)
+    const scheduleTimeout = () => setTimeout(() => {
+      console.warn(`⚠️ Socket timed out (no heartbeat): ${id}`);
+      socket.disconnect(true);
+    }, HEARTBEAT_TIMEOUT_MS);
+
+    let heartbeatTimer = scheduleTimeout();
+    const resetHeartbeat = () => {
+      clearTimeout(heartbeatTimer);
+      heartbeatTimer = scheduleTimeout();
+    };
+
+    const heartbeatInterval = setInterval(() => {
+      socket.emit('ping-check');
+    }, HEARTBEAT_INTERVAL_MS);
+
+    // รองรับทั้ง built-in pong และ custom pong-check
+    socket.on('pong', resetHeartbeat);
+    socket.on('pong-check', resetHeartbeat);
+
+    // optional: mirror ping events if clientส่งมาเอง
+    socket.on('ping-check', () => {
+      socket.emit('pong-check');
+    });
+
     socket.on('disconnect', (reason) => {
       console.log(`🔌 Socket disconnected: ${id}, reason=${reason}`);
+      clearTimeout(heartbeatTimer);
+      clearInterval(heartbeatInterval);
     });
   });
 

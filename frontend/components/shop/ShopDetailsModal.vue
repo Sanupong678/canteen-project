@@ -1,80 +1,85 @@
 <template>
-  <div class="modal-overlay" @click="$emit('close')">
-    <div class="modal-content" @click.stop>
-      <div class="modal-header">
-        <h3>รายละเอียดร้านค้า</h3>
-        <button class="close-btn" @click="$emit('close')">
+  <Teleport to="body">
+    <div class="modal-overlay" @click="$emit('close')">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>รายละเอียดร้านค้า</h3>
+          <button class="close-btn" @click="$emit('close')">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div class="shop-image-container" @click="showImagePopup = true">
+            <img :src="resolveImage(shop.image)" alt="รูปภาพร้านค้า" class="shop-image">
+          </div>
+          <div class="shop-info">
+            <div class="detail-item">
+              <label>รหัสร้าน:</label>
+              <span>{{ shop.customId || 'ไม่ระบุ' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>ชื่อร้าน:</label>
+              <span>{{ shop.name }}</span>
+            </div>
+            <div class="detail-item">
+              <label>ประเภท:</label>
+              <span>{{ getShopTypeLabel(shop.type) }}</span>
+            </div>
+            <div class="detail-item">
+              <label>ตำแหน่ง:</label>
+              <span>{{ shop.location }}</span>
+            </div>
+            <div class="detail-item">
+              <label>รายละเอียด:</label>
+              <span>{{ shop.description }}</span>
+            </div>
+            <div class="detail-item">
+              <label>โรงอาหาร:</label>
+              <span>{{ getCanteenName(shop.canteenId) }}</span>
+            </div>
+            <div class="detail-item">
+              <label>วันที่เริ่มสัญญา:</label>
+              <span>{{ formatDate(shop.contractStartDate) || 'ไม่ระบุ' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>วันที่สิ้นสุดสัญญา:</label>
+              <span class="detail-value">{{ formatDate(shop.contractEndDate) }}</span>
+            </div>
+            <div class="detail-item">
+              <label>สถานะสัญญา:</label>
+              <span :class="{ 'expired': isExpired(shop) }">
+                <i :class="isExpired(shop) ? 'fas fa-exclamation-circle' : 'fas fa-check-circle'"></i>
+                {{ isExpired(shop) ? 'หมดอายุ' : 'มีผล' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="close-btn" @click="$emit('close')">ปิด</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Image Popup -->
+    <div v-if="showImagePopup" class="image-popup" @click="showImagePopup = false">
+      <div class="image-popup-content" @click.stop>
+        <button class="image-popup-close-btn" @click="showImagePopup = false">
           <i class="fas fa-times"></i>
         </button>
-      </div>
-
-      <div class="modal-body">
-        <div class="shop-image-container" @click="showImagePopup = true">
-          <img :src="shop.image || '/images/default-shop.jpg'" alt="รูปภาพร้านค้า" class="shop-image">
-        </div>
-        <div class="shop-info">
-          <div class="detail-item">
-            <label>รหัสร้าน:</label>
-            <span>{{ shop.customId || 'ไม่ระบุ' }}</span>
-          </div>
-          <div class="detail-item">
-            <label>ชื่อร้าน:</label>
-            <span>{{ shop.name }}</span>
-          </div>
-          <div class="detail-item">
-            <label>ประเภท:</label>
-            <span>{{ getShopTypeLabel(shop.type) }}</span>
-          </div>
-          <div class="detail-item">
-            <label>ตำแหน่ง:</label>
-            <span>{{ shop.location }}</span>
-          </div>
-          <div class="detail-item">
-            <label>รายละเอียด:</label>
-            <span>{{ shop.description }}</span>
-          </div>
-          <div class="detail-item">
-            <label>โรงอาหาร:</label>
-            <span>{{ getCanteenName(shop.canteenId) }}</span>
-          </div>
-          <div class="detail-item">
-            <label>วันที่เริ่มสัญญา:</label>
-            <span>{{ formatDate(shop.contractStartDate) || 'ไม่ระบุ' }}</span>
-          </div>
-          <div class="detail-item">
-            <label>วันที่สิ้นสุดสัญญา:</label>
-            <span class="detail-value">{{ formatDate(shop.contractEndDate) }}</span>
-          </div>
-          <div class="detail-item">
-            <label>สถานะสัญญา:</label>
-            <span :class="{ 'expired': isExpired(shop) }">
-              <i :class="isExpired(shop) ? 'fas fa-exclamation-circle' : 'fas fa-check-circle'"></i>
-              {{ isExpired(shop) ? 'หมดอายุ' : 'มีผล' }}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <button class="close-btn" @click="$emit('close')">ปิด</button>
+        <img :src="resolveImage(shop.image)" :alt="shop.name || 'รูปภาพร้านค้า'" class="popup-image">
       </div>
     </div>
-  </div>
-
-  <!-- Image Popup -->
-  <div v-if="showImagePopup" class="image-popup" @click="showImagePopup = false">
-    <div class="image-popup-content">
-      <button class="close-btn" @click="showImagePopup = false">
-        <i class="fas fa-times"></i>
-      </button>
-      <img :src="shop.image" :alt="shop.name" class="popup-image">
-    </div>
-  </div>
+  </Teleport>
 </template>
 
 <script>
+import { resolveShopImageSrc } from '../../utils/imageUtils'
+
 export default {
   name: 'ShopDetailsModal',
+  emits: ['close'],
   props: {
     shop: {
       type: Object,
@@ -87,6 +92,9 @@ export default {
     }
   },
   methods: {
+    resolveImage(imagePath) {
+      return resolveShopImageSrc(imagePath)
+    },
     getShopTypeLabel(type) {
       const types = {
         food: 'อาหาร',
@@ -220,6 +228,9 @@ export default {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   cursor: pointer;
   transition: transform 0.2s;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .shop-image-container:hover {
@@ -280,24 +291,50 @@ export default {
   justify-content: center;
   align-items: center;
   z-index: 2000;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .image-popup-content {
   position: relative;
   max-width: 90%;
   max-height: 90vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-.image-popup .close-btn {
+.image-popup-close-btn {
   position: absolute;
-  top: -40px;
+  top: -50px;
   right: 0;
-  background: none;
+  background: rgba(255, 255, 255, 0.2);
   border: none;
   color: white;
-  font-size: 24px;
+  font-size: 28px;
   cursor: pointer;
-  padding: 5px;
+  padding: 10px 15px;
+  border-radius: 50%;
+  width: 45px;
+  height: 45px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  z-index: 2001;
+}
+
+.image-popup-close-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
 }
 
 .popup-image {
@@ -305,7 +342,19 @@ export default {
   max-height: 90vh;
   object-fit: contain;
   border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  animation: zoomIn 0.3s ease;
+}
+
+@keyframes zoomIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .modal-close-btn {

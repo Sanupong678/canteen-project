@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import Payment from '../models/Payment.js';
-import Shop from '../models/Shop.js';
+import Shop from '../models/shopModel.js';
 import { sendPaymentReminderEmail } from '../config/emailConfig.js';
 
 // Run at 9:00 AM on the 1st day of every month

@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { getCanteens, createCanteen, updateCanteen, deleteCanteen } from '../controllers/canteenController.js';
 import Canteen from '../models/canteenModel.js';
-import Shop from '../models/Shop.js';
+import Shop from '../models/shopModel.js';
 
 const router = express.Router();
 

@@ -3,7 +3,7 @@ import EvaluationItem from '../models/EvaluationItem.js';
 import Evaluation from '../models/Evaluation.js';
 import EvaluationControl from '../models/EvaluationControl.js';
 import ResetControl from '../models/ResetControl.js';
-import Shop from '../models/Shop.js';
+import Shop from '../models/shopModel.js';
 import { checkNewTopics, resetCurrentMonthEvaluations } from '../controllers/evaluationController.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
 import { createRankingEvaluationNotification } from '../controllers/notificationController.js';
@@ -120,31 +120,46 @@ router.get('/shops', async (req, res) => {
       });
     }
 
-    // ดึงร้านค้าที่ยังไม่หมดสัญญา
+    // ดึงร้านค้าที่ยังไม่หมดสัญญา (เลือกเฉพาะ fields ที่จำเป็น)
     const activeShops = await Shop.find({
       contractEndDate: { $gte: currentDate },
       'credentials.status': 'active'
-    }).sort({ name: 1 });
+    })
+      .select('_id customId name type canteenId location contractEndDate')
+      .sort({ name: 1 })
+      .lean();
 
     console.log(`Found ${activeShops.length} active shops`);
 
     // ดึงหัวข้อการประเมินปัจจุบัน
-    const evaluationItems = await EvaluationItem.find().sort({ order: 1 });
+    const evaluationItems = await EvaluationItem.find().sort({ order: 1 }).lean();
     
     // ดึง resetId ปัจจุบัน
     const currentResetId = await getCurrentResetId();
     
+    // ✅ ใช้ batch query แทน N+1 query - query evaluations ทั้งหมดในครั้งเดียว
+    const shopIds = activeShops.map(shop => shop._id);
+    const existingEvaluations = await Evaluation.find({
+      shopId: { $in: shopIds },
+      evaluationMonth: currentMonth,
+      evaluationYear: currentYear,
+      resetId: currentResetId
+    }).lean();
+    
+    // สร้าง Map เพื่อ lookup เร็ว
+    const evaluationsByShop = new Map();
+    existingEvaluations.forEach(evalItem => {
+      const shopIdStr = evalItem.shopId.toString();
+      evaluationsByShop.set(shopIdStr, evalItem);
+    });
+    
     // สร้าง evaluation records สำหรับร้านค้าที่ยังไม่มี
     const shopsWithEvaluations = [];
+    const evaluationsToCreate = [];
     
     for (const shop of activeShops) {
-      // ตรวจสอบว่ามีการประเมินสำหรับเดือนนี้และ resetId นี้หรือไม่
-      let evaluation = await Evaluation.findOne({
-        shopId: shop._id,
-        evaluationMonth: currentMonth,
-        evaluationYear: currentYear,
-        resetId: currentResetId
-      });
+      const shopIdStr = shop._id.toString();
+      let evaluation = evaluationsByShop.get(shopIdStr);
 
       // ถ้าไม่มี ให้สร้างใหม่
       if (!evaluation) {
@@ -174,27 +189,10 @@ router.get('/shops', async (req, res) => {
           evaluationSent: false
         };
 
-        // หา evaluation ที่มีอยู่แล้ว
-        let existingEvaluation = await Evaluation.findOne({
-          shopId: shop._id,
-          evaluationMonth: currentMonth,
-          evaluationYear: currentYear,
-          resetId: currentResetId
-        });
-        
-        if (existingEvaluation) {
-          // อัปเดตข้อมูลที่มีอยู่แล้ว
-          existingEvaluation.items = evaluationData.items;
-          existingEvaluation.totalScore = evaluationData.totalScore;
-          existingEvaluation.finalStatus = evaluationData.finalStatus;
-          existingEvaluation.updatedAt = new Date();
-          evaluation = await existingEvaluation.save();
-        } else {
-          // สร้างใหม่
-          evaluation = new Evaluation(evaluationData);
-          evaluation = await evaluation.save();
-        }
-        console.log(`Created/Updated evaluation for shop: ${shop.name} with resetId: ${currentResetId}`);
+        // เพิ่มเข้า array เพื่อสร้างทีเดียว
+        evaluationsToCreate.push(evaluationData);
+        evaluation = evaluationData; // ใช้ข้อมูลชั่วคราว
+        console.log(`Will create evaluation for shop: ${shop.name} with resetId: ${currentResetId}`);
       }
 
       // เพิ่มข้อมูลร้านค้าและ evaluation
@@ -207,16 +205,41 @@ router.get('/shops', async (req, res) => {
         canteenName: getCanteenName(shop.canteenId),
         location: shop.location,
         contractEndDate: shop.contractEndDate,
-        evaluationSent: evaluation.evaluationSent,
+        evaluationSent: evaluation.evaluationSent || false,
         evaluation: {
-          _id: evaluation._id,
-          totalScore: evaluation.totalScore,
-          finalStatus: evaluation.finalStatus,
-          evaluationMonth: evaluation.evaluationMonth,
-          evaluationYear: evaluation.evaluationYear,
-          evaluatedAt: evaluation.evaluatedAt,
-          evaluationSent: evaluation.evaluationSent,
-          items: evaluation.items
+          _id: evaluation._id || null,
+          totalScore: evaluation.totalScore || 0,
+          finalStatus: evaluation.finalStatus || 'ไม่ผ่าน',
+          evaluationMonth: evaluation.evaluationMonth || currentMonth,
+          evaluationYear: evaluation.evaluationYear || currentYear,
+          evaluatedAt: evaluation.evaluatedAt || new Date(),
+          evaluationSent: evaluation.evaluationSent || false,
+          items: evaluation.items || []
+        }
+      });
+    }
+    
+    // สร้าง evaluations ทั้งหมดในครั้งเดียว (batch insert)
+    if (evaluationsToCreate.length > 0) {
+      await Evaluation.insertMany(evaluationsToCreate);
+      console.log(`Created ${evaluationsToCreate.length} new evaluations`);
+      
+      // อัปเดตข้อมูลใน shopsWithEvaluations สำหรับ evaluations ที่เพิ่งสร้าง
+      const newlyCreatedEvaluations = await Evaluation.find({
+        shopId: { $in: shopIds },
+        evaluationMonth: currentMonth,
+        evaluationYear: currentYear,
+        resetId: currentResetId
+      }).lean();
+      
+      // อัปเดต evaluation._id ใน shopsWithEvaluations
+      newlyCreatedEvaluations.forEach(evalItem => {
+        const shopIndex = shopsWithEvaluations.findIndex(
+          shop => shop._id.toString() === evalItem.shopId.toString()
+        );
+        if (shopIndex !== -1 && !shopsWithEvaluations[shopIndex].evaluation._id) {
+          shopsWithEvaluations[shopIndex].evaluation._id = evalItem._id;
+          shopsWithEvaluations[shopIndex].evaluation.evaluatedAt = evalItem.evaluatedAt;
         }
       });
     }
@@ -261,18 +284,24 @@ router.get('/control-data', async (req, res) => {
       await control.save();
     }
 
-    // ดึงร้านค้าที่ยังไม่หมดสัญญา
+    // ดึงร้านค้าที่ยังไม่หมดสัญญา (เลือกเฉพาะ fields ที่จำเป็น)
     const activeShops = await Shop.find({
       contractEndDate: { $gte: currentDate },
       'credentials.status': 'active'
-    }).sort({ name: 1 });
+    })
+      .select('_id customId name type canteenId location contractEndDate')
+      .sort({ name: 1 })
+      .lean();
 
-    // ดึงการประเมินสำหรับเดือนนี้
+    // ดึงการประเมินสำหรับเดือนนี้ (ใช้ lean() เพื่อเพิ่มความเร็ว)
     const currentEvaluations = await Evaluation.find({
       evaluationMonth: currentMonth,
       evaluationYear: currentYear,
       isActive: true
-    }).populate('shopId', 'customId name type canteenId');
+    })
+      .select('shopId totalScore finalStatus evaluationSent sentAt revenue')
+      .populate('shopId', 'customId name type canteenId')
+      .lean();
 
     // สร้างข้อมูลสำหรับแสดงผล
     const shopsData = activeShops.map(shop => {
@@ -489,27 +518,47 @@ router.get('/rankings', async (req, res) => {
     const { resetId, minRounds = 2 } = req.query;
     const currentResetId = resetId ? parseInt(resetId) : await getCurrentResetId();
     
-    // Get all active shops
+    // Get all active shops (เลือกเฉพาะ fields ที่จำเป็น)
     const shops = await Shop.find({
       'credentials.status': 'active'
+    })
+      .select('_id customId name canteenId type')
+      .lean();
+    
+    const shopIds = shops.map(shop => shop._id);
+    
+    // ✅ ใช้ batch query แทน N+1 query - query evaluations ทั้งหมดในครั้งเดียว
+    const allEvaluations = await Evaluation.find({
+      shopId: { $in: shopIds },
+      resetId: currentResetId,
+      isActive: true,
+      evaluationSent: true
+    })
+      .select('shopId totalScore revenue finalStatus evaluationRound evaluationMonth evaluationYear')
+      .sort({ shopId: 1, evaluationRound: 1 })
+      .lean();
+    
+    // สร้าง Map เพื่อจัดกลุ่ม evaluations ตาม shopId
+    const evaluationsByShop = new Map();
+    allEvaluations.forEach(evalItem => {
+      const shopIdStr = evalItem.shopId.toString();
+      if (!evaluationsByShop.has(shopIdStr)) {
+        evaluationsByShop.set(shopIdStr, []);
+      }
+      evaluationsByShop.get(shopIdStr).push(evalItem);
     });
     
     // Calculate average scores for each shop
     const shopRankings = [];
     
     for (const shop of shops) {
-      // Get evaluations for this shop in the specified resetId
-      const evaluations = await Evaluation.find({
-        shopId: shop._id,
-        resetId: currentResetId,
-        isActive: true,
-        evaluationSent: true
-      }).sort({ evaluationRound: 1 });
+      const shopIdStr = shop._id.toString();
+      const evaluations = evaluationsByShop.get(shopIdStr) || [];
       
       if (evaluations.length === 0) continue;
       
       // Calculate average score
-      const totalScore = evaluations.reduce((sum, evaluation) => sum + evaluation.totalScore, 0);
+      const totalScore = evaluations.reduce((sum, evaluation) => sum + (evaluation.totalScore || 0), 0);
       const avgScore = totalScore / evaluations.length;
       const evaluationRounds = evaluations.length;
       

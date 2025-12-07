@@ -49,6 +49,12 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Add indexes for better query performance
+userSchema.index({ email: 1 }, { sparse: true });
+userSchema.index({ shopId: 1 });
+userSchema.index({ role: 1 });
+userSchema.index({ createdAt: -1 });
+
 // Hash password before saving
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();

@@ -1,6 +1,9 @@
+  // Load environment variables FIRST before any other imports
+  import dotenv from 'dotenv';
+  dotenv.config();
+
   import express from 'express';
   import mongoose from 'mongoose';
-  import dotenv from 'dotenv';
   import cors from 'cors';
   import path from 'path';
   import multer from 'multer';
@@ -32,8 +35,6 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
   import welcomeRoutes from './routes/welcomeRoutes.js';
   import evaluationTopicRoutes from './routes/evaluationTopicRoutes.js';
   import connectDB from './config/database.js';
-
-  dotenv.config();
   const app = express();
   const isProduction = process.env.NODE_ENV === 'production';
 

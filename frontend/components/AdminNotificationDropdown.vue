@@ -129,11 +129,14 @@ export default {
     // Fetch admin notifications
     const fetchNotifications = async () => {
       try {
-        const token = localStorage.getItem('token')
+        // ตรวจสอบ token จากทั้ง localStorage และ sessionStorage
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token')
         if (!token) {
-          console.log('❌ No token found')
+          console.log('❌ No token found in localStorage or sessionStorage')
           return
         }
+
+        console.log('🔍 Fetching admin notifications from /api/admin-notifications/admin...')
 
         const response = await axios.get('/api/admin-notifications/admin', {
           headers: {
@@ -144,12 +147,9 @@ export default {
         if (response.data.success) {
           console.log('📋 Admin notification data:', response.data.data)
           
-          // เรียงลำดับข้อมูลใหม่ให้อยู่บนสุด
-          const sortedNotifications = response.data.data.sort((a, b) => {
-            return new Date(b.createdAt) - new Date(a.createdAt)
-          })
-          
-          notifications.value = sortedNotifications
+          // ใช้ข้อมูลที่เรียงมาแล้วจาก server (ยังไม่อ่านขึ้นก่อน)
+          // ไม่ต้อง sort ใหม่เพราะ backend ได้ sort แล้วให้ยังไม่อ่านขึ้นก่อน
+          notifications.value = response.data.data
           
           // อัปเดต unread count จาก server response
           const newUnreadCount = notifications.value.filter(n => !n.isRead).length
@@ -188,7 +188,7 @@ export default {
       try {
         console.log('🔄 Marking notification as read:', notificationId)
         
-        const token = localStorage.getItem('token')
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token')
         if (!token) {
           console.error('❌ No token found')
           return
@@ -224,7 +224,7 @@ export default {
         console.log('🔄 Marking all admin notifications as read...')
         console.log('📊 Current unread count:', unreadCount.value)
         
-        const token = localStorage.getItem('token')
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token')
         if (!token) {
           console.error('❌ No token found')
           return

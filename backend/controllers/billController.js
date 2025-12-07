@@ -1,12 +1,15 @@
+import mongoose from 'mongoose';
 import Bill from '../models/billModel.js';
-import Shop from '../models/Shop.js';
+import Shop from '../models/shopModel.js';
+import User from '../models/userModel.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import xlsx from 'xlsx';
-import { createBillNotification } from './notificationController.js';
+import { createBillNotification, createNotification } from './notificationController.js';
 import { createAdminBillNotification } from './adminNotificationController.js';
 import { emitToShop, emitToAdmin } from '../socket.js';
+import Notification from '../models/notificationModel.js';
 
 // Get current file directory name
 const __filename = fileURLToPath(import.meta.url);
@@ -15,14 +18,18 @@ const __dirname = path.dirname(__filename);
 // Upload bill slip
 export const uploadBill = async (req, res) => {
   try {
+    const isDev = process.env.NODE_ENV === 'development';
+    
+    if (isDev) {
     console.log('\n=== UPLOAD BILL CONTROLLER DEBUG ===');
-    console.log('Request body:', req.body);
-    console.log('Request file:', req.file);
-    console.log('Request user:', req.user);
+      console.log('Request body:', { billId: req.body.billId, billType: req.body.billType });
+      console.log('Request file:', req.file ? { originalname: req.file.originalname, size: req.file.size } : null);
+      console.log('Request user:', { id: req.user?._id, shopId: req.user?.shopId, role: req.user?.role });
+    }
     
     // ตรวจสอบ user authentication
     if (!req.user) {
-      console.log('❌ No user found in request');
+      if (isDev) console.log('❌ No user found in request');
       return res.status(401).json({ success: false, error: 'User not authenticated' });
     }
     
@@ -30,18 +37,18 @@ export const uploadBill = async (req, res) => {
     
     // ตรวจสอบ billId
     if (!billId) {
-      console.log('❌ billId missing in request body');
+      if (isDev) console.log('❌ billId missing in request body');
       return res.status(400).json({ success: false, error: 'billId is required' });
     }
     
-    console.log('🔍 Looking for bill with ID:', billId);
     const bill = await Bill.findById(billId);
     
     if (!bill) {
-      console.log('❌ Bill not found for billId:', billId);
+      if (isDev) console.log('❌ Bill not found for billId:', billId);
       return res.status(404).json({ success: false, error: 'Bill not found' });
     }
     
+    if (isDev) {
     console.log('✅ Bill found:', {
       id: bill._id,
       shopId: bill.shopId,
@@ -49,31 +56,33 @@ export const uploadBill = async (req, res) => {
       dueDate: bill.dueDate,
       contractEndDate: bill.contractEndDate
     });
+    }
     
     // ตรวจสอบว่า bill นี้เป็นของ user นี้หรือไม่
     if (bill.shopId.toString() !== req.user.shopId.toString()) {
-      console.log('❌ Unauthorized access to bill. User shopId:', req.user.shopId, 'Bill shopId:', bill.shopId);
+      if (isDev) console.log('❌ Unauthorized access to bill');
       return res.status(403).json({ success: false, error: 'Unauthorized access to this bill' });
     }
     
     // ตรวจสอบและสร้าง dueDate ถ้าไม่มี
     if (!bill.dueDate) {
-      console.log('⚠️ No dueDate found, creating default dueDate');
+      if (isDev) console.log('⚠️ No dueDate found, creating default dueDate');
       bill.dueDate = bill.contractEndDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     }
     
     // ตรวจสอบไฟล์
     if (!req.file) {
-      console.log('❌ No file uploaded');
+      if (isDev) console.log('❌ No file uploaded');
       return res.status(400).json({ success: false, error: 'No file uploaded' });
     }
     
+    if (isDev) {
     console.log('✅ File uploaded successfully:', {
       originalname: req.file.originalname,
       filename: req.file.filename,
-      path: req.file.path,
       size: req.file.size
     });
+    }
     
     // บันทึกข้อมูลรูปภาพ
     bill.image = path.basename(req.file.path);
@@ -95,32 +104,37 @@ export const uploadBill = async (req, res) => {
     const uploadDate = new Date();
     
     if (uploadDate > dueDate) {
-      bill.status = 'เลยกำหนด'; // ถ้าเกินกำหนด
-      console.log('⚠️ Bill uploaded after due date - status: เลยกำหนด');
+      bill.status = 'เลยกำหนด';
+      if (isDev) console.log('⚠️ Bill uploaded after due date - status: เลยกำหนด');
     } else {
-      bill.status = 'รอตรวจสอบ'; // ถ้าอยู่ในกำหนด - เปลี่ยนเป็น รอตรวจสอบ
-      console.log('✅ Bill uploaded within due date - status: รอตรวจสอบ');
+      bill.status = 'รอตรวจสอบ';
+      if (isDev) console.log('✅ Bill uploaded within due date - status: รอตรวจสอบ');
     }
     
-    console.log('💾 Saving bill with updated data...');
     await bill.save();
     
+    if (isDev) {
     console.log('✅ Bill updated successfully');
     console.log('=== UPLOAD BILL CONTROLLER COMPLETED ===\n');
+    }
     
     // สร้าง notification สำหรับ admin
     try {
       await createAdminBillNotification(bill, req.user);
-      console.log('✅ Admin bill notification created');
+      if (isDev) console.log('✅ Admin bill notification created');
       // Realtime: notify admin list updated
       emitToAdmin('admin:bill:newUpload', { billId: bill._id, shopId: bill.shopId });
     } catch (notificationError) {
+      if (isDev) {
       console.error('❌ Error creating admin bill notification:', notificationError);
+      }
     }
 
     res.status(200).json({ success: true, data: bill });
   } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
     console.error('❌ UPLOAD BILL ERROR:', error);
+    }
     res.status(500).json({ 
       success: false, 
       error: error.message,
@@ -143,23 +157,15 @@ export const getBillHistory = async (req, res) => {
 // Admin verify bill
 export const verifyBill = async (req, res) => {
   try {
+    const isDev = process.env.NODE_ENV === 'development';
     const { id } = req.params;
     const { status, admin_comment } = req.body;
 
-    console.log('🔍 Verify bill request:', { id, status, admin_comment, body: req.body });
-
     const bill = await Bill.findById(id);
     if (!bill) {
-      console.log('❌ Bill not found:', id);
+      if (isDev) console.log('❌ Bill not found:', id);
       return res.status(404).json({ success: false, error: 'Bill not found' });
     }
-
-    console.log('📋 Bill before update:', {
-      id: bill._id,
-      shopId: bill.shopId,
-      status: bill.status,
-      billType: bill.billType
-    });
 
     bill.status = status;
     bill.admin_comment = admin_comment;
@@ -172,33 +178,37 @@ export const verifyBill = async (req, res) => {
         { ...periodMatch, billType: { $in: ['water', 'electricity'] } },
         { $set: { status: 'เสร็จสิ้น' } }
       );
+      if (isDev) {
       console.log('Cascaded status to W/E bills for utilities payment:', related.modifiedCount);
+      }
     }
 
+    if (isDev) {
     console.log('✅ Bill updated successfully:', {
       id: bill._id,
       shopId: bill.shopId,
       status: bill.status,
       billType: bill.billType
     });
+    }
 
     // สร้าง notification สำหรับ user
     try {
       await createBillNotification(bill, status);
-      console.log('✅ Bill notification created');
+      if (isDev) console.log('✅ Bill notification created');
       // Realtime: notify shop of bill status change
       emitToShop(bill.shopId, 'user:bill:updated', { billId: bill._id, status: bill.status });
-      
-      // ส่ง event ไปยัง frontend (ถ้ามี WebSocket หรือ Server-Sent Events)
-      // emit('billUpdated', { shopId: bill.shopId, billId: bill._id, status });
-      
     } catch (notificationError) {
-      console.error('❌ Error creating bill notification:', notificationError);
+      if (isDev) {
+        console.error('❌ Error creating bill notification:', notificationError.message);
+      }
     }
 
     res.status(200).json({ success: true, data: bill });
   } catch (error) {
-    console.error('❌ Error in verifyBill:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('❌ Error in verifyBill:', error.message);
+    }
     res.status(400).json({ success: false, error: error.message });
   }
 };
@@ -237,23 +247,39 @@ export const getAllBills = async (req, res) => {
     const shopFilter = {};
     if (canteenId) shopFilter.canteenId = parseInt(canteenId);
     if (shopName) shopFilter.name = new RegExp(shopName, 'i');
-    const shops = await Shop.find(shopFilter);
+    const shops = await Shop.find(shopFilter).select('_id name customId canteenId contractStartDate contractEndDate').lean();
 
-    // ตรวจสอบและสร้างบิลสำหรับเดือนปัจจุบันเท่านั้น
+    // ตรวจสอบและสร้างบิลสำหรับเดือนปัจจุบันเท่านั้น (เฉพาะเมื่อไม่ใช่โหมดประวัติ)
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
+    const isViewingCurrentMonth = !month || (parseInt(month) === currentMonth && parseInt(year) === currentYear);
+    const excludeCurrentMonth = req.query.excludeCurrentMonth === 'true';
 
-    for (const shop of shops) {
-      // ตรวจสอบบิลค่าน้ำของเดือนปัจจุบัน
-      let waterBill = await Bill.findOne({ 
-        shopId: shop._id,
-        billType: 'water',
+    // สร้าง bills เฉพาะเมื่อดูข้อมูลเดือนปัจจุบันและไม่ใช่โหมดประวัติ
+    if (isViewingCurrentMonth && !excludeCurrentMonth && shops.length > 0) {
+      const shopIds = shops.map(shop => shop._id);
+      
+      // ใช้ bulk operations เพื่อลดจำนวน database queries
+      const billsToCreate = [];
+      
+      // หา bills ที่มีอยู่แล้วทั้งหมดในครั้งเดียว
+      const existingBills = await Bill.find({
+        shopId: { $in: shopIds },
         month: currentMonth,
         year: currentYear
-      });
-
-      if (!waterBill) {
-        waterBill = new Bill({
+      }).select('shopId billType').lean();
+      
+      const existingBillKeys = new Set(
+        existingBills.map(b => `${b.shopId}_${b.billType}`)
+      );
+      
+      // เตรียม bills ที่จะสร้าง
+      for (const shop of shops) {
+        const shopIdStr = shop._id.toString();
+        
+        // สร้างบิลค่าน้ำ
+        if (!existingBillKeys.has(`${shopIdStr}_water`)) {
+          billsToCreate.push({
           shopId: shop._id,
           shopName: shop.name,
           shopCustomId: shop.customId,
@@ -266,20 +292,11 @@ export const getAllBills = async (req, res) => {
           year: currentYear,
           amount: null
         });
-        await waterBill.save();
-        console.log(`Created water bill for shop ${shop.name} for month ${currentMonth}/${currentYear}`);
       }
 
-      // ตรวจสอบบิลค่าไฟของเดือนปัจจุบัน
-      let electricityBill = await Bill.findOne({
-        shopId: shop._id,
-        billType: 'electricity',
-        month: currentMonth,
-        year: currentYear
-      });
-
-      if (!electricityBill) {
-        electricityBill = new Bill({
+        // สร้างบิลค่าไฟ
+        if (!existingBillKeys.has(`${shopIdStr}_electricity`)) {
+          billsToCreate.push({
           shopId: shop._id,
           shopName: shop.name,
           shopCustomId: shop.customId,
@@ -292,46 +309,15 @@ export const getAllBills = async (req, res) => {
           year: currentYear,
           amount: null
         });
-        await electricityBill.save();
-        console.log(`Created electricity bill for shop ${shop.name} for month ${currentMonth}/${currentYear}`);
+        }
       }
 
-      // ตรวจสอบบิล Utilities (รวม) ของเดือนปัจจุบัน
-      let utilitiesBill = await Bill.findOne({
-        shopId: shop._id,
-        billType: { $in: ['utilities','Utilities'] },
-        month: currentMonth,
-        year: currentYear
-      });
-
-      if (!utilitiesBill) {
-        const combinedAmount =
-          (waterBill && typeof waterBill.amount === 'number' ? waterBill.amount : 0) +
-          (electricityBill && typeof electricityBill.amount === 'number' ? electricityBill.amount : 0);
-
-        utilitiesBill = new Bill({
-          shopId: shop._id,
-          shopName: shop.name,
-          shopCustomId: shop.customId,
-          canteenId: shop.canteenId,
-          contractStartDate: shop.contractStartDate,
-          contractEndDate: shop.contractEndDate,
-          billType: 'utilities',
-          status: 'รอดำเนินการ',
-          month: currentMonth,
-          year: currentYear,
-          amount: combinedAmount > 0 ? combinedAmount : null
-        });
-        await utilitiesBill.save();
-        console.log(`Created utilities bill for shop ${shop.name} for month ${currentMonth}/${currentYear}`);
-      } else {
-        // keep utilities amount in sync when water/electricity amounts exist
-        const combinedAmount =
-          (waterBill && typeof waterBill.amount === 'number' ? waterBill.amount : 0) +
-          (electricityBill && typeof electricityBill.amount === 'number' ? electricityBill.amount : 0);
-        if (combinedAmount > 0 && utilitiesBill.amount !== combinedAmount) {
-          utilitiesBill.amount = combinedAmount;
-          await utilitiesBill.save();
+      // สร้าง bills ทั้งหมดในครั้งเดียว (bulk insert)
+      if (billsToCreate.length > 0) {
+        await Bill.insertMany(billsToCreate);
+        // ลด console.log ใน production
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`Created ${billsToCreate.length} bills for current month`);
         }
       }
     }
@@ -350,20 +336,21 @@ export const getAllBills = async (req, res) => {
       query.year = parseInt(year);
     }
 
-    // ดึงข้อมูล bills พร้อมกับข้อมูลร้านค้า
+    // ดึงข้อมูล bills พร้อมกับข้อมูลร้านค้า - ใช้ lean() เพื่อเพิ่มประสิทธิภาพ
     const bills = await Bill.find(query)
       .populate('shopId', 'name customId canteenId contractStartDate contractEndDate')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
     
-    // จัดรูปแบบข้อมูล
+    // จัดรูปแบบข้อมูล - ใช้ map แบบ asynchronous แต่ไม่ต้องรอ
     const formattedBills = bills.map(bill => ({
       _id: bill._id,
-      shopName: bill.shopId ? bill.shopId.name : '',
-      shopId: bill.shopId ? bill.shopId.customId : '',
-      canteenId: bill.shopId ? bill.shopId.canteenId : '',
-      canteen: bill.shopId ? `โรงอาหาร ${getCanteenName(bill.shopId.canteenId)}` : 'ไม่ระบุ',
-      contractStartDate: bill.shopId ? bill.shopId.contractStartDate : null,
-      contractEndDate: bill.shopId ? bill.shopId.contractEndDate : null,
+      shopName: bill.shopId ? bill.shopId.name : bill.shopName || '',
+      shopId: bill.shopId ? bill.shopId.customId : bill.shopCustomId || '',
+      canteenId: bill.shopId ? bill.shopId.canteenId : bill.canteenId || '',
+      canteen: bill.shopId ? `โรงอาหาร ${getCanteenName(bill.shopId.canteenId)}` : (bill.canteenId ? `โรงอาหาร ${getCanteenName(bill.canteenId)}` : 'ไม่ระบุ'),
+      contractStartDate: bill.shopId ? bill.shopId.contractStartDate : bill.contractStartDate || null,
+      contractEndDate: bill.shopId ? bill.shopId.contractEndDate : bill.contractEndDate || null,
       billType: getBillTypeText(bill.billType),
       status: bill.status || 'รอดำเนินการ',
       month: getThaiMonth(bill.month),
@@ -372,24 +359,11 @@ export const getAllBills = async (req, res) => {
       updatedAt: bill.updatedAt,
       amount: bill.amount || null,
       image: bill.image || null,
-      slip_image_url: bill.slip_image_url || null
+      slip_image_url: bill.slip_image_url || null,
+      imagePath: bill.imagePath || null
     }));
 
-    // บันทึกข้อมูลลงใน data/bill
-    const billDataPath = path.join(__dirname, '../data/bill');
-
-    // สร้างโฟลเดอร์ถ้ายังไม่มี
-    if (!fs.existsSync(billDataPath)) {
-      fs.mkdirSync(billDataPath, { recursive: true });
-    }
-
-    // บันทึกข้อมูลลงไฟล์
-    fs.writeFileSync(
-      path.join(billDataPath, 'bills.json'),
-      JSON.stringify(formattedBills, null, 2)
-    );
-
-    // ส่งข้อมูลกลับ
+    // ส่งข้อมูลกลับ - ลบการบันทึกไฟล์ออกเพื่อเพิ่มประสิทธิภาพ
     res.status(200).json({ 
       success: true, 
       data: formattedBills
@@ -483,69 +457,396 @@ const getThaiMonth = (monthNumber) => {
 
 export const importBillExcel = async (req, res) => {
   try {
-    console.log('importBillExcel called');
+    const isDev = process.env.NODE_ENV === 'development';
+    
+    // ตรวจสอบว่าไฟล์ถูกอัปโหลดหรือไม่
     if (!req.file) {
-      console.log('No file uploaded');
-      return res.status(400).json({ success: false, message: 'No file uploaded' });
+      if (isDev) {
+        console.log('❌ No file uploaded');
+        console.log('📋 Request body:', req.body);
+        console.log('📋 Request files:', req.files);
+      }
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No file uploaded. Please upload an Excel file using field name "file".',
+        hint: 'Make sure to use form-data with field name "file"'
+      });
     }
-    console.log('File uploaded:', req.file.path);
+
+    if (isDev) {
+      console.log('📁 Processing Excel file:', {
+        filename: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        path: req.file.path
+      });
+    }
+    
+    // ตรวจสอบว่าเป็นไฟล์ Excel หรือไม่
+    const allowedMimeTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'application/octet-stream' // บางครั้ง Excel files จะมี MIME type นี้
+    ];
+    
+    if (!allowedMimeTypes.includes(req.file.mimetype) && !req.file.originalname.match(/\.(xlsx|xls)$/i)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid file type. Please upload an Excel file (.xlsx or .xls)',
+        receivedMimeType: req.file.mimetype,
+        receivedFilename: req.file.originalname
+      });
+    }
+    
     const workbook = xlsx.readFile(req.file.path);
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows = xlsx.utils.sheet_to_json(sheet);
-    console.log('Rows parsed:', rows.length);
-
-    let updated = 0, notFound = 0;
-    for (const row of rows) {
-      if (!row.shopId || !row.billType || !row.month || !row.year || typeof row.amount !== 'number') continue;
-      const result = await Bill.updateOne(
-        {
-          shopId: row.shopId,
-          billType: row.billType,
-          month: row.month,
-          year: row.year
-        },
-        { $set: { amount: row.amount } }
-      );
-      if (result.nModified > 0) updated++;
-      else notFound++;
+    
+    if (isDev) {
+      console.log('📊 Excel file parsed:', {
+        sheetName: workbook.SheetNames[0],
+        rowsCount: rows.length,
+        firstRow: rows[0] || null
+      });
     }
-    res.json({ success: true, updated, notFound });
+
+    if (rows.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Excel file is empty or has no data rows' 
+      });
+    }
+
+    // ค้นหา Shop ทั้งหมดเพื่อ map customId -> shopId (เพิ่มประสิทธิภาพ)
+    const allShops = await Shop.find().select('_id customId').lean();
+    const shopMap = new Map();
+    allShops.forEach(shop => {
+      if (shop.customId) {
+        shopMap.set(shop.customId, shop._id);
+      }
+    });
+    
+    if (isDev) {
+      console.log(`📋 Loaded ${shopMap.size} shops for mapping customId to shopId`);
+    }
+
+    // ใช้ bulk operations เพื่อเพิ่มประสิทธิภาพ
+    const updateOperations = [];
+    const errors = [];
+    
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNum = i + 2; // +2 เพราะ row 1 คือ header, row 2 คือ data แถวแรก
+      
+      // ตรวจสอบ required fields
+      if (!row.shopId) {
+        errors.push(`Row ${rowNum}: Missing shopId`);
+        continue;
+      }
+      if (!row.billType) {
+        errors.push(`Row ${rowNum}: Missing billType`);
+        continue;
+      }
+      if (!row.month) {
+        errors.push(`Row ${rowNum}: Missing month`);
+        continue;
+      }
+      if (!row.year) {
+        errors.push(`Row ${rowNum}: Missing year`);
+        continue;
+      }
+      if (row.amount === undefined || row.amount === null) {
+        errors.push(`Row ${rowNum}: Missing amount`);
+        continue;
+      }
+      
+      // ตรวจสอบว่า amount เป็นตัวเลข
+      const amount = typeof row.amount === 'number' ? row.amount : parseFloat(row.amount);
+      if (isNaN(amount)) {
+        errors.push(`Row ${rowNum}: Invalid amount (must be a number), got: ${row.amount}`);
+        continue;
+      }
+      
+      // ตรวจสอบ billType
+      const validBillTypes = ['water', 'electricity', 'utilities', 'Utilities'];
+      if (!validBillTypes.includes(row.billType)) {
+        errors.push(`Row ${rowNum}: Invalid billType "${row.billType}". Must be one of: ${validBillTypes.join(', ')}`);
+        continue;
+      }
+      
+      // ตรวจสอบ month (1-12)
+      const month = parseInt(row.month);
+      if (isNaN(month) || month < 1 || month > 12) {
+        errors.push(`Row ${rowNum}: Invalid month "${row.month}". Must be 1-12`);
+        continue;
+      }
+      
+      // ตรวจสอบ year
+      const year = parseInt(row.year);
+      if (isNaN(year) || year < 2000 || year > 2100) {
+        errors.push(`Row ${rowNum}: Invalid year "${row.year}". Must be a valid year`);
+        continue;
+      }
+      
+      // ตรวจสอบ shopId (customId) format - ต้องเป็น string เช่น RRN002, E2005
+      const customId = String(row.shopId).trim();
+      if (!customId || customId.length < 2) {
+        errors.push(`Row ${rowNum}: Invalid shopId (customId) format. Expected shop code like RRN002, E2005, got: ${row.shopId}`);
+        continue;
+      }
+      
+      // ค้นหา Shop จาก customId โดยใช้ Map ที่สร้างไว้ (เร็วกว่า query หลายครั้ง)
+      const shopObjectId = shopMap.get(customId);
+      if (!shopObjectId) {
+        errors.push(`Row ${rowNum}: Shop not found with customId "${customId}". Available customIds: ${Array.from(shopMap.keys()).slice(0, 10).join(', ')}...`);
+        continue;
+      }
+      
+      updateOperations.push({
+        updateOne: {
+          filter: {
+            shopId: shopObjectId, // ใช้ ObjectId จาก Shop
+            billType: row.billType.toLowerCase(),
+            month: month,
+            year: year
+          },
+          update: { $set: { amount: amount } }
+        }
+      });
+    }
+    
+    // ถ้ามี errors มากเกินไป ให้ return error
+    if (errors.length > 0 && errors.length === rows.length) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'All rows have errors. Please check your Excel file format.',
+        errors: errors.slice(0, 10), // แสดงแค่ 10 errors แรก
+        totalErrors: errors.length
+      });
+    }
+    
+    let updated = 0, notFound = 0;
+    const updatedShopIds = new Set(); // เก็บ shopId ที่ถูกอัปเดตเพื่อส่ง socket notification
+    
+    if (updateOperations.length > 0) {
+      const result = await Bill.bulkWrite(updateOperations, { ordered: false });
+      updated = result.modifiedCount || 0;
+      notFound = updateOperations.length - updated;
+      
+      // เก็บ shopId ที่ถูกอัปเดต
+      updateOperations.forEach(op => {
+        if (op.updateOne && op.updateOne.filter && op.updateOne.filter.shopId) {
+          updatedShopIds.add(op.updateOne.filter.shopId.toString());
+        }
+      });
+      
+      if (isDev) {
+        console.log('✅ Bulk write result:', {
+          total: updateOperations.length,
+          updated,
+          notFound,
+          updatedShops: updatedShopIds.size
+        });
+      }
+      
+      // สร้าง notification สำหรับ users ที่เกี่ยวข้อง
+      try {
+        // หา bills ที่ถูกอัปเดตเพื่อสร้าง notification (ใช้ bulk query เพื่อเพิ่มประสิทธิภาพ)
+        const billFilters = updateOperations
+          .filter(op => op.updateOne && op.updateOne.filter)
+          .map(op => op.updateOne.filter);
+        
+        const updatedBills = billFilters.length > 0
+          ? await Bill.find({ $or: billFilters }).lean()
+          : [];
+        
+        // กรองเฉพาะ bills ที่มี amount
+        const billsWithAmount = updatedBills.filter(bill => bill.amount && typeof bill.amount === 'number' && bill.amount > 0);
+        
+        if (isDev) {
+          console.log(`📋 Found ${billsWithAmount.length} updated bills with amount for notification`);
+        }
+        
+        // หา users ทั้งหมดที่เกี่ยวข้องกับ shopIds ที่ถูกอัปเดต (ใช้ bulk query เพื่อเพิ่มประสิทธิภาพ)
+        const uniqueShopIds = [...new Set(billsWithAmount.map(bill => bill.shopId))];
+        const allUsers = uniqueShopIds.length > 0
+          ? await User.find({ shopId: { $in: uniqueShopIds } }).select('_id shopId').lean()
+          : [];
+        
+        // สร้าง Map เพื่อเก็บ users ตาม shopId
+        const usersByShopId = new Map();
+        allUsers.forEach(user => {
+          const shopIdStr = user.shopId?.toString();
+          if (shopIdStr) {
+            if (!usersByShopId.has(shopIdStr)) {
+              usersByShopId.set(shopIdStr, []);
+            }
+            usersByShopId.get(shopIdStr).push(user);
+          }
+        });
+        
+        if (isDev) {
+          console.log(`👥 Found ${allUsers.length} users across ${uniqueShopIds.length} shops`);
+        }
+        
+        // สร้าง notification สำหรับแต่ละ bill
+        for (const bill of billsWithAmount) {
+          try {
+            // หา users ที่เกี่ยวข้องกับ shopId นี้จาก Map
+            const shopIdStr = bill.shopId.toString();
+            const users = usersByShopId.get(shopIdStr) || [];
+            
+            if (isDev && users.length > 0) {
+              console.log(`👥 Found ${users.length} users for shopId: ${shopIdStr}`);
+            }
+            
+            // สร้าง admin notification สำหรับ shop นี้ (ไม่ต้องสร้างแยกตาม user แต่สร้างตาม shopId)
+            try {
+              const billTypeText = bill.billType === 'electricity' ? 'ค่าไฟ' : bill.billType === 'water' ? 'ค่าน้ำ' : 'ค่าบริการ';
+              const monthText = getThaiMonth(bill.month);
+              const title = 'บิลค่าบริการ';
+              const amountText = bill.amount && typeof bill.amount === 'number' 
+                ? bill.amount.toLocaleString('th-TH') 
+                : '0';
+              const message = `บิล${billTypeText} เดือน${monthText} ${bill.year} มีจำนวนเงิน ${amountText} บาท กรุณาชำระเงิน`;
+              
+              // หา userId จาก users ที่เกี่ยวข้อง (ใช้ user แรกที่เจอ หรือใช้ shopId)
+              const userId = users.length > 0 ? users[0]._id : bill.shopId;
+              
+              // สร้าง admin notification (ตามรูปแบบเดียวกับ sendAdminNotification)
+              const adminNotification = new Notification({
+                userId: userId, // ใช้ userId จาก user หรือ shopId (ตามรูปแบบ sendAdminNotification ใช้ shop.userId || shop._id)
+                shopId: bill.shopId,
+                type: 'admin_notification', // ใช้ admin_notification แทน bill
+                title: title,
+                message: message,
+                status: 'new', // ใช้ 'new' แทน 'รอดำเนินการ' (ตามรูปแบบ sendAdminNotification)
+                isRead: false,
+                relatedId: bill._id,
+                priority: 'high', // ตั้งค่า priority เป็น high เพราะเป็นเรื่องสำคัญ
+                sentBy: req.user?._id || req.user?.id || req.user?.username || 'admin', // ใช้ admin ที่อัปโหลด Excel
+                sentAt: new Date(),
+                recipientShopId: bill.shopId // ระบุ shopId ที่จะรับ notification
+                // ไม่ต้องใส่ recipients เพราะมี recipientShopId แล้ว
+              });
+              
+              await adminNotification.save();
+              
+              if (isDev) {
+                console.log(`✅ Admin notification created for shopId: ${shopIdStr} - bill ${bill._id}`);
+              }
+            } catch (notifError) {
+              if (isDev) {
+                console.warn(`⚠️ Error creating admin notification for shopId ${shopIdStr}:`, notifError.message);
+              }
+            }
+          } catch (billError) {
+            if (isDev) {
+              console.warn(`⚠️ Error processing bill ${bill._id}:`, billError.message);
+            }
+          }
+        }
+        
+        if (isDev) {
+          console.log(`✅ Created notifications for ${billsWithAmount.length} bills`);
+        }
+      } catch (notificationError) {
+        if (isDev) {
+          console.warn('⚠️ Error creating notifications:', notificationError.message);
+        }
+        // ไม่ throw error เพราะเป็น operation รอง
+      }
+      
+      // Emit socket events เพื่อ notify users ที่เกี่ยวข้อง
+      try {
+        updatedShopIds.forEach(shopId => {
+          emitToShop(shopId, 'user:bill:amountUpdated', { 
+            message: 'จำนวนเงินบิลถูกอัปเดตแล้ว กรุณารีเฟรชหน้าเพจ',
+            shopId: shopId
+          });
+        });
+        
+        // Notify admin
+        emitToAdmin('admin:bill:importCompleted', { 
+          updated, 
+          notFound,
+          totalRows: rows.length
+        });
+        
+        if (isDev) {
+          console.log(`📡 Emitted socket events to ${updatedShopIds.size} shops`);
+        }
+      } catch (socketError) {
+        if (isDev) {
+          console.warn('⚠️ Error emitting socket events:', socketError.message);
+        }
+      }
+    }
+    
+    // ลบไฟล์ชั่วคราวหลังจากประมวลผลเสร็จ
+    try {
+      if (req.file.path && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+    } catch (cleanupError) {
+      if (isDev) {
+        console.warn('⚠️ Error cleaning up temp file:', cleanupError.message);
+      }
+    }
+    
+    res.json({ 
+      success: true, 
+      updated, 
+      notFound,
+      totalRows: rows.length,
+      validRows: updateOperations.length,
+      errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
+      totalErrors: errors.length > 0 ? errors.length : undefined
+    });
   } catch (err) {
-    console.error('importBillExcel error:', err);
-    res.status(500).json({ success: false, message: err.message });
+    // ลบไฟล์ชั่วคราวถ้าเกิด error
+    try {
+      if (req.file?.path && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+    } catch (cleanupError) {
+      // Ignore cleanup errors
+    }
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.error('❌ importBillExcel error:', err);
+      console.error('❌ Error stack:', err.stack);
+    }
+    res.status(500).json({ 
+      success: false, 
+      message: err.message || 'An error occurred while processing the Excel file',
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 };
 
 // ดึงรูปภาพ base64 จาก MongoDB
 export const getBillImage = async (req, res) => {
   try {
-    console.log('=== GET BILL IMAGE DEBUG ===');
-    console.log('Bill ID:', req.params.billId);
-    console.log('User:', req.user);
+    const isDev = process.env.NODE_ENV === 'development';
+    const billId = req.params.billId;
     
-    const bill = await Bill.findById(req.params.billId);
+    const bill = await Bill.findById(billId);
     if (!bill) {
-      console.log('❌ Bill not found:', req.params.billId);
+      if (isDev) console.log('❌ Bill not found:', billId);
       return res.status(404).json({ success: false, error: 'Bill not found' });
     }
     
-    console.log('✅ Bill found:', {
-      id: bill._id,
-      shopId: bill.shopId,
-      image: bill.image,
-      imagePath: bill.imagePath
-    });
-    
     // ตรวจสอบว่า user มีสิทธิ์เข้าถึง bill นี้หรือไม่
     if (req.user && req.user.role !== 'admin' && bill.shopId.toString() !== req.user.shopId.toString()) {
-      console.log('❌ Unauthorized access to bill image');
+      if (isDev) console.log('❌ Unauthorized access to bill image');
       return res.status(403).json({ success: false, error: 'Unauthorized' });
     }
     
     if (bill.image && bill.imagePath) {
       // ตรวจสอบว่าไฟล์หมดอายุหรือไม่
       if (bill.imageExpiryDate && new Date() > bill.imageExpiryDate) {
-        console.log('⚠️ Image expired:', bill.imageExpiryDate);
+        if (isDev) console.log('⚠️ Image expired');
         // ลบข้อมูลรูปภาพที่หมดอายุ
         bill.image = null;
         bill.imagePath = null;
@@ -555,12 +856,11 @@ export const getBillImage = async (req, res) => {
         return res.status(404).json({ success: false, error: 'Image expired' });
       }
       
-      console.log('🔍 Looking for image at:', bill.imagePath);
       if (fs.existsSync(bill.imagePath)) {
-        console.log('✅ Image found, sending:', bill.imagePath);
+        if (isDev) console.log('✅ Image found, sending');
         
         // Set CORS headers
-        res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+        res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'http://localhost:3000');
         res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
         res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
         res.header('Access-Control-Allow-Credentials', 'true');
@@ -577,7 +877,9 @@ export const getBillImage = async (req, res) => {
         res.set('Content-Type', contentType);
         const stream = fs.createReadStream(bill.imagePath);
         stream.on('error', (err) => {
-          console.error('❌ Stream error while sending bill image:', err);
+          if (isDev) {
+            console.error('❌ Stream error while sending bill image:', err.message);
+          }
           if (!res.headersSent) {
             res.status(500).send('Error streaming image');
           } else {
@@ -586,21 +888,20 @@ export const getBillImage = async (req, res) => {
         });
         return stream.pipe(res);
       } else {
-        console.log('❌ Image file does NOT exist:', bill.imagePath);
+        if (isDev) console.log('❌ Image file does NOT exist');
         // ลบ path ออกจาก database เมื่อไฟล์หาย
         bill.image = null;
         bill.imagePath = null;
         bill.imageUploadDate = null;
         bill.imageExpiryDate = null;
         await bill.save();
-        console.log('Removed image path from database');
       }
-    } else {
-      console.log('Bill has no image field:', bill);
     }
     return res.status(404).send('Not found');
   } catch (error) {
-    console.log('Error in getBillImage:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error in getBillImage:', error.message);
+    }
     res.status(500).send('Error loading image');
   }
 };
@@ -608,19 +909,19 @@ export const getBillImage = async (req, res) => {
 // Cancel bill slip image (admin)
 export const cancelBillImage = async (req, res) => {
   try {
+    const isDev = process.env.NODE_ENV === 'development';
     const { id } = req.params;
-    console.log('Cancel bill image request:', { id });
 
     const bill = await Bill.findById(id);
     if (!bill) {
-      console.log('Bill not found:', id);
+      if (isDev) console.log('Bill not found:', id);
       return res.status(404).json({ success: false, error: 'Bill not found' });
     }
     
     // ลบไฟล์ภาพถ้ามี
     if (bill.imagePath && fs.existsSync(bill.imagePath)) {
       fs.unlinkSync(bill.imagePath);
-      console.log('Deleted image file:', bill.imagePath);
+      if (isDev) console.log('Deleted image file');
       }
     
     // ลบข้อมูลรูปภาพและเปลี่ยน status เป็น "รอดำเนินการ"
@@ -630,24 +931,29 @@ export const cancelBillImage = async (req, res) => {
     bill.imageUploadDate = null;
     bill.imageExpiryDate = null;
     bill.payment_date = null;
-    bill.status = 'รอดำเนินการ'; // เปลี่ยน status กลับเป็น รอดำเนินการ
+    bill.status = 'รอดำเนินการ';
     
       await bill.save();
-    console.log('Bill updated - status changed to รอดำเนินการ');
+    
+    if (isDev) console.log('Bill updated - status changed to รอดำเนินการ');
     
     // สร้าง notification สำหรับ user
     try {
       await createBillNotification(bill, 'รอดำเนินการ');
-      console.log('✅ Bill cancellation notification created');
+      if (isDev) console.log('✅ Bill cancellation notification created');
       // Realtime: notify shop of bill image cancellation
       emitToShop(bill.shopId, 'user:bill:imageCancelled', { billId: bill._id });
     } catch (notificationError) {
-      console.error('❌ Error creating bill cancellation notification:', notificationError);
+      if (isDev) {
+        console.error('❌ Error creating bill cancellation notification:', notificationError.message);
+      }
     }
     
     res.status(200).json({ success: true, data: bill });
   } catch (error) {
-    console.error('Error in cancelBillImage:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error in cancelBillImage:', error.message);
+    }
     res.status(400).json({ success: false, error: error.message });
   }
 };
@@ -673,7 +979,11 @@ export const deleteBill = async (req, res) => {
 // Cleanup expired images (เรียกใช้ทุกวัน)
 export const cleanupExpiredImages = async () => {
   try {
+    const isDev = process.env.NODE_ENV === 'development';
+    
+    if (isDev) {
     console.log('Starting cleanup of expired images...');
+    }
     
     // หา bills ที่มีรูปภาพหมดอายุ
     const expiredBills = await Bill.find({
@@ -681,26 +991,48 @@ export const cleanupExpiredImages = async () => {
       image: { $ne: null }
     });
     
+    if (isDev) {
     console.log(`Found ${expiredBills.length} expired images`);
-    
-    for (const bill of expiredBills) {
-      // ลบไฟล์รูปภาพ
-      if (bill.imagePath && fs.existsSync(bill.imagePath)) {
-        fs.unlinkSync(bill.imagePath);
-        console.log('Deleted expired image:', bill.imagePath);
-      }
-      
-      // ลบข้อมูลจาก database
-      bill.image = null;
-      bill.imagePath = null;
-      bill.imageUploadDate = null;
-      bill.imageExpiryDate = null;
-      await bill.save();
     }
     
+    // ใช้ bulk update เพื่อเพิ่มประสิทธิภาพ
+    const billIds = expiredBills.map(bill => bill._id);
+    
+    if (billIds.length > 0) {
+      // ลบไฟล์รูปภาพ
+      for (const bill of expiredBills) {
+      if (bill.imagePath && fs.existsSync(bill.imagePath)) {
+          try {
+        fs.unlinkSync(bill.imagePath);
+          } catch (fileError) {
+            if (isDev) {
+              console.error('Error deleting file:', fileError.message);
+            }
+          }
+        }
+      }
+      
+      // Bulk update database
+      await Bill.updateMany(
+        { _id: { $in: billIds } },
+        {
+          $set: {
+            image: null,
+            imagePath: null,
+            imageUploadDate: null,
+            imageExpiryDate: null
+          }
+        }
+      );
+    }
+    
+    if (isDev) {
     console.log('Cleanup completed');
+    }
   } catch (error) {
-    console.error('Error during cleanup:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error during cleanup:', error.message);
+    }
   }
 };
 

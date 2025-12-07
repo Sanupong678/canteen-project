@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import Notification from '../models/notificationModel.js';
 import Evaluation from '../models/Evaluation.js';
 import MoneyHistory from '../models/moneyHistoryModel.js';
-import Shop from '../models/Shop.js';
+import Shop from '../models/shopModel.js';
 
 // ตรวจสอบและสร้าง Monthly Ranking Notification
 export const checkAndCreateMonthlyRankingNotification = async (req, res) => {

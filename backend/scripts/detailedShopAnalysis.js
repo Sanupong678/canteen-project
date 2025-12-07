@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-import Shop from '../models/Shop.js';
+import Shop from '../models/shopModel.js';
 
 // Load environment variables
 dotenv.config();

@@ -579,14 +579,14 @@ onMounted(() => {
   .filters-left { width: 100%; }
 }
 .page-container {
-  padding: 2rem;
+  padding: 1rem;
   background-color: #f0f2f5;
   min-height: calc(100vh - 64px);
   overflow: hidden;
 }
 
 .content-wrapper {
-  max-width: 1200px;
+  max-width: 1600px;
   margin: 0 auto;
   overflow: hidden;
 }
@@ -610,21 +610,147 @@ onMounted(() => {
 
 .filters-section {
   background: #ffffff;
-  padding: 20px;
+  padding: 12px 16px;
   border-radius: 12px;
   margin-bottom: 24px;
   box-shadow: 0 4px 20px rgba(231, 76, 60, 0.1);
 }
 
+.filters-row {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-col { flex: 2 1 auto; }
+.search-col { order: 1; }
+.filters-left { order: 2; flex: 1 1 auto; }
+
+.filters-left-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-input :deep(.v-field) { height: 44px !important; }
+.filter-input :deep(.v-field__input) { align-items: center !important; }
+.filter-input :deep(.v-field__prepend-inner),
+.filter-input :deep(.v-field__append-inner) { align-items: center !important; }
+.filter-input :deep(.v-field__prepend-inner .v-icon),
+.filter-input :deep(.v-field__append-inner .v-icon) { align-self: center !important; margin-top: 0 !important; }
+
+/* Keep label centered like a placeholder (no floating) */
+.pill-select :deep(.v-field-label) {
+  top: 28% !important;
+  transform: translateY(-50%) scale(1) !important;
+  opacity: 1 !important;
+}
+
+/* Ensure v-select selection text sits middle */
+.pill-select :deep(.v-select__selection-text),
+.pill-select :deep(.v-select__selection) {
+  display: flex !important;
+  align-items: center !important;
+  font-size: 13px !important;
+  margin-top: -2px !important;
+}
+
+/* Right arrow vertical centering */
+.filter-input--md :deep(.v-select__menu-icon),
+.filter-input--md :deep(.v-select__menu-icon .v-icon) {
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+}
+
+.filter-input--md { width: 130px; }
+
+.filter-input--search { width: min(520px, 100%); }
+
 .custom-select {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(231, 76, 60, 0.1);
+  background: transparent;
+  box-shadow: none;
 }
 
 .custom-select :deep(.v-select__selections) {
   font-size: 14px;
   font-weight: 500;
+}
+
+.custom-select :deep(.v-input__control),
+.custom-select :deep(.v-field) {
+  min-height: 40px !important;
+}
+
+.pill-select :deep(.v-field) {
+  border-radius: 28px !important;
+  background: #fff !important;
+  border: 1px solid #e9ecef !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+.pill-select :deep(.v-field--focused) {
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.18), 0 2px 8px rgba(0,0,0,0.08) !important;
+  border-color: #2196f3 !important; /* ring-primary */
+}
+
+.pill-select :deep(.v-select__selections) {
+  padding-left: 10px !important;
+}
+
+.pill-select :deep(.v-select__menu-icon .v-icon) {
+  color: #6b7280 !important; /* gray-500 */
+}
+
+.pill-select:focus-within :deep(.v-select__menu-icon .v-icon) {
+  color: #2563eb !important; /* blue-600 */
+}
+
+.search-input {
+  --pill-radius: 28px;
+}
+
+.search-input :deep(.v-field) {
+  border-radius: var(--pill-radius) !important;
+  background: #fff !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  border: 1px solid #eee !important;
+}
+
+.search-input :deep(.v-field__input) {
+  padding-left: 16px !important;
+  font-size: 16px !important;
+  color: #333 !important;
+}
+
+.search-input :deep(.v-field__append-inner .v-icon) {
+  color: #c0392b !important;
+  transition: color 0.2s ease;
+}
+
+.search-input :deep(.v-field__clearable) {
+  display: none !important;
+}
+
+.search-input:hover :deep(.v-field__append-inner .v-icon),
+.search-input:focus-within :deep(.v-field__append-inner .v-icon) {
+  color: #e74c3c !important;
+}
+
+/* Desktop alignment: search left, dropdowns right */
+@media (min-width: 992px) {
+  .search-col { order: 1; }
+  .filters-left { order: 2; }
+  .filters-left-row { flex-wrap: nowrap; }
+}
+
+/* Mobile-first: search on top, dropdowns stack below */
+@media (max-width: 991px) {
+  .filters-row { gap: 10px; }
+  .search-col { order: 1; width: 100%; }
+  .filters-left { order: 2; width: 100%; }
+  .filter-input--md { width: calc(50% - 6px); }
+  .filter-input--search { width: 100%; }
 }
 
 .custom-table {
@@ -744,6 +870,28 @@ onMounted(() => {
 * {
   scrollbar-width: none;
   -ms-overflow-style: none;
+}
+
+/* ซ่อน Scrollbar ของ v-data-table wrapper โดยเฉพาะ */
+.v-data-table :deep(.v-data-table__wrapper) {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+}
+
+.v-data-table :deep(.v-data-table__wrapper)::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.v-data-table :deep(.v-data-table__wrapper)::-webkit-scrollbar-track {
+  display: none !important;
+}
+
+.v-data-table :deep(.v-data-table__wrapper)::-webkit-scrollbar-thumb {
+  display: none !important;
 }
 
 /* Responsive Design */

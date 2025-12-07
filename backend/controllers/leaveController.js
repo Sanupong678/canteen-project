@@ -1,5 +1,5 @@
 import Leave from '../models/leaveModel.js';
-import Shop from '../models/Shop.js';
+import Shop from '../models/shopModel.js';
 import User from '../models/userModel.js';
 import { createLeaveNotification } from './notificationController.js';
 import { createAdminLeaveNotification } from './adminNotificationController.js';
@@ -8,21 +8,49 @@ import { emitToShop, emitToAdmin } from '../socket.js';
 // Get all leaves (admin)
 export const getLeaves = async (req, res) => {
   try {
-    const leaves = await Leave.find().sort({ createdAt: -1 });
+    // ดึงข้อมูลการลาทั้งหมด
+    const leaves = await Leave.find()
+      .sort({ createdAt: -1 })
+      .lean(); // ใช้ lean() เพื่อเพิ่มความเร็ว
 
-    // ดึงข้อมูลร้านค้า, ผู้ใช้ และโรงอาหารเพิ่มเติม
-    const leavesWithDetails = await Promise.all(leaves.map(async (leave) => {
-      const shop = await Shop.findById(leave.shopId);
-      const user = await User.findById(leave.userId);
+    // รวบรวม shopIds และ userIds ทั้งหมด
+    const shopIds = [...new Set(leaves.map(leave => leave.shopId?.toString()).filter(Boolean))];
+    const userIds = [...new Set(leaves.map(leave => leave.userId?.toString()).filter(Boolean))];
+    
+    // Query shops และ users ทั้งหมดในครั้งเดียว (batch query)
+    const [shops, users] = await Promise.all([
+      Shop.find({ _id: { $in: shopIds } })
+        .select('name canteenId') // เลือกเฉพาะ fields ที่จำเป็น
+        .lean(),
+      User.find({ _id: { $in: userIds } })
+        .select('name department position') // เลือกเฉพาะ fields ที่จำเป็น
+        .lean()
+    ]);
+    
+    // สร้าง Map เพื่อ lookup เร็ว
+    const shopMap = new Map();
+    shops.forEach(shop => {
+      shopMap.set(shop._id.toString(), shop);
+    });
+    
+    const userMap = new Map();
+    users.forEach(user => {
+      userMap.set(user._id.toString(), user);
+    });
+
+    // Map ข้อมูล leaves พร้อม shop และ user details
+    const leavesWithDetails = leaves.map(leave => {
+      const shop = shopMap.get(leave.shopId?.toString());
+      const user = userMap.get(leave.userId?.toString());
       return {
-        ...leave.toObject(),
+        ...leave,
         shopName: shop ? shop.name : 'ไม่ระบุร้านค้า',
         canteen: shop ? `โรงอาหาร${getCanteenName(shop.canteenId)}` : 'ไม่ระบุโรงอาหาร',
         userName: user ? user.name : 'ไม่ระบุชื่อผู้ใช้',
         department: user ? user.department : 'ไม่ระบุแผนก',
         position: user ? user.position : 'ไม่ระบุตำแหน่ง'
       };
-    }));
+    });
 
     res.json({ data: leavesWithDetails });
   } catch (error) {

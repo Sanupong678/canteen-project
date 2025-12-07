@@ -311,17 +311,22 @@ export const getUserNotifications = async (req, res) => {
       console.log('🔍 Fetching admin notifications for shopId:', shopId);
       
       // แสดงเฉพาะ admin notifications ที่เกี่ยวข้องกับ shopId นี้เท่านั้น และไม่เก่ากว่า 1 เดือน
+      // แก้ไข: แสดงเฉพาะ notification ที่มี shopId ตรงกับ shopId ของ user เท่านั้น
+      // เพื่อป้องกันการแสดง notification ซ้ำกัน (notification หลักที่ไม่มี shopId + notification ที่มี shopId)
       let adminNotifications = [];
       if (shopId && shopId !== 'admin') {
+        // แปลง shopId เป็น ObjectId อย่างปลอดภัย
+        let shopObjectId;
+        if (shopId instanceof mongoose.Types.ObjectId) {
+          shopObjectId = shopId;
+        } else if (typeof shopId === 'string' && mongoose.Types.ObjectId.isValid(shopId)) {
+          shopObjectId = new mongoose.Types.ObjectId(shopId);
+        }
+        
         const adminNotificationQuery = {
           type: 'admin_notification',
-          createdAt: { $gte: oneMonthAgo }, // เฉพาะข้อมูลที่สร้างภายใน 1 เดือนที่แล้ว
-          $or: [
-            { recipients: 'all' },
-            { recipients: 'active' },
-            { recipients: 'expired' },
-            { recipientShopId: shopId }
-          ]
+          shopId: shopObjectId, // แสดงเฉพาะ notification ที่มี shopId ตรงกับ shopId ของ user
+          createdAt: { $gte: oneMonthAgo } // เฉพาะข้อมูลที่สร้างภายใน 1 เดือนที่แล้ว
         };
         
         adminNotifications = await Notification.find(adminNotificationQuery)
@@ -335,18 +340,9 @@ export const getUserNotifications = async (req, res) => {
       // เพิ่ม admin notifications เข้าไปในรายการ (เฉพาะที่เกี่ยวข้องกับ shopId นี้)
       for (const adminNotification of adminNotifications) {
         // ตรวจสอบเพิ่มเติมว่า notification นี้เกี่ยวข้องกับ shopId นี้จริงหรือไม่
-        let shouldShow = false;
-        
-        if (adminNotification.recipients === 'all' || 
-            adminNotification.recipients === 'active' || 
-            adminNotification.recipients === 'expired') {
-          shouldShow = true;
-        } else if (adminNotification.recipientShopId && 
-                   adminNotification.recipientShopId.toString() === shopId.toString()) {
-          shouldShow = true;
-        }
-        
-        if (shouldShow) {
+        // (ตอนนี้ query กรองแล้ว แต่ตรวจสอบอีกครั้งเพื่อความปลอดภัย)
+        if (adminNotification.shopId && 
+            adminNotification.shopId.toString() === shopId.toString()) {
           notifications.push({
             _id: `admin_${adminNotification._id}`,
             type: 'admin_notification',
@@ -513,51 +509,65 @@ export const markNotificationAsRead = async (req, res) => {
 // Mark all notifications as read
 export const markAllNotificationsAsRead = async (req, res) => {
   try {
-    const userId = req.user.userId;
-    const shopId = req.user.shopId;
+    const isDev = process.env.NODE_ENV === 'development';
+    const userId = req.user?.userId;
+    const shopId = req.user?.shopId;
 
-    console.log('🔍 Marking all notifications as read for user:', userId);
+    // Validate required fields
+    if (!userId || !shopId) {
+      if (isDev) {
+        console.error('❌ Missing userId or shopId:', { userId, shopId, user: req.user });
+      }
+      return res.status(400).json({
+        success: false,
+        error: 'User information is incomplete. Please login again.'
+      });
+    }
+
+    if (isDev) {
+      console.log('🔍 Marking all notifications as read for user:', userId, 'shopId:', shopId);
+    }
 
     // ดึงหรือสร้าง user read status
     let userReadStatus = await UserReadStatus.findOne({ userId });
     if (!userReadStatus) {
-      userReadStatus = new UserReadStatus({ userId, shopId });
+      userReadStatus = new UserReadStatus({ userId, shopId, readBills: [], readLeaves: [], readRepairs: [] });
     }
 
-    // ดึงข้อมูลทั้งหมดที่ยังไม่ได้อ่าน
-    const bills = await Bill.find({ 
-      shopId, 
-      status: { $ne: 'รอดำเนินการ' } 
-    });
-    
-    const leaves = await Leave.find({ 
-      shopId, 
-      status: { $ne: 'pending' } 
-    });
-    
-    const repairs = await Repair.find({ 
-      shopId, 
-      status: { $ne: 'pending' } 
-    });
+    // ดึงข้อมูลเฉพาะ ID เท่านั้น (ไม่ต้องดึงข้อมูลทั้งหมด) - ใช้ select('_id') เพื่อเพิ่มประสิทธิภาพ
+    const [bills, leaves, repairs] = await Promise.all([
+      Bill.find({ shopId, status: { $ne: 'รอดำเนินการ' } }).select('_id').lean(),
+      Leave.find({ shopId, status: { $ne: 'pending' } }).select('_id').lean(),
+      Repair.find({ shopId, status: { $ne: 'pending' } }).select('_id').lean()
+    ]);
 
-    // เพิ่ม ID ของบิลที่อ่านแล้ว
+    // ใช้ Set เพื่อเพิ่มประสิทธิภาพในการตรวจสอบ
+    const readBillsSet = new Set(userReadStatus.readBills.map(id => id.toString()));
+    const readLeavesSet = new Set(userReadStatus.readLeaves.map(id => id.toString()));
+    const readRepairsSet = new Set(userReadStatus.readRepairs.map(id => id.toString()));
+
+    // เพิ่ม ID ที่ยังไม่มีใน read status
     bills.forEach(bill => {
-      if (!userReadStatus.readBills.includes(bill._id.toString())) {
-        userReadStatus.readBills.push(bill._id.toString());
+      const billId = bill._id.toString();
+      if (!readBillsSet.has(billId)) {
+        readBillsSet.add(billId);
+        userReadStatus.readBills.push(billId);
       }
     });
 
-    // เพิ่ม ID ของการลาที่อ่านแล้ว
     leaves.forEach(leave => {
-      if (!userReadStatus.readLeaves.includes(leave._id.toString())) {
-        userReadStatus.readLeaves.push(leave._id.toString());
+      const leaveId = leave._id.toString();
+      if (!readLeavesSet.has(leaveId)) {
+        readLeavesSet.add(leaveId);
+        userReadStatus.readLeaves.push(leaveId);
       }
     });
 
-    // เพิ่ม ID ของการแจ้งซ่อมที่อ่านแล้ว
     repairs.forEach(repair => {
-      if (!userReadStatus.readRepairs.includes(repair._id.toString())) {
-        userReadStatus.readRepairs.push(repair._id.toString());
+      const repairId = repair._id.toString();
+      if (!readRepairsSet.has(repairId)) {
+        readRepairsSet.add(repairId);
+        userReadStatus.readRepairs.push(repairId);
       }
     });
 
@@ -568,6 +578,19 @@ export const markAllNotificationsAsRead = async (req, res) => {
 
     // อัปเดต admin notifications ให้เป็น isRead = true
     if (shopId) {
+      try {
+        // แปลง shopId เป็น ObjectId อย่างปลอดภัย
+        let shopObjectId;
+        if (shopId instanceof mongoose.Types.ObjectId) {
+          shopObjectId = shopId;
+        } else if (typeof shopId === 'string' && mongoose.Types.ObjectId.isValid(shopId)) {
+          shopObjectId = new mongoose.Types.ObjectId(shopId);
+        } else {
+          if (isDev) console.warn('⚠️ Invalid shopId format:', shopId);
+          shopObjectId = null;
+        }
+
+        if (shopObjectId) {
       await Notification.updateMany(
         {
           type: 'admin_notification',
@@ -575,20 +598,96 @@ export const markAllNotificationsAsRead = async (req, res) => {
             { recipients: 'all' },
             { recipients: 'active' },
             { recipients: 'expired' },
-            { recipientShopId: shopId }
+                { recipientShopId: shopObjectId }
           ]
         },
         { $set: { isRead: true } }
       );
+        }
+        
+        if (isDev) {
       console.log('✅ Admin notifications marked as read for shopId:', shopId);
+        }
+      } catch (updateError) {
+        if (isDev) {
+          console.error('⚠️ Error updating admin notifications:', updateError.message);
+        }
+        // ไม่ throw error เพราะเป็น operation รอง
+      }
     }
 
+    // คำนวณวันที่ 3 วันที่แล้ว
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    
+    // สร้างเงื่อนไขสำหรับลบการแจ้งเตือนที่เก่ากว่า 3 วันและเป็น isRead = true
+    const deleteConditions = [];
+
+    // เพิ่มเงื่อนไขสำหรับ user notifications
+    if (userId) {
+      deleteConditions.push({ userId });
+    }
+    if (shopId) {
+      deleteConditions.push({ shopId });
+      
+      // เพิ่มเงื่อนไขสำหรับ admin notifications ที่ส่งมาให้ shop นี้
+      // แก้ไข: เพิ่มเงื่อนไขสำหรับ admin notifications ที่มี shopId ตรงกับ shopId ของ user
+      try {
+        let shopObjectId;
+        if (shopId instanceof mongoose.Types.ObjectId) {
+          shopObjectId = shopId;
+        } else if (typeof shopId === 'string' && mongoose.Types.ObjectId.isValid(shopId)) {
+          shopObjectId = new mongoose.Types.ObjectId(shopId);
+        }
+        
+        if (shopObjectId) {
+          // เพิ่มเงื่อนไขสำหรับ admin notifications ที่มี shopId
+          deleteConditions.push({
+            type: 'admin_notification',
+            shopId: shopObjectId
+          });
+          
+          // เพิ่มเงื่อนไขสำหรับ admin notifications ที่มี recipientShopId (กรณีเก่า)
+          deleteConditions.push({
+            type: 'admin_notification',
+            recipientShopId: shopObjectId
+          });
+        }
+      } catch (idError) {
+        if (isDev) {
+          console.warn('⚠️ Error creating ObjectId for shopId:', idError.message);
+        }
+      }
+    }
+
+    // ลบการแจ้งเตือนที่เก่ากว่า 3 วัน (ถ้ามีเงื่อนไข)
+    let deleteResult = { deletedCount: 0 };
+    if (deleteConditions.length > 0) {
+    const deleteQuery = {
+      $or: deleteConditions,
+      isRead: true,
+      createdAt: { $lt: threeDaysAgo }
+    };
+
+      deleteResult = await Notification.deleteMany(deleteQuery);
+    
+      if (isDev) {
+    console.log('🗑️ Deleted old notifications:', {
+      deletedCount: deleteResult.deletedCount,
+      olderThan: threeDaysAgo.toISOString()
+    });
+      }
+    }
+
+    if (isDev) {
     console.log('✅ All notifications marked as read');
     console.log('📊 Read status updated:', {
       readBills: userReadStatus.readBills.length,
       readLeaves: userReadStatus.readLeaves.length,
-      readRepairs: userReadStatus.readRepairs.length
+      readRepairs: userReadStatus.readRepairs.length,
+      deletedNotifications: deleteResult.deletedCount
     });
+    }
 
     res.status(200).json({
       success: true,
@@ -596,14 +695,19 @@ export const markAllNotificationsAsRead = async (req, res) => {
       data: {
         readBills: userReadStatus.readBills.length,
         readLeaves: userReadStatus.readLeaves.length,
-        readRepairs: userReadStatus.readRepairs.length
+        readRepairs: userReadStatus.readRepairs.length,
+        deletedNotifications: deleteResult.deletedCount
       }
     });
   } catch (error) {
-    console.error('Error marking all notifications as read:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('❌ Error marking all notifications as read:', error);
+      console.error('❌ Error stack:', error.stack);
+    }
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message || 'An error occurred while marking notifications as read',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };

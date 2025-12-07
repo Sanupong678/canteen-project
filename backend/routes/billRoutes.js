@@ -114,18 +114,33 @@ const billUpload = multer({
 // === Multer for Excel import ===
 const excelUpload = multer({
   storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, 'uploads/bills/'),
+    destination: (req, file, cb) => {
+      const uploadPath = 'uploads/bills/';
+      if (!fs.existsSync(uploadPath)) {
+        fs.mkdirSync(uploadPath, { recursive: true });
+      }
+      cb(null, uploadPath);
+    },
     filename: (req, file, cb) => {
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
       cb(null, 'import-' + uniqueSuffix + path.extname(file.originalname));
     }
   }),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-        file.mimetype === 'application/vnd.ms-excel') {
+    // ตรวจสอบ MIME type และ extension
+    const allowedMimeTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'application/octet-stream' // บางครั้ง Excel files จะมี MIME type นี้
+    ];
+    const allowedExtensions = ['.xlsx', '.xls'];
+    const fileExtension = path.extname(file.originalname).toLowerCase();
+    
+    if (allowedMimeTypes.includes(file.mimetype) || allowedExtensions.includes(fileExtension)) {
       cb(null, true);
     } else {
-      cb(new Error('Only Excel files are allowed!'), false);
+      cb(new Error('Only Excel files are allowed! (.xlsx, .xls)'), false);
     }
   }
 });
@@ -149,7 +164,38 @@ router.get('/history/paginated', getBillHistoryWithPagination);
 // Admin bill routes (support legacy paths too)
 router.get(['/admin', '/bills/admin'], isAdmin, getAllBills);
 router.put(['/admin/verify/:id', '/bills/admin/verify/:id'], isAdmin, verifyBill);
-router.post(['/admin/import-excel', '/bills/admin/import-excel'], isAdmin, excelUpload.single('file'), importBillExcel);
+// Excel import with error handling
+router.post(['/admin/import-excel', '/bills/admin/import-excel'], isAdmin, (req, res, next) => {
+  excelUpload.single('file')(req, res, (err) => {
+    if (err) {
+      // Handle multer errors
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+          success: false,
+          message: 'ไฟล์มีขนาดใหญ่เกินไป (สูงสุด 10MB)'
+        });
+      }
+      if (err.message === 'Only Excel files are allowed!') {
+        return res.status(400).json({
+          success: false,
+          message: 'กรุณาอัปโหลดไฟล์ Excel เท่านั้น (.xlsx, .xls)'
+        });
+      }
+      if (err.message && err.message.includes('Unexpected field')) {
+        return res.status(400).json({
+          success: false,
+          message: 'Field name ต้องเป็น "file"',
+          hint: 'Make sure to use form-data with field name "file"'
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        message: 'เกิดข้อผิดพลาดในการอัปโหลดไฟล์: ' + err.message
+      });
+    }
+    next();
+  });
+}, importBillExcel);
 router.put(['/admin/cancel-image/:id', '/bills/admin/cancel-image/:id'], isAdmin, cancelBillImage);
 router.delete(['/admin/:id', '/bills/admin/:id'], isAdmin, deleteBill);
 router.post(['/admin/cleanup', '/bills/admin/cleanup'], isAdmin, cleanupExpiredImages);

@@ -663,6 +663,62 @@
         </div>
       </div>
     </div>
+
+    <!-- Import Excel Confirmation Dialog -->
+    <div v-if="showImportConfirmDialog" class="import-dialog-overlay" @click.self="cancelImport">
+      <div class="import-dialog-card">
+        <div class="import-dialog-header">
+          <i class="fas fa-exclamation-circle"></i>
+          <h3>ยืนยันการอัปโหลดไฟล์ Excel</h3>
+        </div>
+        <div class="import-dialog-body">
+          <div class="import-confirm-content">
+            <div class="warning-message">
+              <i class="fas fa-exclamation-triangle warning-icon"></i>
+              <p class="warning-title">คุณต้องการอัปโหลดไฟล์ Excel นี้ใช่หรือไม่?</p>
+              <p class="warning-text">
+                การอัปโหลดไฟล์จะอัปเดตรายได้ของร้านค้าในระบบ กรุณาตรวจสอบข้อมูลก่อนดำเนินการ
+              </p>
+            </div>
+            
+            <div class="file-info-card">
+              <div class="file-info-row">
+                <i class="fas fa-file-excel file-icon"></i>
+                <div class="file-info-content">
+                  <div class="file-info-label">ชื่อไฟล์:</div>
+                  <div class="file-info-value">{{ fileInfo.name }}</div>
+                </div>
+              </div>
+              <div class="file-info-row">
+                <i class="fas fa-file-alt file-icon"></i>
+                <div class="file-info-content">
+                  <div class="file-info-label">ขนาดไฟล์:</div>
+                  <div class="file-info-value">{{ formatFileSize(fileInfo.size) }}</div>
+                </div>
+              </div>
+              <div class="file-info-row">
+                <i class="fas fa-check-circle file-icon"></i>
+                <div class="file-info-content">
+                  <div class="file-info-label">ประเภทไฟล์:</div>
+                  <div class="file-info-value">Excel (.xlsx, .xls) / CSV (.csv)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="import-dialog-actions">
+          <button class="btn-cancel" @click="cancelImport">
+            <i class="fas fa-times"></i>
+            ยกเลิก
+          </button>
+          <button class="btn-confirm" @click="importExcel(selectedFile)" :disabled="isLoading">
+            <i class="fas fa-check" v-if="!isLoading"></i>
+            <i class="fas fa-spinner fa-spin" v-if="isLoading"></i>
+            {{ isLoading ? 'กำลังอัปโหลด...' : 'ยืนยันอัปโหลด' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </layout-admin>
 </template>
 
@@ -691,6 +747,9 @@ export default {
       evaluationSystemEnabled: true,
       showEvaluationModal: false,
       selectedShop: null,
+      selectedFile: null,
+      showImportConfirmDialog: false,
+      fileInfo: { name: '', size: 0, type: '' },
       newTopic: {
         title: '',
         description: '',
@@ -1528,37 +1587,53 @@ export default {
         'text/csv' // .csv
       ]
       
-      if (!allowedTypes.includes(file.type)) {
+      if (!allowedTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls|csv)$/i)) {
         alert('กรุณาเลือกไฟล์ Excel (.xlsx, .xls) หรือ CSV (.csv) เท่านั้น')
+        event.target.value = ''
         return
       }
 
       // ตรวจสอบขนาดไฟล์ (ไม่เกิน 10MB)
       if (file.size > 10 * 1024 * 1024) {
         alert('ขนาดไฟล์ไม่ควรเกิน 10MB')
+        event.target.value = ''
         return
       }
 
-      try {
-        await this.importExcel(file)
-      } catch (error) {
-        console.error('Error importing file:', error)
-        alert('เกิดข้อผิดพลาดในการ import ไฟล์')
-      } finally {
-        // รีเซ็ต input file
-        event.target.value = ''
+      // เก็บข้อมูลไฟล์และแสดง confirmation dialog
+      this.selectedFile = file
+      this.fileInfo = {
+        name: file.name,
+        size: file.size,
+        type: file.type || 'application/vnd.ms-excel'
       }
+      this.showImportConfirmDialog = true
+
+      // รีเซ็ต input file
+      event.target.value = ''
+    },
+
+    formatFileSize(bytes) {
+      if (bytes === 0) return '0 Bytes'
+      const k = 1024
+      const sizes = ['Bytes', 'KB', 'MB', 'GB']
+      const i = Math.floor(Math.log(bytes) / Math.log(k))
+      return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+    },
+
+    cancelImport() {
+      this.showImportConfirmDialog = false
+      this.selectedFile = null
+      this.fileInfo = { name: '', size: 0, type: '' }
     },
 
     async importExcel(file) {
+      if (!file) return
+      
+      this.showImportConfirmDialog = false
+      this.isLoading = true
+      
       try {
-        // เพิ่มการ confirm ก่อนอัปโหลด
-        if (!confirm('คุณต้องการยืนยันการอัปโหลดไฟล์ Excel หรือไม่?')) {
-          return
-        }
-        
-        this.isLoading = true
-        
         // สร้าง FormData สำหรับส่งไฟล์
         const formData = new FormData()
         formData.append('file', file)
@@ -1591,6 +1666,8 @@ export default {
         }
       } finally {
         this.isLoading = false
+        this.selectedFile = null
+        this.fileInfo = { name: '', size: 0, type: '' }
       }
     }
   }
@@ -3268,6 +3345,178 @@ input:checked + .slider:before {
   .summary-info-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Import Confirmation Dialog Styles */
+.import-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.import-dialog-card {
+  background: white;
+  border-radius: 16px;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.import-dialog-header {
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+  color: white;
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.import-dialog-header i {
+  font-size: 24px;
+}
+
+.import-dialog-header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.import-dialog-body {
+  padding: 24px;
+}
+
+.import-confirm-content {
+  text-align: center;
+}
+
+.warning-message {
+  margin-bottom: 24px;
+}
+
+.warning-icon {
+  font-size: 48px;
+  color: #f39c12;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.warning-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
+}
+
+.warning-text {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.file-info-card {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 20px;
+  border: 2px solid #e9ecef;
+}
+
+.file-info-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 8px;
+  background: white;
+  border-radius: 8px;
+  gap: 12px;
+}
+
+.file-info-row:last-child {
+  margin-bottom: 0;
+}
+
+.file-icon {
+  font-size: 20px;
+  color: #3498db;
+  min-width: 24px;
+}
+
+.file-info-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.file-info-label {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.file-info-value {
+  font-size: 14px;
+  color: #333;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.import-dialog-actions {
+  padding: 16px 24px;
+  background: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.btn-cancel,
+.btn-confirm {
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  min-width: 120px;
+  justify-content: center;
+}
+
+.btn-cancel {
+  background: #e9ecef;
+  color: #495057;
+}
+
+.btn-cancel:hover {
+  background: #dee2e6;
+}
+
+.btn-confirm {
+  background: #28a745;
+  color: white;
+}
+
+.btn-confirm:hover:not(:disabled) {
+  background: #218838;
+}
+
+.btn-confirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>
 

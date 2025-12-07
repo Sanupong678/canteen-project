@@ -1,11 +1,13 @@
 import express from 'express';
-import Shop from '../models/Shop.js';
+import Shop from '../models/shopModel.js';
 import User from '../models/userModel.js';
 import bcrypt from 'bcryptjs';
 import Evaluation from '../models/Evaluation.js'; // Added import for Evaluation
 import multer from 'multer';
 import xlsx from 'xlsx';
 import fs from 'fs';
+import { updateShop, createShop } from '../controllers/shopController.js';
+import Canteen from '../models/canteenModel.js';
 
 const router = express.Router();
 
@@ -253,6 +255,62 @@ router.get('/debug/missing-canteen', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+// Function สำหรับสร้าง customId ใหม่ (copy จาก shopController)
+const canteenAbbreviations = {
+  'โรงอาหาร C5': 'C5',
+  'โรงอาหาร D1': 'D1', 
+  'โรงอาหาร Dormity': 'D',
+  'โรงอาหาร E1': 'E1',
+  'โรงอาหาร E2': 'E2',
+  'โรงอาหาร Epark': 'EP',
+  'โรงอาหาร Msquare': 'MQ',
+  'โรงอาหาร RuemRim': 'RRN',
+  'โรงอาหาร S2': 'S2'
+};
+
+async function generateNewCustomId(canteenId) {
+  try {
+    // ดึงข้อมูลโรงอาหาร
+    const canteen = await Canteen.findOne({ canteenId });
+    if (!canteen) {
+      throw new Error(`ไม่พบโรงอาหารที่มี canteenId: ${canteenId}`);
+    }
+    
+    const canteenName = canteen.name;
+    const abbreviation = canteenAbbreviations[canteenName];
+    
+    if (!abbreviation) {
+      throw new Error(`ไม่พบชื่อย่อสำหรับโรงอาหาร: ${canteenName}`);
+    }
+    
+    // หาเลขลำดับถัดไป
+    let nextNumber = 1;
+    const pattern = new RegExp(`^${abbreviation}(\\d{3})$`);
+    
+    // หาเลขสูงสุดที่มีอยู่แล้ว
+    const existingShops = await Shop.find({
+      customId: { $regex: pattern }
+    });
+    
+    if (existingShops.length > 0) {
+      const existingNumbers = existingShops
+        .map(shop => {
+          const match = shop.customId.match(pattern);
+          return match ? parseInt(match[1]) : 0;
+        })
+        .sort((a, b) => b - a);
+      
+      nextNumber = existingNumbers[0] + 1;
+    }
+    
+    // สร้าง customId ใหม่ (3 หลัก)
+    return `${abbreviation}${nextNumber.toString().padStart(3, '0')}`;
+  } catch (error) {
+    console.error('Error generating customId:', error);
+    throw error;
+  }
+}
+
 // Create a new shop
 router.post('/', async (req, res) => {
   try {
@@ -279,31 +337,48 @@ router.post('/', async (req, res) => {
     const savedUser = await user.save();
     console.log('Created new user:', savedUser);
     
-    // Get the latest shop to determine the next customId
-    const latestShop = await Shop.findOne().sort({ customId: -1 });
-    let nextCustomId = 'ShopID001';
-
-    if (latestShop && latestShop.customId) {
-      const currentNumber = parseInt(latestShop.customId.replace('ShopID', ''));
-      nextCustomId = `ShopID${String(currentNumber + 1).padStart(3, '0')}`;
-    }
+    // สร้าง customId ใหม่ตามรูปแบบที่กำหนด (C5001, D1001, etc.)
+    const newCustomId = await generateNewCustomId(req.body.canteenId);
+    console.log('Generated customId:', newCustomId);
 
     // Create shop with user reference and hashed password
     const shop = new Shop({
       ...req.body,
-      customId: nextCustomId,
+      customId: newCustomId,
       canteenId: parseInt(req.body.canteenId), // แปลงเป็น number
       credentials: {
-        username: credentials.username,
-        password: credentials.password,
-        password_hash: hashedPassword,
+        username: credentials.username.trim(), // trim whitespace
+        password: credentials.password, // เก็บไว้สำหรับ fallback (ไม่ควรใช้)
+        password_hash: hashedPassword, // ใช้ password_hash สำหรับ login
         status: 'active'
       },
       userId: savedUser._id
     });
     
+    console.log('Shop data before save:', {
+      username: shop.credentials.username,
+      hasPasswordHash: !!shop.credentials.password_hash,
+      passwordHashLength: shop.credentials.password_hash?.length
+    });
+    
     const newShop = await shop.save();
-    console.log('Created new shop:', newShop);
+    console.log('Created new shop:', {
+      id: newShop._id,
+      name: newShop.name,
+      customId: newShop.customId,
+      username: newShop.credentials.username,
+      hasPasswordHash: !!newShop.credentials.password_hash,
+      passwordHashLength: newShop.credentials.password_hash?.length
+    });
+    
+    // ตรวจสอบว่า password_hash ถูกเก็บจริงๆ
+    const verifyShop = await Shop.findById(newShop._id);
+    if (!verifyShop.credentials.password_hash) {
+      console.error('⚠️ WARNING: password_hash not saved! Re-saving...');
+      verifyShop.credentials.password_hash = hashedPassword;
+      await verifyShop.save();
+      console.log('✅ password_hash re-saved');
+    }
     
     // Update user with shop reference
     savedUser.shopId = newShop._id;
@@ -312,6 +387,15 @@ router.post('/', async (req, res) => {
     res.status(201).json(newShop);
   } catch (error) {
     console.error('Error creating shop:', error);
+    
+    // จัดการ error สำหรับ duplicate customId
+    if (error.code === 11000 && error.keyPattern && error.keyPattern.customId) {
+      return res.status(400).json({ 
+        message: `รหัสร้านค้า ${req.body.customId || 'ที่สร้างอัตโนมัติ'} มีอยู่แล้ว กรุณาลองใหม่อีกครั้ง`,
+        errorType: 'duplicate_customId',
+        field: 'customId'
+      });
+    }
     
     // จัดการ error สำหรับ duplicate username
     if (error.code === 11000 && error.keyPattern && error.keyPattern['credentials.username']) {
@@ -327,22 +411,8 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Update a shop
-router.put('/:id', async (req, res) => {
-  try {
-    const shop = await Shop.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
-    if (!shop) {
-      return res.status(404).json({ message: 'Shop not found' });
-    }
-    res.json(shop);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-});
+// Update a shop - ใช้ controller เพื่อให้แน่ใจว่าอัปเดต database และ Bill ที่เกี่ยวข้อง
+router.put('/:id', updateShop);
 
 // Delete a shop
 router.delete('/:id', async (req, res) => {
@@ -470,7 +540,12 @@ router.post('/reset-all-scores', async (req, res) => {
 router.get('/canteen/:canteenId', async (req, res) => {
   try {
     const { canteenId } = req.params;
-    const shops = await Shop.find({ canteenId: parseInt(canteenId) });
+    // เลือกเฉพาะ fields ที่จำเป็นเพื่อลดขนาดข้อมูลและเพิ่มความเร็ว
+    // ไม่ดึง image (base64) เพราะใช้เวลานานในการโหลดและส่งข้อมูล
+    // image จะถูกดึงเมื่อต้องการแสดงรายละเอียดเท่านั้น
+    const shops = await Shop.find({ canteenId: parseInt(canteenId) })
+      .select('-image -credentials.password -credentials.password_hash')
+      .lean(); // ใช้ lean() เพื่อเพิ่มความเร็วในการ query
     console.log(`Found all shops for canteen ${canteenId}:`, shops.length);
     res.json(shops);
   } catch (error) {
@@ -1022,7 +1097,7 @@ router.post('/import-revenue', (req, res) => {
             evaluationMonth: parseInt(month),
             evaluationYear: parseInt(year)
           },
-          { $set: { revenue: revenueNumber } }
+          { $set: { revenue: revenueNumber, isActive: true } }
         );
 
         if (result.modifiedCount > 0) {

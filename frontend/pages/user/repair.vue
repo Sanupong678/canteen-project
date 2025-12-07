@@ -59,74 +59,85 @@
                 </div>
               </v-col>
               <v-col cols="12">
-                <v-btn
-                  color="primary"
-                  block
-                  :loading="loading"
-                  :disabled="!isFormValid || loading"
-                  @click="handleSubmit"
-                  class="submit-btn"
-                >
-                  ส่งเรื่อง
-                </v-btn>
+                <div class="text-center mt-6">
+                  <v-btn
+                    color="primary"
+                    block
+                    :loading="loading"
+                    :disabled="!isFormValid || loading"
+                    @click="handleSubmit"
+                    class="submit-btn"
+                  >
+                    ส่งเรื่อง
+                  </v-btn>
+                </div>
               </v-col>
             </v-row>
           </v-form>
 
-          <div class="history-link" @click="showHistory = !showHistory">
+          <div class="history-link" @click="showHistory = true">
             ประวัติการแจ้งซ่อม
           </div>
 
-          <div v-if="showHistory" class="history-container">
-            <div v-if="repairHistory.length === 0" class="text-gray-500 text-center py-4">
-              <p class="text-lg font-medium mb-2">ยังไม่เคยแจ้งซ่อมมาก่อน</p>
-              <p class="text-sm text-gray-400">เมื่อคุณแจ้งซ่อมครั้งแรก ข้อมูลจะแสดงที่นี่</p>
-            </div>
-            <div v-else class="space-y-3">
-              <div
-                v-for="(repair, index) in paginatedRepairHistory"
-                :key="repair._id"
-                class="history-item"
-              >
-                <p class="font-semibold">วันที่แจ้ง: {{ formatDate(repair.report_date) }}</p>
-                <p class="font-semibold">หมวดหมู่: {{ getCategoryText(repair.category) }}</p>
-                <p class="issue-text">รายละเอียดปัญหา: {{ repair.issue }}</p>
-                <p class="status-badge" :class="getStatusClass(repair.status)">
-                  สถานะ: {{ getStatusText(repair.status) }}
-                </p>
-                <div v-if="repair.images && repair.images.length" class="image-grid">
-                  <img 
-                    v-for="(image, imgIndex) in repair.images" 
-                    :key="imgIndex"
-                    :src="image"
-                    @click="viewImages(repair.images)"
-                    class="history-image"
-                  />
+          <!-- History Dialog -->
+          <v-dialog v-model="showHistory" max-width="800px" persistent>
+            <v-card class="history-dialog-card">
+              <v-card-title class="history-dialog-header">
+                <h2>ประวัติการแจ้งซ่อม</h2>
+                <span @click="showHistory = false" class="close-btn">×</span>
+              </v-card-title>
+              <v-card-text class="history-dialog-body">
+                <div v-if="repairHistory.length === 0" class="text-gray-500 text-center py-4">
+                  <p class="text-lg font-medium mb-2">ยังไม่เคยแจ้งซ่อมมาก่อน</p>
+                  <p class="text-sm text-gray-400">เมื่อคุณแจ้งซ่อมครั้งแรก ข้อมูลจะแสดงที่นี่</p>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Pagination -->
-          <div v-if="showHistory && repairHistory.length > 0" class="pagination-section">
-            <div class="items-per-page">
-              <span class="label">Items per page:</span>
-              <span class="fixed-size">5</span>
-              <span class="range">{{ startIndexDisplay }}-{{ endIndexDisplay }} of {{ repairHistory.length }}</span>
-            </div>
-            <div class="pagination">
-              <template v-for="p in totalPages">
-                <button v-if="p <= 3 || p === totalPages || Math.abs(p - currentPage) <= 1"
-                        :key="`p-`+p"
-                        class="page-num"
-                        :class="{ active: p === currentPage }"
-                        @click="goToPage(p)">{{ p }}</button>
-                <span v-else-if="p === 4 && currentPage > 4" :key="'dots-left'">...</span>
-                <span v-else-if="p === totalPages - 1 && currentPage < totalPages - 3" :key="'dots-right'">...</span>
-              </template>
-              <button class="page-next" :disabled="currentPage === totalPages" @click="nextPage">next</button>
-            </div>
-          </div>
+                <div v-else class="space-y-3">
+                  <div
+                    v-for="(repair, index) in paginatedRepairHistory"
+                    :key="repair._id"
+                    class="history-item"
+                  >
+                    <p class="font-semibold">วันที่แจ้ง: {{ formatDate(repair.report_date) }}</p>
+                    <p class="font-semibold">หมวดหมู่: {{ getCategoryText(repair.category) }}</p>
+                    <p class="issue-text">รายละเอียดปัญหา: {{ repair.issue }}</p>
+                    <p class="status-badge" :class="getStatusClass(repair.status)">
+                      สถานะ: {{ getStatusText(repair.status) }}
+                    </p>
+                    <div v-if="repair.images && repair.images.length" class="image-grid">
+                      <img 
+                        v-for="(image, imgIndex) in repair.images" 
+                        :key="imgIndex"
+                        :src="image"
+                        @click="viewImages(repair.images)"
+                        class="history-image"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </v-card-text>
+              <v-card-actions v-if="repairHistory.length > 0" class="history-dialog-footer">
+                <div class="pagination-section">
+                  <div class="items-per-page">
+                    <span class="label">Items per page:</span>
+                    <span class="fixed-size">5</span>
+                    <span class="range">{{ startIndexDisplay }}-{{ endIndexDisplay }} of {{ repairHistory.length }}</span>
+                  </div>
+                  <div class="pagination">
+                    <template v-for="p in totalPages">
+                      <button v-if="p <= 3 || p === totalPages || Math.abs(p - currentPage) <= 1"
+                              :key="`p-`+p"
+                              class="page-num"
+                              :class="{ active: p === currentPage }"
+                              @click="goToPage(p)">{{ p }}</button>
+                      <span v-else-if="p === 4 && currentPage > 4" :key="'dots-left'">...</span>
+                      <span v-else-if="p === totalPages - 1 && currentPage < totalPages - 3" :key="'dots-right'">...</span>
+                    </template>
+                    <button class="page-next" :disabled="currentPage === totalPages" @click="nextPage">next</button>
+                  </div>
+                </div>
+              </v-card-actions>
+            </v-card>
+          </v-dialog>
         </div>
 
         <!-- Image Preview Dialog -->
@@ -237,7 +248,16 @@ const handleSubmit = async () => {
       }
     })
 
-    if (response.data.success) {
+    if (response.data && response.data.success && response.data.data) {
+      // เพิ่มข้อมูลใหม่ที่เพิ่งส่งเข้าไปในประวัติทันที (ไม่ต้องรอ admin อนุมัติ)
+      const newRepair = response.data.data
+      // เพิ่มข้อมูลใหม่ที่ด้านบนของ array
+      repairHistory.value = [newRepair, ...repairHistory.value]
+      
+      // เปิดแสดงประวัติทันทีหลังจากส่งคำขอสำเร็จ
+      showHistory.value = true
+      
+      // Reset form
       if (form.value) {
         form.value.reset()
       }
@@ -247,9 +267,10 @@ const handleSubmit = async () => {
       images.value = []
       imagePreview.value = []
       
+      // ดึงข้อมูลใหม่จาก API เพื่อให้แน่ใจว่าข้อมูลตรงกับ backend
+      fetchRepairHistory().catch(err => console.error('Error refreshing history:', err))
+      
       alert('บันทึกการแจ้งซ่อมเรียบร้อยแล้ว')
-      await fetchRepairHistory()
-      showHistory.value = true
     }
   } catch (error) {
     console.error('Error details:', {
@@ -273,8 +294,16 @@ const fetchRepairHistory = async () => {
     console.log('API Response:', response.data)
     if (response.data && Array.isArray(response.data)) {
       repairHistory.value = response.data
+      // เปิดแสดงประวัติถ้ามีข้อมูล
+      if (repairHistory.value.length > 0) {
+        showHistory.value = true
+      }
     } else if (response.data && Array.isArray(response.data.data)) {
       repairHistory.value = response.data.data
+      // เปิดแสดงประวัติถ้ามีข้อมูล
+      if (repairHistory.value.length > 0) {
+        showHistory.value = true
+      }
     } else {
       console.warn('Unexpected response format:', response.data)
       repairHistory.value = []
@@ -521,7 +550,7 @@ const endIndexDisplay = computed(() => Math.min(currentPage.value * pageSize, re
 }
 
 .submit-btn:disabled {
-  background: #cbd5e0;
+  background: #cbd5e0 !important;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
@@ -529,6 +558,8 @@ const endIndexDisplay = computed(() => Math.min(currentPage.value * pageSize, re
 
 /* History Section Styles */
 .history-link {
+  display: block;
+  width: 100%;
   color: #e74c3c;
   font-weight: 600;
   padding: 12px 20px;
@@ -539,7 +570,7 @@ const endIndexDisplay = computed(() => Math.min(currentPage.value * pageSize, re
   cursor: pointer;
   font-size: 16px;
   box-shadow: 0 2px 8px rgba(231, 76, 60, 0.1);
-  margin-bottom: 1rem;
+  margin: 1rem 0 0.75rem 0;
   text-align: center;
   text-decoration: none;
 }
@@ -557,6 +588,45 @@ const endIndexDisplay = computed(() => Math.min(currentPage.value * pageSize, re
   margin-top: 1rem;
   box-shadow: 0 4px 12px rgba(231, 76, 60, 0.1);
   border-left: 4px solid #e74c3c;
+}
+
+/* History Dialog Styles */
+.history-dialog-card {
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+
+.history-dialog-header {
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px !important;
+  margin: 0 !important;
+}
+
+.history-dialog-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+}
+
+.history-dialog-header .close-btn {
+  color: white !important;
+}
+
+.history-dialog-body {
+  padding: 24px !important;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.history-dialog-footer {
+  padding: 16px 24px !important;
+  border-top: 1px solid #e2e8f0;
+  background: #f8f9fa;
 }
 
 /* Pagination styles */
@@ -741,5 +811,13 @@ const endIndexDisplay = computed(() => Math.min(currentPage.value * pageSize, re
 
 .space-y-3 > * + * {
   margin-top: 0.75rem;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.mt-6 {
+  margin-top: 1.5rem;
 }
 </style> 

@@ -1,6 +1,6 @@
 import Evaluation from '../models/Evaluation.js';
 import EvaluationItem from '../models/EvaluationItem.js';
-import Shop from '../models/Shop.js';
+import Shop from '../models/shopModel.js';
 
 // Check for new evaluation topics and update existing evaluations
 export const checkNewTopics = async (req, res) => {

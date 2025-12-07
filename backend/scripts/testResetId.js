@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import Evaluation from '../models/Evaluation.js';
 import ResetControl from '../models/ResetControl.js';
-import Shop from '../models/Shop.js';
+import Shop from '../models/shopModel.js';
 import dotenv from 'dotenv';
 
 // Load environment variables

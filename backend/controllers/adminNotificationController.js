@@ -1,4 +1,4 @@
-import Shop from '../models/Shop.js';
+import Shop from '../models/shopModel.js';
 import Notification from '../models/notificationModel.js';
 import User from '../models/userModel.js';
 
@@ -207,31 +207,53 @@ export const getAdminNotifications = async (req, res) => {
     console.log('👤 User:', req.user);
     
     // ดึงข้อมูล notifications ทั้งหมด (user-to-admin notifications)
-    // เรียงลำดับ: ข้อมูลที่ยังไม่อ่านขึ้นก่อน, แล้วเรียงตามวันที่อัปเดตล่าสุด
-    const notifications = await Notification.find({
-      type: { $in: ['bill', 'leave', 'repair'] }
-    })
-      .sort({ isRead: 1, createdAt: -1 }) // isRead: 1 = false (ยังไม่อ่าน) ขึ้นก่อน, createdAt: -1 = ใหม่สุดขึ้นก่อน
-      .limit(50);
+    // กรองเฉพาะ notifications ที่ยังไม่อ่าน (isRead: false) เท่านั้น
+    // และต้องมี userId หรือ shopId (เพื่อแยกจาก notifications อื่นๆ)
+    const query = {
+      type: { $in: ['bill', 'leave', 'repair'] },
+      isRead: false, // แสดงเฉพาะที่ยังไม่อ่านเท่านั้น
+      $or: [
+        { userId: { $exists: true, $ne: null } },
+        { shopId: { $exists: true, $ne: null } }
+      ]
+    };
     
-    console.log('📋 Found admin notifications:', notifications.length);
+    console.log('📋 Query filter:', JSON.stringify(query, null, 2));
     
-    // แสดงข้อมูล isRead ของแต่ละ notification
+    // Query ข้อมูลใหม่สุดก่อน (เพราะดึงเฉพาะที่ยังไม่อ่านแล้ว ไม่ต้อง sort ใหม่)
+    const notifications = await Notification.find(query)
+      .sort({ createdAt: -1 }) // ดึงข้อมูลใหม่สุดก่อน
+      .limit(50); // จำกัด 50 รายการ
+    
+    console.log('📋 Total unread notifications found:', notifications.length);
+    
+    console.log('📋 Final unread admin notifications:', notifications.length);
+    
+    // แสดงข้อมูลของแต่ละ notification (ทุกอันควรเป็น isRead: false)
     notifications.forEach((notification, index) => {
       console.log(`📋 Notification ${index + 1}:`, {
         id: notification._id,
         title: notification.title,
+        message: notification.message?.substring(0, 50) + '...',
         isRead: notification.isRead,
-        type: notification.type
+        type: notification.type,
+        status: notification.status,
+        userId: notification.userId,
+        shopId: notification.shopId,
+        createdAt: notification.createdAt
       });
     });
     
-    const unreadCount = notifications.filter(n => !n.isRead).length;
-    console.log('📊 Unread count from server:', unreadCount);
+    const unreadCount = notifications.length; // ทุกอันควรเป็น unread แล้ว
+    console.log('📊 Unread count:', unreadCount);
     
     res.status(200).json({
       success: true,
-      data: notifications
+      data: notifications,
+      meta: {
+        total: notifications.length,
+        unread: unreadCount
+      }
     });
   } catch (error) {
     console.error('❌ Error getting admin notifications:', error);

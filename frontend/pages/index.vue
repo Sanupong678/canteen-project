@@ -139,8 +139,10 @@ export default {
 .login-button {
   display: inline-block;
   padding: 20px 50px;
-  background: white;
-  color: #dc3545;
+  background: rgba(189, 189, 189, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: white;
   text-decoration: none;
   border-radius: 30px;
   font-size: 1.4rem;
@@ -148,7 +150,7 @@ export default {
   text-align: center;
   transition: all 0.3s ease;
   box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
-  border: none;
+  border: 2px solid rgba(255, 255, 255, 0.3);
   cursor: pointer;
   min-width: 220px;
   position: relative;
@@ -162,7 +164,7 @@ export default {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(220, 53, 69, 0.1), transparent);
+  background: linear-gradient(90deg, transparent, rgba(220, 53, 69, 0.2), transparent);
   transition: left 0.5s;
 }
 
@@ -171,10 +173,11 @@ export default {
 }
 
 .login-button:hover {
-  background: #dc3545;
+  background: rgba(220, 53, 69, 0.9);
   color: white;
   transform: translateY(-8px);
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 25px 60px rgba(220, 53, 69, 0.6);
+  border-color: rgba(220, 53, 69, 0.8);
   text-decoration: none;
 }
 

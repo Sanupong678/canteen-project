@@ -135,7 +135,8 @@ export const createShop = async (req, res) => {
 export const getAllShops = async (req, res) => {
   try {
     const shops = await Shop.find()
-      .populate('credentials.userId', 'username email')
+      .populate('userId', 'username email') // ใช้ userId field แยก (จาก Shop.js)
+      .populate('credentials.userId', 'username email') // หรือ populate credentials.userId ถ้ามี
       .sort({ createdAt: -1 });
 
     // Debug: ตรวจสอบข้อมูลการประเมิน
@@ -179,7 +180,8 @@ export const getAllShops = async (req, res) => {
 export const getShopById = async (req, res) => {
   try {
     const shop = await Shop.findById(req.params.id)
-      .populate('credentials.userId', 'username email');
+      .populate('userId', 'username email') // ใช้ userId field แยก
+      .populate('credentials.userId', 'username email'); // หรือ populate credentials.userId ถ้ามี
 
     if (!shop) {
       return res.status(404).json({
@@ -213,54 +215,93 @@ export const updateShop = async (req, res) => {
     console.log('Shop ID:', req.params.id);
     console.log('Update data:', req.body);
     
+    // แยก credentials object ออกมาเพื่อป้องกัน conflict
+    const { credentials, ...otherFields } = req.body;
+    
+    // สร้าง update object โดยใช้ dot notation สำหรับ nested fields
+    const updateData = { ...otherFields };
+    
+    // ถ้ามีการส่ง credentials มา ให้แปลงเป็น dot notation
+    if (credentials && typeof credentials === 'object') {
+      // ใช้ $set operator สำหรับ nested fields
+      Object.keys(credentials).forEach(key => {
+        updateData[`credentials.${key}`] = credentials[key];
+      });
+      
+      // อัพเดท credentials.updatedAt อัตโนมัติ
+      updateData['credentials.updatedAt'] = new Date();
+    }
+    
+    console.log('Update data with dot notation:', updateData);
+    
+    // อัพเดท shop ใน database โดยใช้ $set operator เพื่อป้องกัน conflict
     const shop = await Shop.findByIdAndUpdate(
       req.params.id,
+      { $set: updateData },
       { 
-        ...req.body,
-        'credentials.updatedAt': new Date()
-      },
-      { new: true }
+        new: true, 
+        runValidators: true // ตรวจสอบ validation
+      }
     );
 
     if (!shop) {
+      console.error('Shop not found:', req.params.id);
       return res.status(404).json({
         success: false,
         message: 'ไม่พบร้านค้า'
       });
     }
     
-    console.log('Updated shop data:', {
+    // ตรวจสอบว่า shop ถูกบันทึกแล้ว
+    console.log('✅ Shop updated in database:', {
+      _id: shop._id,
       name: shop.name,
+      customId: shop.customId,
       evaluationCompleted: shop.evaluationCompleted,
       evaluationDate: shop.evaluationDate,
       score: shop.score,
       evaluationStatus: shop.evaluationStatus
     });
 
-    // Update associated bill
-    const bill = await Bill.findOne({ shopId: shop._id });
-    if (bill) {
-      if (req.body.name) {
-        bill.shopName = req.body.name;
+    // Update associated bills (อาจมีหลาย bills)
+    const bills = await Bill.find({ shopId: shop._id });
+    if (bills && bills.length > 0) {
+      for (const bill of bills) {
+        let billUpdated = false;
+        
+        if (req.body.name && bill.shopName !== req.body.name) {
+          bill.shopName = req.body.name;
+          billUpdated = true;
+        }
+        
+        if (req.body.contractEndDate && bill.contractEndDate !== new Date(req.body.contractEndDate)) {
+          bill.contractEndDate = new Date(req.body.contractEndDate);
+          if (bill.calculateNotificationDates) {
+            bill.calculateNotificationDates(req.body.contractEndDate);
+          }
+          billUpdated = true;
+        }
+        
+        if (billUpdated) {
+          await bill.save();
+          console.log(`✅ Bill ${bill._id} updated for shop ${shop.name}`);
+        }
       }
-      if (req.body.contractEndDate) {
-        bill.contractEndDate = req.body.contractEndDate;
-        bill.calculateNotificationDates(req.body.contractEndDate);
-      }
-      await bill.save();
     }
 
+    // ส่งกลับ shop object ที่อัปเดตแล้ว
     res.json({
       success: true,
       data: {
         shop,
-        bill
+        bills: bills || []
       }
     });
   } catch (error) {
+    console.error('❌ Error updating shop:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'เกิดข้อผิดพลาดในการอัพเดทร้านค้า'
     });
   }
 };

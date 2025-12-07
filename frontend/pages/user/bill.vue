@@ -8,6 +8,10 @@
             <p class="page-subtitle">รายการบิลที่ต้องดำเนินการ</p>
           </div>
           <div class="header-actions">
+            <select id="paymentTypeSelect" v-model="selectedType" class="header-select-type">
+              <option value="water">ค่าน้ำ</option>
+              <option value="electricity">ค่าไฟ</option>
+            </select>
             <router-link to="/user/bill-history" class="history-button">
               <i class="fas fa-history"></i>
               ดูประวัติ
@@ -16,15 +20,6 @@
         </div>
 
         <div class="bill-container">
-          <!-- Payment Type Buttons -->
-          <div class="payment-type-dropdown">
-            <select id="paymentTypeSelect" v-model="selectedType" class="select-type">
-              <option value="water">ค่าน้ำ</option>
-              <option value="electricity">ค่าไฟ</option>
-              <option value="utilities">รวม (ค่าน้ำ+ค่าไฟ)</option>
-            </select>
-            <label for="paymentTypeSelect" class="re-only">เลือกประเภท</label>
-          </div>
 
           <!-- Bill List -->
           <div class="bills-list">
@@ -62,7 +57,7 @@
 
                 <div class="right-section">
                   <div class="payment-info">
-                    <h3 v-if="bill.amount" class="amount">฿{{ formatAmount(bill.amount) }}</h3>
+                    <h3 v-if="bill.amount !== null && bill.amount !== undefined && typeof bill.amount === 'number' && !isNaN(bill.amount) && bill.amount > 0" class="amount">฿{{ formatAmount(bill.amount) }}</h3>
                     <h3 v-else class="amount amount-pending">รอการกำหนดจำนวนเงิน</h3>
                     <div class="account-info">
                       <p>เลขบัญชี: {{ bill.accountNumber }}</p>
@@ -83,9 +78,9 @@
                       :disabled="!!bill.image"
                       @click="triggerFileInput(bill.id)"
                     >
-                      {{ bill.type === 'utilities' ? 'อัปโหลดสลิปรวม (Utilities)' : 'อัปโหลดสลิป' }}
+                      อัปโหลดสลิป
                     </button>
-                    <div v-else-if="!bill.amount" class="waiting-message">
+                    <div v-else-if="!bill.amount || bill.amount === null || bill.amount === undefined || typeof bill.amount !== 'number' || isNaN(bill.amount) || bill.amount <= 0" class="waiting-message">
                       <p>รอการกำหนดจำนวนเงินจากผู้ดูแลระบบ</p>
                     </div>
                     <!-- ปุ่มยืนยันอัปโหลด -->
@@ -109,10 +104,11 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { format } from 'date-fns'
 import { th } from 'date-fns/locale'
 import axios from 'axios'
+import { useNuxtApp } from '#app'
 
 export default {
   name: 'BillPage',
@@ -124,10 +120,62 @@ export default {
     const selectedFiles = ref({})
 
     const filteredBills = computed(() => {
-      return bills.value.filter(bill => 
-        bill.type === selectedType.value && 
-        bill.status !== 'เสร็จสิ้น'
-      )
+      console.log('🔍 filteredBills computed - Total bills:', bills.value.length)
+      console.log('🔍 selectedType:', selectedType.value)
+      console.log('🔍 All bills:', bills.value.map(b => ({
+        id: b.id,
+        type: b.type,
+        amount: b.amount,
+        amountType: typeof b.amount,
+        status: b.status
+      })))
+      
+      const filtered = bills.value.filter(bill => {
+        console.log('🔍 Checking bill:', {
+          id: bill.id,
+          type: bill.type,
+          selectedType: selectedType.value,
+          amount: bill.amount,
+          amountType: typeof bill.amount,
+          status: bill.status
+        })
+        
+        // ตรวจสอบว่า type ตรงกัน
+        if (bill.type !== selectedType.value) {
+          console.log('❌ Type mismatch:', bill.type, '!==', selectedType.value)
+          return false
+        }
+        
+        // ตรวจสอบว่า status ไม่ใช่ 'เสร็จสิ้น'
+        if (bill.status === 'เสร็จสิ้น') {
+          console.log('❌ Status is เสร็จสิ้น, skipping')
+          return false
+        }
+        
+        // แสดงบิลที่มี amount แล้ว (ไม่ใช่ null, undefined, หรือ "-")
+        // amount ต้องเป็นตัวเลขที่มากกว่า 0
+        // ตรวจสอบว่า amount เป็น number และมากกว่า 0
+        const hasAmount = bill.amount !== null && 
+                         bill.amount !== undefined && 
+                         typeof bill.amount === 'number' &&
+                         !isNaN(bill.amount) &&
+                         bill.amount > 0
+        
+        const shouldShow = hasAmount || bill.status === 'รอดำเนินการ' || bill.status === 'เลยกำหนด'
+        
+        console.log('✅ Bill passed filter:', {
+          id: bill.id,
+          hasAmount,
+          status: bill.status,
+          shouldShow
+        })
+        
+        // แสดงบิลที่มี amount หรือ status เป็น 'รอดำเนินการ' หรือ 'เลยกำหนด'
+        return shouldShow
+      })
+      
+      console.log('✅ Filtered bills count:', filtered.length)
+      return filtered
     })
 
     const formatDate = (date) => {
@@ -148,7 +196,6 @@ export default {
     const getBillTypeText = (type) => {
       if (type === 'water') return 'ค่าน้ำ'
       if (type === 'electricity') return 'ค่าไฟ'
-      if (type === 'utilities') return 'รวม (ค่าน้ำ+ค่าไฟ)'
       return type
     }
 
@@ -194,8 +241,24 @@ export default {
 
     // ฟังก์ชันตรวจสอบว่าสามารถอัปโหลดสลิปได้หรือไม่
     const canUploadSlip = (bill) => {
+      // ตรวจสอบว่า amount มีค่าและถูกต้อง (ไม่ใช่ null, undefined, "", หรือ "-")
+      // amount ต้องเป็น number และมากกว่า 0
+      const hasAmount = bill.amount !== null && 
+                       bill.amount !== undefined && 
+                       typeof bill.amount === 'number' &&
+                       !isNaN(bill.amount) &&
+                       bill.amount > 0
+      
+      console.log('🔍 canUploadSlip check:', {
+        id: bill.id,
+        amount: bill.amount,
+        amountType: typeof bill.amount,
+        hasAmount: hasAmount,
+        status: bill.status
+      })
+      
       // ไม่แสดงปุ่มเมื่อยังไม่มี amount (รอ admin อัปโหลด Excel)
-      if (!bill.amount) {
+      if (!hasAmount) {
         return false
       }
       
@@ -209,8 +272,8 @@ export default {
         return false
       }
       
-      // กรณีไม่มี status ให้แสดงปุ่ม
-      if (!bill.status) {
+      // กรณีไม่มี status แต่มี amount ให้แสดงปุ่ม (เพื่อให้สามารถอัปโหลดสลิปได้)
+      if (!bill.status && hasAmount) {
         return true
       }
       
@@ -260,7 +323,11 @@ export default {
         formData.append('transferDate', new Date().toISOString())
         formData.append('billType', bill.type)
         
-        const token = localStorage.getItem('token')
+        // ตรวจสอบ token จากทั้ง localStorage และ sessionStorage
+        let token = localStorage.getItem('token')
+        if (!token) {
+          token = sessionStorage.getItem('token')
+        }
         console.log('Token status:', token ? 'Present' : 'Missing')
         
         // ตรวจสอบ token
@@ -313,25 +380,74 @@ export default {
     }
 
     const fetchBills = async () => {
+      console.log('🚀 fetchBills() called')
       try {
-        const token = localStorage.getItem('token')
+        // ตรวจสอบ token จากทั้ง localStorage และ sessionStorage
+        let token = localStorage.getItem('token')
         if (!token) {
+          token = sessionStorage.getItem('token')
+          console.log('🔑 Token from sessionStorage:', token ? 'Present' : 'Missing')
+        } else {
+          console.log('🔑 Token from localStorage:', 'Present')
+        }
+        
+        if (!token) {
+          console.log('❌ No token found in localStorage or sessionStorage')
           bills.value = []
           return
         }
+        console.log('📡 Calling API: /api/bills/history')
         // เรียก API backend พร้อมแนบ token
         const response = await axios.get(`/api/bills/history`, {
           headers: { Authorization: `Bearer ${token}` }
         })
+        console.log('📥 API Response received:', {
+          success: response.data?.success,
+          dataLength: response.data?.data?.length,
+          data: response.data
+        })
         if (response.data && response.data.success && Array.isArray(response.data.data)) {
-          console.log('📊 API Response:', response.data.data)
+          console.log('📊 API Response - Total bills:', response.data.data.length)
+          console.log('📊 API Response data:', response.data.data)
           // แปลงข้อมูลให้เหมาะกับการแสดงผล
           bills.value = response.data.data.map(bill => {
-            console.log('🔍 Processing bill:', bill)
-            return {
-            id: bill._id,
-            type: bill.billType,
+            console.log('🔍 Processing bill (raw):', {
+              _id: bill._id,
+              billType: bill.billType,
             amount: bill.amount,
+              amountType: typeof bill.amount,
+              status: bill.status,
+              month: bill.month,
+              year: bill.year
+            })
+            // แปลง amount ให้เป็นตัวเลขถ้าเป็น string ที่เป็นตัวเลข
+            // หรือใช้ค่า number โดยตรงถ้าเป็น number แล้ว
+            let amount = bill.amount
+            if (amount === null || amount === undefined) {
+              amount = null
+            } else if (typeof amount === 'string') {
+              // ถ้าเป็น string ให้ parse ถ้าเป็นตัวเลข
+              const trimmed = amount.trim()
+              if (trimmed === '' || trimmed === '-') {
+                amount = null
+              } else {
+                const parsed = parseFloat(trimmed)
+                amount = isNaN(parsed) ? null : parsed
+              }
+            } else if (typeof amount === 'number') {
+              // ถ้าเป็น number แล้ว ใช้ค่าโดยตรง
+              amount = isNaN(amount) ? null : amount
+            } else {
+              // กรณีอื่นๆ ให้เป็น null
+              amount = null
+            }
+            
+            console.log('💰 Amount processed:', { original: bill.amount, processed: amount, type: typeof bill.amount })
+            
+            const processedBill = {
+            id: bill._id,
+            type: bill.billType, // ใช้ billType จาก API โดยตรง (water/electricity)
+            amount: amount, // ใช้ amount ที่ประมวลผลแล้ว (number หรือ null)
             billMonth: new Date(bill.year, bill.month ? bill.month-1 : 0),
             createdAt: bill.createdAt,
             dueDate: bill.dueDate || bill.contractEndDate,
@@ -341,18 +457,114 @@ export default {
               status: bill.status || 'รอดำเนินการ', // เพิ่ม status
               image: bill.image || null // เพิ่ม image
             }
+            
+            console.log('✅ Processed bill:', {
+              id: processedBill.id,
+              type: processedBill.type,
+              amount: processedBill.amount,
+              amountType: typeof processedBill.amount,
+              status: processedBill.status,
+              month: bill.month,
+              year: bill.year
+            })
+            return processedBill
           })
-          console.log('✅ Processed bills:', bills.value)
+          console.log('✅ All processed bills:', bills.value)
+          
+          // ตรวจสอบว่ามีบิลที่มี amount แล้วหรือไม่
+          const billsWithAmount = bills.value.filter(b => 
+            b.amount !== null && 
+            b.amount !== undefined && 
+            typeof b.amount === 'number' && 
+            !isNaN(b.amount) && 
+            b.amount > 0
+          )
+          
+          console.log('✅ Bills summary:', {
+            total: bills.value.length,
+            water: bills.value.filter(b => b.type === 'water').length,
+            electricity: bills.value.filter(b => b.type === 'electricity').length,
+            withAmount: billsWithAmount.length,
+            withoutAmount: bills.value.filter(b => !b.amount || b.amount === null).length,
+            statuses: bills.value.reduce((acc, b) => {
+              acc[b.status || 'ไม่มี status'] = (acc[b.status || 'ไม่มี status'] || 0) + 1
+              return acc
+            }, {}),
+            billsWithAmountByType: {
+              water: billsWithAmount.filter(b => b.type === 'water').length,
+              electricity: billsWithAmount.filter(b => b.type === 'electricity').length
+            }
+          })
+          
+          // ถ้า selectedType ปัจจุบันไม่มีบิลที่มี amount แล้ว แต่มีบิล type อื่นที่มี amount
+          // ให้เปลี่ยน selectedType อัตโนมัติเพื่อแสดงบิลที่มี amount
+          const currentTypeBillsWithAmount = billsWithAmount.filter(b => b.type === selectedType.value)
+          if (currentTypeBillsWithAmount.length === 0 && billsWithAmount.length > 0) {
+            const firstBillWithAmount = billsWithAmount[0]
+            if (selectedType.value !== firstBillWithAmount.type) {
+              console.log(`🔄 Auto-switching selectedType from '${selectedType.value}' to '${firstBillWithAmount.type}' (ไม่มีบิล ${selectedType.value} ที่มี amount แต่มีบิล ${firstBillWithAmount.type} ที่มี amount)`)
+              selectedType.value = firstBillWithAmount.type
+            }
+          } else if (currentTypeBillsWithAmount.length > 0) {
+            console.log(`✅ มีบิล ${selectedType.value} ที่มี amount แล้ว: ${currentTypeBillsWithAmount.length} รายการ`)
+          }
         } else {
+          console.log('⚠️ API response format invalid:', response.data)
           bills.value = []
         }
       } catch (error) {
-        console.error('Error fetching bills:', error)
+        console.error('❌ Error fetching bills:', error)
+        console.error('❌ Error details:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status,
+          statusText: error.response?.statusText
+        })
         bills.value = []
       }
     }
 
+    console.log('🔄 Calling fetchBills() on component setup')
     fetchBills()
+
+    // Realtime updates via socket
+    let socketRefreshTimer = null
+    let socket = null
+    
+    const debouncedSocketRefresh = () => {
+      clearTimeout(socketRefreshTimer)
+      socketRefreshTimer = setTimeout(() => {
+        fetchBills()
+      }, 1000) // รอ 1 วินาทีหลังจาก event สุดท้าย
+    }
+
+    onMounted(() => {
+      console.log('📌 Component mounted, calling fetchBills() again')
+      fetchBills() // เรียกอีกครั้งเมื่อ component mount
+      
+      try {
+        const { $socket } = useNuxtApp()
+        if ($socket) {
+          socket = $socket
+          // Listen for bill amount updates from admin
+          $socket.on('user:bill:amountUpdated', debouncedSocketRefresh)
+          // Listen for other bill updates
+          $socket.on('user:bill:updated', debouncedSocketRefresh)
+          $socket.on('user:bill:imageCancelled', debouncedSocketRefresh)
+        }
+      } catch (e) {
+        console.warn('Socket connection error:', e)
+      }
+    })
+
+    onUnmounted(() => {
+      if (socketRefreshTimer) clearTimeout(socketRefreshTimer)
+      if (socket) {
+        socket.off('user:bill:amountUpdated', debouncedSocketRefresh)
+        socket.off('user:bill:updated', debouncedSocketRefresh)
+        socket.off('user:bill:imageCancelled', debouncedSocketRefresh)
+      }
+    })
 
     return {
       selectedType,
@@ -422,6 +634,33 @@ export default {
 .header-actions {
   display: flex;
   gap: 12px;
+  align-items: center;
+}
+
+.header-select-type {
+  padding: 12px 20px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  min-width: 150px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  transition: all 0.3s ease;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
+}
+
+.header-select-type:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+}
+
+.header-select-type option {
+  background: #c0392b;
+  color: white;
 }
 
 .history-button {
@@ -435,6 +674,7 @@ export default {
   display: flex;
   align-items: center;
   gap: 8px;
+  backdrop-filter: blur(10px);
 }
 
 .history-button:hover {
@@ -446,43 +686,6 @@ export default {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0;
-}
-
-.payment-type-dropdown {
-  background: #ffffff;
-  padding: 20px;
-  border-radius: 12px;
-  margin-bottom: 24px;
-  box-shadow: 0 4px 20px rgba(231, 76, 60, 0.1);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-
-.select-type {
-  padding: 12px 24px;
-  font-size: 16px;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  min-width: 200px;
-  cursor: pointer;
-  background: white;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(231, 76, 60, 0.1);
-}
-
-.select-type:focus {
-  outline: none;
-  border-color: #e74c3c;
-  box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.1);
-}
-
-.select-label {
-  font-size: 14px;
-  color: #4a5568;
-  font-weight: 600;
-  user-select: none;
 }
 
 .bills-list {
@@ -722,10 +925,18 @@ export default {
   .header-actions {
     width: 100%;
     justify-content: center;
+    flex-wrap: wrap;
   }
 
-  .payment-type-dropdown {
-    padding: 16px;
+  .header-select-type {
+    width: 100%;
+    max-width: 200px;
+  }
+
+  .history-button {
+    width: 100%;
+    max-width: 200px;
+    justify-content: center;
   }
 
   .bill-card {

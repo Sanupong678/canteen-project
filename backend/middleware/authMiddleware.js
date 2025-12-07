@@ -1,64 +1,93 @@
 import jwt from 'jsonwebtoken';
 import Session from '../models/sessionModel.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-2024';
+// Lazy loading JWT_SECRET to ensure dotenv.config() has run first
+let _jwtSecret = null;
+let _warningShown = false;
+
+const getJwtSecret = () => {
+  if (_jwtSecret === null) {
+    // Check if JWT_SECRET is set in environment
+    const envSecret = process.env.JWT_SECRET;
+    
+    if (!envSecret) {
+      if (process.env.NODE_ENV === 'production') {
+        console.error('❌ CRITICAL: JWT_SECRET is not set in environment variables!');
+        console.error('Please set JWT_SECRET in your .env file before running the application.');
+        process.exit(1);
+      } else {
+        // Use default for development only
+        _jwtSecret = 'your-super-secret-jwt-key-2024-dev-only';
+        if (!_warningShown) {
+          console.warn('⚠️  WARNING: Using default JWT_SECRET for development. This is NOT secure for production!');
+          console.warn('⚠️  Please create a .env file and set JWT_SECRET with a strong random value.');
+          _warningShown = true;
+        }
+      }
+    } else {
+      _jwtSecret = envSecret;
+    }
+  }
+  return _jwtSecret;
+};
+
+// Don't initialize here - let it be lazy loaded when actually used
 
 export const generateToken = (user) => {
-  console.log('Generating token for user:', user);
-  const token = jwt.sign(user, JWT_SECRET, { expiresIn: '24h' });
-  console.log('Generated token payload:', jwt.decode(token));
+  // Only log in development mode, and never log sensitive data
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Generating token for user:', { id: user._id || user.id, role: user.role });
+  }
+  const token = jwt.sign(user, getJwtSecret(), { expiresIn: '24h' });
   return token;
 };
 
 export const verifyToken = async (req, res, next) => {
   try {
+    // Only log in development mode
+    const isDev = process.env.NODE_ENV === 'development';
+    if (isDev) {
     console.log('\n=== Token Verification Started ===');
-    console.log('Headers:', {
-      authorization: req.headers.authorization,
-      cookie: req.headers.cookie
-    });
-    console.log('Cookies:', req.cookies);
+    }
     
     let token;
     
     // ตรวจสอบ token จาก Authorization header
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
-      console.log('✅ Found token in Authorization header:', token.substring(0, 20) + '...');
+      if (isDev) console.log('✅ Found token in Authorization header');
     }
     // ตรวจสอบ token จาก cookies (รองรับทั้ง admin และ user)
     else if (req.cookies.admin_token) {
       token = req.cookies.admin_token;
-      console.log('✅ Found admin token in cookies:', token.substring(0, 20) + '...');
+      if (isDev) console.log('✅ Found admin token in cookies');
     }
     else if (req.cookies.user_token) {
       token = req.cookies.user_token;
-      console.log('✅ Found user token in cookies:', token.substring(0, 20) + '...');
+      if (isDev) console.log('✅ Found user token in cookies');
     }
     // รองรับ cookie เก่า (backward compatibility)
     else if (req.cookies.token) {
       token = req.cookies.token;
-      console.log('✅ Found legacy token in cookies:', token.substring(0, 20) + '...');
+      if (isDev) console.log('✅ Found legacy token in cookies');
     }
 
     if (!token) {
-      console.log('❌ No token found in request');
+      if (isDev) console.log('❌ No token found in request');
       return res.status(401).json({ message: 'No token provided' });
     }
 
-    console.log('Attempting to verify token...');
-    console.log('🔍 Token value:', token ? token.substring(0, 20) + '...' : 'null');
-    console.log('🔍 Token type:', typeof token);
-    console.log('🔍 Token length:', token ? token.length : 0);
+    const decoded = jwt.verify(token, getJwtSecret());
     
-    const decoded = jwt.verify(token, JWT_SECRET);
+    if (isDev) {
     console.log('✅ Token verified successfully');
-    console.log('Decoded token:', decoded);
+      console.log('Decoded token:', { id: decoded._id || decoded.id, role: decoded.role, shopId: decoded.shopId });
+    }
 
     // ถ้าเป็น admin ไม่ต้องตรวจสอบ session
     if (decoded.role === 'admin') {
       req.user = decoded;
-      console.log('✅ Admin access granted');
+      if (isDev) console.log('✅ Admin access granted');
       return next();
     }
 
@@ -69,10 +98,9 @@ export const verifyToken = async (req, res, next) => {
       logoutTime: null,
       expiresAt: { $gt: new Date() }
     });
-    console.log('Session found:', session ? '✅ Yes' : '❌ No');
 
     if (!session) {
-      console.log('❌ No valid session found');
+      if (isDev) console.log('❌ No valid session found');
       return res.status(401).json({ message: 'Invalid or expired session' });
     }
 
@@ -81,29 +109,32 @@ export const verifyToken = async (req, res, next) => {
     await session.save();
 
     req.user = decoded;
+    if (isDev) {
     console.log('✅ User verified successfully');
     console.log('=== Token Verification Completed ===\n');
+    }
     next();
   } catch (error) {
-    console.error('❌ Token verification error:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('❌ Token verification error:', error.message);
+    }
     return res.status(401).json({ message: 'Invalid token' });
   }
 };
 
 export const isAdmin = async (req, res, next) => {
-  console.log('Checking admin role...');
-  console.log('User in request:', req.user);
+  const isDev = process.env.NODE_ENV === 'development';
   
   if (!req.user) {
-    console.log('No user found in request');
+    if (isDev) console.log('No user found in request');
     return res.status(401).json({ message: 'User not authenticated' });
   }
 
   if (req.user.role !== 'admin') {
-    console.log('User is not admin. Role:', req.user.role);
+    if (isDev) console.log('User is not admin. Role:', req.user.role);
     return res.status(403).json({ message: 'Access denied. Admin role required.' });
   }
 
-  console.log('Admin access granted');
+  if (isDev) console.log('Admin access granted');
   next();
 }; 

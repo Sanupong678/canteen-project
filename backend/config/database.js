@@ -15,9 +15,9 @@ const connectDB = async () => {
       maxPoolSize: parseInt(process.env.DB_MAX_POOL_SIZE) || 10,
       minPoolSize: parseInt(process.env.DB_MIN_POOL_SIZE) || 2,
       maxIdleTimeMS: parseInt(process.env.DB_MAX_IDLE_TIME) || 30000,
-      family: 4,
-      keepAlive: process.env.KEEP_ALIVE === 'true' || true,
-      keepAliveInitialDelay: parseInt(process.env.KEEP_ALIVE_INITIAL_DELAY) || 300000
+      family: 4
+      // Removed deprecated options: keepAlive and keepAliveInitialDelay
+      // MongoDB driver now handles these automatically
     };
 
     const conn = await mongoose.connect(process.env.MONGODB_URI, options);

@@ -212,7 +212,7 @@
         </div>
 
         <div class="modal-body">
-          <div class="shop-image-container">
+          <div class="shop-image-container" @click="showImagePopup = true">
             <img :src="getFullImageUrl(shopData.image)" alt="รูปภาพร้านค้า" class="shop-image">
           </div>
           <div class="shop-info">
@@ -263,11 +263,22 @@
         </div>
       </div>
     </div>
+
+    <!-- Image Popup -->
+    <div v-if="showImagePopup" class="image-popup" @click="showImagePopup = false">
+      <div class="image-popup-content" @click.stop>
+        <button class="image-popup-close-btn" @click="showImagePopup = false">
+          <i class="fas fa-times"></i>
+        </button>
+        <img :src="getFullImageUrl(shopData.image)" :alt="shopData.name || 'รูปภาพร้านค้า'" class="popup-image">
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
 import NotificationDropdown from './NotificationDropdown.vue'
+import { resolveShopImageSrc } from '../utils/imageUtils'
 
 export default {
   name: 'LayoutUser',
@@ -282,6 +293,7 @@ export default {
       userId: null,
       showChangePasswordModal: false,
       showDetailsModal: false,
+      showImagePopup: false,
       passwordForm: {
         newPassword: '',
         confirmPassword: ''
@@ -399,9 +411,7 @@ export default {
       return types[type] || type || 'ไม่ระบุ'
     },
     getFullImageUrl(imagePath) {
-      if (!imagePath) return '/images/default-shop.jpg'
-      if (imagePath.startsWith('http')) return imagePath
-      return `${process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000'}${imagePath}`
+      return resolveShopImageSrc(imagePath)
     },
     getCanteenName(canteenId) {
       const canteens = {
@@ -1231,6 +1241,16 @@ export default {
 .shop-image-container {
   text-align: center;
   margin-bottom: 20px;
+  cursor: pointer;
+  transition: transform 0.2s;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.shop-image-container:hover {
+  transform: scale(1.05);
 }
 
 .shop-image {
@@ -1238,6 +1258,7 @@ export default {
   max-height: 200px;
   border-radius: 8px;
   object-fit: cover;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .shop-info {
@@ -1264,6 +1285,84 @@ export default {
 
 .detail-item span.expired {
   color: #dc3545;
+}
+
+/* Image Popup Styles */
+.image-popup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 3000;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.image-popup-content {
+  position: relative;
+  max-width: 90%;
+  max-height: 90vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.image-popup-close-btn {
+  position: absolute;
+  top: -50px;
+  right: 0;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  font-size: 28px;
+  cursor: pointer;
+  padding: 10px 15px;
+  border-radius: 50%;
+  width: 45px;
+  height: 45px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  z-index: 3001;
+}
+
+.image-popup-close-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.popup-image {
+  max-width: 100%;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  animation: zoomIn 0.3s ease;
+}
+
+@keyframes zoomIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 /* Responsive Modal */

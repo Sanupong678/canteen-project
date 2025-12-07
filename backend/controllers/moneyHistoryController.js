@@ -1,5 +1,5 @@
 import MoneyHistory from '../models/moneyHistoryModel.js';
-import Shop from '../models/Shop.js';
+import Shop from '../models/shopModel.js';
 import multer from 'multer';
 import xlsx from 'xlsx';
 import path from 'path';

@@ -74,12 +74,40 @@ export default {
           sessionStorage.setItem('isAuthenticated', 'true');
           sessionStorage.setItem('userRole', response.data.role);
           
-          // เก็บ userId และ shopData สำหรับ user
+          // เก็บ userId และ shopData สำหรับ user (เก็บเฉพาะข้อมูลที่จำเป็น)
           if (response.data.userData) {
-            // เก็บ userId (ใช้ shop._id เป็น userId สำหรับ user)
-            sessionStorage.setItem('userId', response.data.userData.id || '');
-            // เก็บ shopData
-            sessionStorage.setItem('shopData', JSON.stringify(response.data.userData));
+            try {
+              // เก็บ userId (ใช้ shop._id เป็น userId สำหรับ user)
+              sessionStorage.setItem('userId', response.data.userData.id || '');
+              
+              // เก็บเฉพาะข้อมูลที่จำเป็น ไม่เก็บ image หรือข้อมูลใหญ่ๆ
+              const essentialShopData = {
+                id: response.data.userData.id,
+                name: response.data.userData.name,
+                username: response.data.userData.username,
+                type: response.data.userData.type,
+                description: response.data.userData.description,
+                location: response.data.userData.location,
+                contractStartDate: response.data.userData.contractStartDate,
+                contractEndDate: response.data.userData.contractEndDate,
+                canteenId: response.data.userData.canteenId,
+                // ไม่เก็บ image เพื่อประหยัด storage
+                customId: response.data.userData.customId
+              };
+              
+              sessionStorage.setItem('shopData', JSON.stringify(essentialShopData));
+              console.log('✅ Stored essential shop data (excluding image)');
+            } catch (storageError) {
+              console.error('⚠️ Storage error (likely quota exceeded):', storageError);
+              // เก็บเฉพาะข้อมูลสำคัญที่สุด
+              try {
+                sessionStorage.setItem('userId', response.data.userData.id || '');
+                sessionStorage.setItem('shopName', response.data.userData.name || '');
+                sessionStorage.setItem('shopId', response.data.userData.id || '');
+              } catch (minimalStorageError) {
+                console.error('❌ Failed to store even minimal data:', minimalStorageError);
+              }
+            }
           }
           
           console.log('💾 Stored in sessionStorage:', {

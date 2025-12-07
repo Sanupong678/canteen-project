@@ -31,7 +31,17 @@ const leaveSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
+}, {
+  timestamps: true
 });
+
+// Add indexes for better query performance
+leaveSchema.index({ userId: 1 });
+leaveSchema.index({ shopId: 1 });
+leaveSchema.index({ status: 1 });
+leaveSchema.index({ createdAt: -1 });
+leaveSchema.index({ shopId: 1, status: 1 });
+leaveSchema.index({ startDate: 1, endDate: 1 });
 
 // ก่อนบันทึก ให้ตรวจสอบว่ามีข้อมูลที่จำเป็นครบถ้วน
 leaveSchema.pre('save', function(next) {

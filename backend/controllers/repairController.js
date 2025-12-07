@@ -1,5 +1,5 @@
 import Repair from '../models/repairModel.js';
-import Shop from '../models/Shop.js';
+import Shop from '../models/shopModel.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -40,18 +40,35 @@ const upload = multer({
 // Get all repairs (admin)
 export const getRepairs = async (req, res) => {
   try {
-    // ดึงข้อมูลการแจ้งซ่อมทั้งหมด
-    const repairs = await Repair.find().sort({ createdAt: -1 });
+    // ดึงข้อมูลการแจ้งซ่อมทั้งหมด (ไม่ดึง images เพื่อเพิ่มประสิทธิภาพ)
+    const repairs = await Repair.find()
+      .select('-images') // ไม่ดึง base64 images เพื่อเพิ่มความเร็ว
+      .sort({ createdAt: -1 })
+      .lean(); // ใช้ lean() เพื่อเพิ่มความเร็ว
 
-    // ดึงข้อมูลร้านค้าและโรงอาหารเพิ่มเติม
-    const repairsWithDetails = await Promise.all(repairs.map(async (repair) => {
-      const shop = await Shop.findById(repair.shopId);
+    // รวบรวม shopIds ทั้งหมด
+    const shopIds = [...new Set(repairs.map(repair => repair.shopId?.toString()).filter(Boolean))];
+    
+    // Query shops ทั้งหมดในครั้งเดียว (batch query)
+    const shops = await Shop.find({ _id: { $in: shopIds } })
+      .select('name canteenId') // เลือกเฉพาะ fields ที่จำเป็น
+      .lean();
+    
+    // สร้าง Map เพื่อ lookup เร็ว
+    const shopMap = new Map();
+    shops.forEach(shop => {
+      shopMap.set(shop._id.toString(), shop);
+    });
+
+    // Map ข้อมูล repairs พร้อม shop details
+    const repairsWithDetails = repairs.map(repair => {
+      const shop = shopMap.get(repair.shopId?.toString());
       return {
-        ...repair.toObject(),
+        ...repair,
         shopName: shop ? shop.name : 'ไม่ระบุร้านค้า',
         canteen: shop ? `โรงอาหาร${getCanteenName(shop.canteenId)}` : 'ไม่ระบุโรงอาหาร'
       };
-    }));
+    });
 
     res.json({ data: repairsWithDetails });
   } catch (error) {

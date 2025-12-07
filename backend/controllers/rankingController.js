@@ -1,7 +1,7 @@
 import Ranking from '../models/rankingModel.js';
 import Canteen from '../models/canteenModel.js';
 import Evaluation from '../models/Evaluation.js';
-import Shop from '../models/Shop.js';
+import Shop from '../models/shopModel.js';
 import multer from 'multer';
 import xlsx from 'xlsx';
 import path from 'path';
@@ -201,21 +201,36 @@ const getCurrentRankingData = async (req, res) => {
     console.log('📊 Total evaluations used:', allShopEvaluations.length);
     
     // คำนวณคะแนนเฉลี่ยของทุกร้านค้าใน canteen เดียวกัน
-    const allShopsInCanteen = await Shop.find({ canteenId }).select('_id');
+    const allShopsInCanteen = await Shop.find({ canteenId }).select('_id').lean();
     const shopIdsInCanteen = allShopsInCanteen.map(shop => shop._id);
     
     console.log('📊 All shops in canteen:', shopIdsInCanteen.length);
     
-    const shopsWithAverageScores = [];
+    // ✅ ใช้ batch query แทน N+1 query - query evaluations ทั้งหมดในครั้งเดียว
+    const allShopEvaluationsInCanteen = await Evaluation.find({
+      shopId: { $in: shopIdsInCanteen },
+      isActive: true,
+      evaluationSent: true,
+      totalScore: { $exists: true, $ne: null }
+    })
+      .select('shopId totalScore')
+      .lean();
     
+    // สร้าง Map เพื่อจัดกลุ่ม evaluations ตาม shopId
+    const evaluationsByShop = new Map();
+    allShopEvaluationsInCanteen.forEach(evalItem => {
+      const shopIdStr = evalItem.shopId.toString();
+      if (!evaluationsByShop.has(shopIdStr)) {
+        evaluationsByShop.set(shopIdStr, []);
+      }
+      evaluationsByShop.get(shopIdStr).push(evalItem);
+    });
+    
+    // คำนวณคะแนนเฉลี่ยของแต่ละร้าน
+    const shopsWithAverageScores = [];
     for (const shopIdInCanteen of shopIdsInCanteen) {
-      // คำนวณคะแนนเฉลี่ยของแต่ละร้าน
-      const shopEvaluations = await Evaluation.find({
-        shopId: shopIdInCanteen,
-        isActive: true,
-        evaluationSent: true,
-        totalScore: { $exists: true, $ne: null }
-      });
+      const shopIdStr = shopIdInCanteen.toString();
+      const shopEvaluations = evaluationsByShop.get(shopIdStr) || [];
       
       if (shopEvaluations.length > 0) {
         const totalScore = shopEvaluations.reduce((sum, evaluation) => sum + (evaluation.totalScore || 0), 0);
@@ -291,19 +306,49 @@ const getMonthlyHistory = async (req, res) => {
     console.log('📊 Evaluation history records:', evaluationHistory.length);
     
     // Calculate ranks for each month
-    const monthlyHistory = [];
+    // ✅ ใช้ batch query แทน N+1 query - รวบรวมเดือนทั้งหมดแล้ว query ครั้งเดียว
+    const uniqueMonths = [...new Set(
+      evaluationHistory.map(e => `${e.evaluationYear}-${e.evaluationMonth}`)
+    )];
     
-    for (const evaluation of evaluationHistory) {
-      // Get all evaluations for this month to calculate rank
-      const monthEvaluations = await Evaluation.find({
-        evaluationYear: evaluation.evaluationYear,
-        evaluationMonth: evaluation.evaluationMonth,
+    // Query evaluations ทั้งหมดสำหรับเดือนที่ต้องการในครั้งเดียว
+    const monthYearPairs = uniqueMonths.map(monthYear => {
+      const [year, month] = monthYear.split('-').map(Number);
+      return { evaluationYear: year, evaluationMonth: month };
+    });
+    
+    const allMonthEvaluations = await Evaluation.find({
+      $or: monthYearPairs.map(pair => ({
+        evaluationYear: pair.evaluationYear,
+        evaluationMonth: pair.evaluationMonth,
         isActive: true
-      }).sort({ totalScore: -1 }); // Sort by score descending
+      }))
+    })
+      .select('shopId totalScore evaluationYear evaluationMonth')
+      .lean();
+    
+    // สร้าง Map เพื่อจัดกลุ่ม evaluations ตามเดือน
+    const evaluationsByMonth = new Map();
+    allMonthEvaluations.forEach(evalItem => {
+      const monthKey = `${evalItem.evaluationYear}-${evalItem.evaluationMonth}`;
+      if (!evaluationsByMonth.has(monthKey)) {
+        evaluationsByMonth.set(monthKey, []);
+      }
+      evaluationsByMonth.get(monthKey).push(evalItem);
+    });
+    
+    // คำนวณ rank สำหรับแต่ละเดือน
+    const monthlyHistory = [];
+    for (const evaluation of evaluationHistory) {
+      const monthKey = `${evaluation.evaluationYear}-${evaluation.evaluationMonth}`;
+      const monthEvaluations = evaluationsByMonth.get(monthKey) || [];
+      
+      // เรียงลำดับตามคะแนน
+      monthEvaluations.sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
       
       // Find rank of current shop
       const rank = monthEvaluations.findIndex(evalItem => 
-        evalItem.shopId.toString() === shopId
+        evalItem.shopId.toString() === shopId.toString()
       ) + 1;
       
       const historyItem = {

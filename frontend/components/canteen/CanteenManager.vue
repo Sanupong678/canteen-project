@@ -33,6 +33,10 @@
         </div>
 
         <div class="shop-list">
+          <div v-if="isLoading" class="shop-loading">
+            <div class="shop-loading-spinner"></div>
+            <p>กำลังโหลดข้อมูลร้านค้า...</p>
+          </div>
           <div v-if="filteredActiveShops.length === 0 && filteredExpiredShops.length === 0" class="empty-state">
             ยังไม่มีร้านค้าในโรงอาหารนี้
           </div>
@@ -206,6 +210,7 @@ export default {
   data() {
     return {
       shops: [],
+      isLoading: false,
       searchQuery: '',
       selectedCategory: '',
       showAddShopForm: false,
@@ -280,6 +285,7 @@ export default {
       return diff > 0 ? Math.ceil(diff / (1000 * 60 * 60 * 24)) : 0
     },
     async loadShops() {
+      this.isLoading = true
       try {
         const response = await shopService.getCanteenShops(Number(this.canteenId))
         if (response && Array.isArray(response)) {
@@ -292,10 +298,20 @@ export default {
       } catch (error) {
         console.error('Error loading shops:', error)
         this.shops = []
+      } finally {
+        this.isLoading = false
       }
     },
-    handleViewDetails(shop) {
-      this.selectedShop = shop
+    async handleViewDetails(shop) {
+      // ดึงข้อมูล shop ใหม่ที่รวม image เพื่อแสดงใน modal
+      try {
+        const fullShopData = await shopService.getShop(shop._id || shop.id)
+        this.selectedShop = fullShopData
+      } catch (error) {
+        console.error('Error loading shop details:', error)
+        // ถ้าโหลดไม่ได้ ใช้ข้อมูลเดิม
+        this.selectedShop = shop
+      }
       this.showDetailsModal = true
     },
     handleEditShop(shop) {
@@ -348,22 +364,29 @@ export default {
         }
         console.log('Formatted data:', formattedData)
 
-        if (this.shopToEdit) {
-          console.log('Updating existing shop with ID:', this.shopToEdit._id)
+        if (this.shopToEdit && this.shopToEdit._id) {
+          // เก็บ shopId ไว้ก่อนที่จะ reset shopToEdit
+          const shopId = this.shopToEdit._id
+          console.log('Updating existing shop with ID:', shopId)
           try {
             // Update existing shop
-            const updatedShop = await shopService.updateShop(this.shopToEdit._id, formattedData)
-            console.log('Received updated shop from server:', updatedShop)
+            const response = await shopService.updateShop(shopId, formattedData)
+            console.log('Received updated shop response from server:', response)
+            
+            // Controller ส่งกลับ { success: true, data: { shop, bill } }
+            const updatedShop = response?.data?.shop || response?.shop || response
             
             if (!updatedShop) {
               throw new Error('ไม่ได้รับข้อมูลร้านค้าที่อัพเดทจาก server')
             }
 
+            console.log('Extracted shop data:', updatedShop)
+
             // Reload all shops to ensure data consistency
             await this.loadShops()
             
             // Update selectedShop if it's the same shop being edited
-            if (this.selectedShop && this.selectedShop._id === this.shopToEdit._id) {
+            if (this.selectedShop && this.selectedShop._id === shopId) {
               this.selectedShop = updatedShop
             }
 
@@ -614,6 +637,32 @@ h2 {
 .shop-list {
   display: grid;
   gap: 15px;
+}
+
+.shop-loading {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 30px 0;
+  color: #4b5563;
+  font-size: 14px;
+}
+
+.shop-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 4px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  animation: shop-spin 0.9s linear infinite;
+  margin-bottom: 12px;
+}
+
+@keyframes shop-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .empty-state {

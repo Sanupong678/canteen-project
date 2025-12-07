@@ -88,6 +88,13 @@ const billSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Add indexes for better query performance
+billSchema.index({ shopId: 1, month: 1, year: 1, billType: 1 });
+billSchema.index({ status: 1 });
+billSchema.index({ canteenId: 1 });
+billSchema.index({ createdAt: -1 });
+billSchema.index({ month: 1, year: 1 });
+
 // Function to calculate notification dates
 billSchema.methods.calculateNotificationDates = function(contractEndDate) {
   const oneMonth = new Date(contractEndDate);

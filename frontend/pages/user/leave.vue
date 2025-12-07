@@ -64,48 +64,57 @@
             </div>
 
             <!-- History toggle below submit button -->
-            <div class="history-link" @click="showHistory = !showHistory">
+            <div class="history-link" @click="showHistory = true">
               ประวัติการลา
             </div>
 
-            <div v-if="showHistory" class="history-container">
-              <div v-if="leaveHistory.length === 0" class="text-gray-500 text-center py-4">
-                <p class="text-lg font-medium mb-2">ยังไม่เคยแจ้งลามาก่อน</p>
-                <p class="text-sm text-gray-400">เมื่อคุณแจ้งลาครั้งแรก ข้อมูลจะแสดงที่นี่</p>
-              </div>
-              <div v-else class="space-y-3">
-                <div
-                  v-for="(leave, index) in paginatedLeaveHistory"
-                  :key="index"
-                  class="history-item"
-                >
-                  <p class="font-semibold">วันที่ลา: {{ formatDate(leave.startDate) }} ถึง {{ formatDate(leave.endDate) }}</p>
-                  <p>เหตุผล: {{ leave.issue || leave.reason }}</p>
-                  <p class="status-badge" :class="leave.status">
-                    สถานะ: {{ getStatusText(leave.status) }}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Pagination -->
-            <div v-if="showHistory && leaveHistory.length > 0" class="pagination-section">
-              <div class="items-per-page">
-                <span class="label">Items per page:</span>
-                <span class="fixed-size">5</span>
-                <span class="range">{{ startIndexDisplay }}-{{ endIndexDisplay }} of {{ leaveHistory.length }}</span>
-              </div>
-              <div class="pagination">
-                <button
-                  v-for="p in totalPages"
-                  :key="`p-`+p"
-                  class="page-num"
-                  :class="{ active: p === currentPage }"
-                  @click="goToPage(p)"
-                >{{ p }}</button>
-                <button class="page-next" :disabled="currentPage === totalPages" @click="nextPage">next</button>
-              </div>
-            </div>
+            <!-- History Dialog -->
+            <v-dialog v-model="showHistory" max-width="800px" persistent>
+              <v-card class="history-dialog-card">
+                <v-card-title class="history-dialog-header">
+                  <h2>ประวัติการลา</h2>
+                  <span @click="showHistory = false" class="close-btn">×</span>
+                </v-card-title>
+                <v-card-text class="history-dialog-body">
+                  <div v-if="leaveHistory.length === 0" class="text-gray-500 text-center py-4">
+                    <p class="text-lg font-medium mb-2">ยังไม่เคยแจ้งลามาก่อน</p>
+                    <p class="text-sm text-gray-400">เมื่อคุณแจ้งลาครั้งแรก ข้อมูลจะแสดงที่นี่</p>
+                  </div>
+                  <div v-else class="space-y-3">
+                    <div
+                      v-for="(leave, index) in paginatedLeaveHistory"
+                      :key="index"
+                      class="history-item"
+                    >
+                      <p class="font-semibold">วันที่ลา: {{ formatDate(leave.startDate) }} ถึง {{ formatDate(leave.endDate) }}</p>
+                      <p>เหตุผล: {{ leave.issue || leave.reason }}</p>
+                      <p class="status-badge" :class="leave.status">
+                        สถานะ: {{ getStatusText(leave.status) }}
+                      </p>
+                    </div>
+                  </div>
+                </v-card-text>
+                <v-card-actions v-if="leaveHistory.length > 0" class="history-dialog-footer">
+                  <div class="pagination-section">
+                    <div class="items-per-page">
+                      <span class="label">Items per page:</span>
+                      <span class="fixed-size">5</span>
+                      <span class="range">{{ startIndexDisplay }}-{{ endIndexDisplay }} of {{ leaveHistory.length }}</span>
+                    </div>
+                    <div class="pagination">
+                      <button
+                        v-for="p in totalPages"
+                        :key="`p-`+p"
+                        class="page-num"
+                        :class="{ active: p === currentPage }"
+                        @click="goToPage(p)"
+                      >{{ p }}</button>
+                      <button class="page-next" :disabled="currentPage === totalPages" @click="nextPage">next</button>
+                    </div>
+                  </div>
+                </v-card-actions>
+              </v-card>
+            </v-dialog>
           </div>
         </div>
       </div>
@@ -143,6 +152,10 @@ const fetchLeaveHistory = async () => {
     })
     if (response.data && response.data.data) {
       leaveHistory.value = response.data.data
+      // เปิดแสดงประวัติถ้ามีข้อมูล
+      if (leaveHistory.value.length > 0) {
+        showHistory.value = true
+      }
     } else {
       leaveHistory.value = []
     }
@@ -179,14 +192,22 @@ const submitLeave = async () => {
     })
 
     if (response.data && response.data.data) {
-      // เพิ่มข้อมูลใหม่เข้าไปในประวัติ
-      await fetchLeaveHistory() // ดึงข้อมูลใหม่จาก API
+      // เพิ่มข้อมูลใหม่ที่เพิ่งส่งเข้าไปในประวัติทันที (ไม่ต้องรอ admin อนุมัติ)
+      const newLeave = response.data.data
+      // เพิ่มข้อมูลใหม่ที่ด้านบนของ array
+      leaveHistory.value = [newLeave, ...leaveHistory.value]
+      
+      // เปิดแสดงประวัติทันทีหลังจากส่งคำขอสำเร็จ
+      showHistory.value = true
       
       // Reset form
       startDate.value = ''
       endDate.value = ''
       reason.value = ''
       dateError.value = ''
+      
+      // ดึงข้อมูลใหม่จาก API เพื่อให้แน่ใจว่าข้อมูลตรงกับ backend
+      fetchLeaveHistory().catch(err => console.error('Error refreshing history:', err))
       
       alert('บันทึกการลาสำเร็จ')
     }
@@ -417,6 +438,45 @@ const endIndexDisplay = computed(() => Math.min(currentPage.value * pageSize, le
   margin-top: 1rem;
   box-shadow: 0 4px 12px rgba(231, 76, 60, 0.1);
   border-left: 4px solid #e74c3c;
+}
+
+/* History Dialog Styles */
+.history-dialog-card {
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+
+.history-dialog-header {
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px !important;
+  margin: 0 !important;
+}
+
+.history-dialog-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+}
+
+.history-dialog-header .close-btn {
+  color: white !important;
+}
+
+.history-dialog-body {
+  padding: 24px !important;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.history-dialog-footer {
+  padding: 16px 24px !important;
+  border-top: 1px solid #e2e8f0;
+  background: #f8f9fa;
 }
 
 /* Pagination styles */

@@ -1,5 +1,5 @@
 import Login from '../models/loginModel.js';
-import Shop from '../models/Shop.js';
+import Shop from '../models/shopModel.js';
 import { generateToken } from '../middleware/authMiddleware.js';
 import bcrypt from 'bcryptjs';
 import Session from '../models/sessionModel.js';
@@ -155,26 +155,53 @@ export const login = async (req, res) => {
 
     // ถ้าไม่ใช่ admin จึงค่อยตรวจสอบ shop
     console.log('Not admin, checking shop credentials...');
+    console.log('Looking for username:', username);
+    
+    // ค้นหา shop โดยใช้ username (case sensitive หรือ case insensitive)
     const shop = await Shop.findOne({
       'credentials.username': { $regex: new RegExp(`^${username}$`, 'i') }
     });
 
     if (!shop) {
+      console.log('Shop not found for username:', username);
       return res.status(401).json({ 
         success: false, 
         message: 'Invalid credentials' 
       });
     }
 
-    // ตรวจสอบ password ของ shop
-    if (!shop.credentials.password_hash && shop.credentials.password) {
-      shop.credentials.password_hash = await hashPassword(shop.credentials.password);
-      await shop.save();
+    console.log('Shop found:', {
+      id: shop._id,
+      name: shop.name,
+      username: shop.credentials.username,
+      hasPasswordHash: !!shop.credentials.password_hash,
+      hasPassword: !!shop.credentials.password
+    });
+
+    // ตรวจสอบ password_hash
+    if (!shop.credentials.password_hash) {
+      // ถ้าไม่มี password_hash แต่มี password ให้ hash ใหม่
+      if (shop.credentials.password) {
+        console.log('Hashing password for shop:', shop.name);
+        shop.credentials.password_hash = await hashPassword(shop.credentials.password);
+        await shop.save();
+        console.log('Password hashed and saved');
+      } else {
+        console.error('No password or password_hash found for shop:', shop.name);
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Invalid credentials - password not set' 
+        });
+      }
     }
 
+    // ตรวจสอบ password
+    console.log('Comparing password...');
     const isPasswordValid = await bcrypt.compare(password, shop.credentials.password_hash);
+    console.log('Password valid:', isPasswordValid);
     
     if (!isPasswordValid) {
+      console.log('Invalid password for shop:', shop.name);
       return res.status(401).json({ 
         success: false, 
         message: 'Invalid credentials' 
@@ -228,6 +255,7 @@ export const login = async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000
     });
 
+    // ส่งเฉพาะข้อมูลที่จำเป็น ไม่ส่ง image เพื่อประหยัด storage quota
     return res.json({
       success: true,
       role: 'user',
@@ -241,7 +269,9 @@ export const login = async (req, res) => {
         location: shop.location,
         contractStartDate: shop.contractStartDate,
         contractEndDate: shop.contractEndDate,
-        image: shop.image
+        canteenId: shop.canteenId,
+        customId: shop.customId
+        // ไม่ส่ง image เพื่อประหยัด storage quota (สามารถดึงจาก API ได้ถ้าต้องการ)
       },
       token
     });
