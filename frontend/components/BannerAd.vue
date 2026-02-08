@@ -167,7 +167,7 @@ export default {
                 const canvas = cropper.getCroppedCanvas()
                 const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.9))
                 if (!blob) { cleanup(); return }
-                const token = localStorage.getItem('token')
+                // ใช้ axios interceptor (validate token อัตโนมัติ)
                 const backendUrl = this.getBackendUrl()
                 const formData = new FormData()
                 formData.append('image', new File([blob], 'banner.jpg', { type: 'image/jpeg' }))
@@ -175,7 +175,6 @@ export default {
                 formData.append('description', 'Banner advertisement')
                 const response = await axios.post(`${backendUrl}/api/backgrounds`, formData, {
                   headers: {
-                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'multipart/form-data'
                   }
                 })
@@ -218,18 +217,9 @@ export default {
         console.log('- Current Background:', current)
         
         if (current) {
-          const token = localStorage.getItem('token')
-          console.log('- Token exists:', !!token)
-          
-          if (!token) {
-            alert('กรุณาเข้าสู่ระบบใหม่')
-            return
-          }
-          
+          // ใช้ axios interceptor (validate token อัตโนมัติ)
           console.log('- Deleting background ID:', current._id)
-          const response = await axios.delete(`${backendUrl}/api/backgrounds/${current._id}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          })
+          const response = await axios.delete(`${backendUrl}/api/backgrounds/${current._id}`)
           
           console.log('- Delete response:', response.data)
           await this.loadBackgrounds()

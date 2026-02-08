@@ -70,46 +70,31 @@ export const initSocket = (server) => {
   });
 
   io.on('connection', (socket) => {
-    // Basic lifecycle logs
+    // Basic lifecycle logs - ลด log level ใน production
     const id = socket.id;
     const role = socket.user?.role || 'guest';
     const shopId = socket.user?.shopId || 'none';
-    console.log(`🔌 Socket connected: ${id} role=${role} shopId=${shopId}`);
+    
+    // Log เฉพาะใน development หรือเมื่อจำเป็น
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🔌 Socket connected: ${id} role=${role} shopId=${shopId}`);
+    }
 
     // เพิ่ม error handler
     socket.on('error', (error) => {
       console.error(`❌ Socket error for ${id}:`, error);
     });
 
-    // Heartbeat watchdog สำหรับ socket.io v4 (ไม่ใช้ transport socket โดยตรง)
-    const scheduleTimeout = () => setTimeout(() => {
-      console.warn(`⚠️ Socket timed out (no heartbeat): ${id}`);
-      socket.disconnect(true);
-    }, HEARTBEAT_TIMEOUT_MS);
-
-    let heartbeatTimer = scheduleTimeout();
-    const resetHeartbeat = () => {
-      clearTimeout(heartbeatTimer);
-      heartbeatTimer = scheduleTimeout();
-    };
-
-    const heartbeatInterval = setInterval(() => {
-      socket.emit('ping-check');
-    }, HEARTBEAT_INTERVAL_MS);
-
-    // รองรับทั้ง built-in pong และ custom pong-check
-    socket.on('pong', resetHeartbeat);
-    socket.on('pong-check', resetHeartbeat);
-
-    // optional: mirror ping events if clientส่งมาเอง
-    socket.on('ping-check', () => {
-      socket.emit('pong-check');
-    });
+    // ใช้ Socket.io built-in ping/pong mechanism แทน custom heartbeat
+    // Socket.io จะจัดการ ping/pong อัตโนมัติตาม pingInterval และ pingTimeout ที่ตั้งไว้
+    // ไม่ต้องสร้าง custom heartbeat mechanism ที่ซ้ำซ้อน
 
     socket.on('disconnect', (reason) => {
-      console.log(`🔌 Socket disconnected: ${id}, reason=${reason}`);
-      clearTimeout(heartbeatTimer);
-      clearInterval(heartbeatInterval);
+      // Log เฉพาะใน development หรือเมื่อ reason ไม่ใช่ปกติ (เช่น timeout, error)
+      if (process.env.NODE_ENV === 'development' || 
+          (reason !== 'transport close' && reason !== 'client namespace disconnect')) {
+        console.log(`🔌 Socket disconnected: ${id}, reason=${reason}`);
+      }
     });
   });
 

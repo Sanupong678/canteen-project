@@ -280,7 +280,10 @@ export default {
       
       // Initialize notification store ทันที
       console.log('🔄 Initializing notifications in NotificationDropdown...')
-      console.log('🔍 Token exists:', !!localStorage.getItem('token'))
+      // ใช้ token validation สำหรับ debug
+      const { getTokenWithState, getTokenFingerprint } = await import('@/utils/tokenUtils')
+      const { token, state } = getTokenWithState()
+      console.log('🔍 Token state:', state, 'fingerprint:', getTokenFingerprint(token || ''))
       console.log('🔍 Is authenticated:', !!localStorage.getItem('isAuthenticated'))
       notificationStore.initialize()
     })

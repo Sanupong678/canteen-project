@@ -8,6 +8,7 @@ import xlsx from 'xlsx';
 import fs from 'fs';
 import { updateShop, createShop } from '../controllers/shopController.js';
 import Canteen from '../models/canteenModel.js';
+import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -769,13 +770,20 @@ router.get('/details/:shopId', async (req, res) => {
 });
 
 // Update shop password
-router.put('/update-password/:shopId', async (req, res) => {
+// ใช้ middleware protect เพื่อตรวจสอบ authentication
+router.put('/update-password/:shopId', protect, async (req, res) => {
   try {
     const { shopId } = req.params;
     const { newPassword } = req.body;
     
     console.log('🔍 Updating password for shopId:', shopId);
+    console.log('👤 Authenticated user:', {
+      userId: req.user?._id,
+      shopId: req.user?.shopId,
+      role: req.user?.role
+    });
     
+    // ตรวจสอบว่ามี newPassword หรือไม่
     if (!newPassword) {
       return res.status(400).json({
         success: false,
@@ -822,32 +830,50 @@ router.put('/update-password/:shopId', async (req, res) => {
       });
     }
     
-    // Find and update user password
-    if (shop.credentials && shop.credentials.userId) {
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
-      
-      await User.findByIdAndUpdate(shop.credentials.userId, {
-        password: hashedPassword,
-        updatedAt: new Date()
+    // ตรวจสอบสิทธิ์: ตรวจสอบว่า user เป็นเจ้าของ shop จริงๆ
+    // Admin สามารถเปลี่ยนรหัสผ่านของ shop ใดก็ได้
+    // User (shop owner) สามารถเปลี่ยนรหัสผ่านของตัวเองเท่านั้น
+    const isAdmin = req.user?.role === 'admin';
+    const isShopOwner = req.user?.shopId?.toString() === shopId.toString() || 
+                        req.user?._id?.toString() === shopId.toString();
+    
+    if (!isAdmin && !isShopOwner) {
+      return res.status(403).json({
+        success: false,
+        message: 'คุณไม่มีสิทธิ์เปลี่ยนรหัสผ่านของร้านค้านี้'
       });
-      
-      // Update shop credentials timestamp
-      await Shop.findByIdAndUpdate(shopId, {
-        'credentials.updatedAt': new Date()
-      });
-      
-      console.log('✅ Password updated successfully');
-      
-      res.json({
-        success: true,
-        message: 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว'
-      });
-    } else {
+    }
+    
+    // ตรวจสอบว่า shop มี userId หรือไม่ (ใช้ shop.userId ไม่ใช่ shop.credentials.userId)
+    if (!shop.userId) {
       return res.status(404).json({
         success: false,
         message: 'ไม่พบข้อมูลการเข้าสู่ระบบของร้านค้านี้'
       });
     }
+    
+    // Hash password ใหม่
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    
+    // อัปเดต password ใน User model
+    await User.findByIdAndUpdate(shop.userId, {
+      password: hashedPassword,
+      updatedAt: new Date()
+    });
+    
+    // อัปเดต password ใน Shop model (credentials.password_hash)
+    shop.credentials.password_hash = hashedPassword;
+    shop.credentials.password = newPassword; // เก็บรหัสผ่านต้นฉบับไว้ด้วย (ถ้าจำเป็น)
+    shop.credentials.updatedAt = new Date();
+    await shop.save();
+    
+    console.log('✅ Password updated successfully for shop:', shop.name);
+    
+    res.json({
+      success: true,
+      message: 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว'
+    });
     
   } catch (error) {
     console.error('❌ Error updating password:', error);

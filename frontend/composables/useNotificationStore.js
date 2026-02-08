@@ -1,5 +1,6 @@
 import { ref, reactive, readonly } from 'vue'
 import axios from 'axios'
+import { getTokenWithState, TokenState, logTokenState, getTokenFingerprint, clearInvalidToken } from '@/utils/tokenUtils'
 
 // Global notification store
 const notifications = ref([])
@@ -47,21 +48,29 @@ export const useNotificationStore = () => {
   // Fetch notifications
   const fetchNotifications = async () => {
     try {
-      const token = getSessionStorage('token')
-      const isAuthenticated = getSessionStorage('isAuthenticated')
+      // ใช้ token validation utility แทนการอ่านตรงๆ
+      const { token, state } = getTokenWithState()
       
-      if (!token || !isAuthenticated) {
-        console.log('❌ No token or not authenticated')
+      // ตรวจสอบ token state
+      if (state !== TokenState.VALID || !token) {
+        logTokenState(state, token)
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[AUTH] Cannot fetch notifications - token state: ${state}, fingerprint: ${getTokenFingerprint(token || '')}`)
+        }
+        
+        // Clear invalid token
+        if (state !== TokenState.MISSING) {
+          clearInvalidToken()
+        }
         return
       }
 
-      console.log('🔍 Fetching notifications with token:', token.substring(0, 20) + '...')
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[AUTH] Fetching notifications with valid token, fingerprint: ${getTokenFingerprint(token)}`)
+      }
 
-      const response = await axios.get('/api/notifications/user', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+      // ใช้ axios ที่มี interceptor แล้ว (จะ validate token อัตโนมัติ)
+      const response = await axios.get('/api/notifications/user')
 
       if (response.data.success) {
         console.log('📋 Raw notification data:', response.data.data)
@@ -115,10 +124,15 @@ export const useNotificationStore = () => {
   // Mark all as read
   const markAllAsRead = async () => {
     try {
-      const token = getSessionStorage('token')
-      const response = await axios.put('/api/notifications/mark-all-read', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      // ใช้ token validation
+      const { token, state } = getTokenWithState()
+      if (state !== TokenState.VALID || !token) {
+        logTokenState(state, token)
+        return
+      }
+      
+      // ใช้ axios ที่มี interceptor แล้ว
+      const response = await axios.put('/api/notifications/mark-all-read', {})
       
       if (response.data.success) {
         console.log('✅ All notifications marked as read')
@@ -142,10 +156,15 @@ export const useNotificationStore = () => {
   // Mark single notification as read
   const markAsRead = async (notificationId) => {
     try {
-      const token = getSessionStorage('token')
-      await axios.put(`/api/notifications/${notificationId}/read`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      // ใช้ token validation
+      const { token, state } = getTokenWithState()
+      if (state !== TokenState.VALID || !token) {
+        logTokenState(state, token)
+        return
+      }
+      
+      // ใช้ axios ที่มี interceptor แล้ว
+      await axios.put(`/api/notifications/${notificationId}/read`, {})
       
       // อัปเดต local state
       const notification = notifications.value.find(n => n._id === notificationId)

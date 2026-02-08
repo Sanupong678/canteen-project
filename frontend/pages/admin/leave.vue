@@ -631,26 +631,66 @@ onMounted(() => {
   -ms-overflow-style: none;
 }
 
-/* ซ่อน Scrollbar ของ v-data-table wrapper โดยเฉพาะ */
+/* ซ่อน Scrollbar แนวนอน แต่แสดง Scrollbar แนวตั้ง */
 .v-data-table :deep(.v-data-table__wrapper) {
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
-  overflow-x: auto !important;
-  overflow-y: hidden !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  /* ซ่อน scrollbar แนวนอน */
+  scrollbar-width: thin !important;
+  scrollbar-color: #cbd5e0 transparent !important;
+  -ms-overflow-style: auto !important;
 }
 
+/* ซ่อน scrollbar แนวนอน แต่แสดง scrollbar แนวตั้ง */
 .v-data-table :deep(.v-data-table__wrapper)::-webkit-scrollbar {
-  display: none !important;
-  width: 0 !important;
+  width: 8px !important;
   height: 0 !important;
 }
 
 .v-data-table :deep(.v-data-table__wrapper)::-webkit-scrollbar-track {
-  display: none !important;
+  background: transparent !important;
 }
 
 .v-data-table :deep(.v-data-table__wrapper)::-webkit-scrollbar-thumb {
+  background-color: #cbd5e0 !important;
+  border-radius: 4px !important;
+}
+
+.v-data-table :deep(.v-data-table__wrapper)::-webkit-scrollbar-thumb:hover {
+  background-color: #a0aec0 !important;
+}
+
+/* ซ่อน Scrollbar ในทุกส่วนของ table */
+.v-data-table :deep(table) {
+  overflow-x: hidden !important;
+}
+
+.v-data-table :deep(.v-data-table__wrapper table) {
+  overflow-x: hidden !important;
+}
+
+.v-data-table :deep(.v-data-table__tr) {
+  overflow-x: hidden !important;
+}
+
+.v-data-table :deep(.v-data-table__tbody) {
+  overflow-x: hidden !important;
+}
+
+.v-data-table :deep(.v-data-table__thead) {
+  overflow-x: hidden !important;
+}
+
+/* ซ่อน scrollbar ในทุก element ภายใน table */
+.v-data-table :deep(*) {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.v-data-table :deep(*)::-webkit-scrollbar {
   display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 /* Responsive Design */

@@ -129,20 +129,10 @@ export default {
     // Fetch admin notifications
     const fetchNotifications = async () => {
       try {
-        // ตรวจสอบ token จากทั้ง localStorage และ sessionStorage
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token')
-        if (!token) {
-          console.log('❌ No token found in localStorage or sessionStorage')
-          return
-        }
-
+        // ใช้ axios interceptor (validate token อัตโนมัติ)
         console.log('🔍 Fetching admin notifications from /api/admin-notifications/admin...')
 
-        const response = await axios.get('/api/admin-notifications/admin', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
+        const response = await axios.get('/api/admin-notifications/admin')
 
         if (response.data.success) {
           console.log('📋 Admin notification data:', response.data.data)
@@ -188,15 +178,8 @@ export default {
       try {
         console.log('🔄 Marking notification as read:', notificationId)
         
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token')
-        if (!token) {
-          console.error('❌ No token found')
-          return
-        }
-        
-        const response = await axios.put(`/api/admin-notifications/admin/${notificationId}/read`, {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        // ใช้ axios interceptor (validate token อัตโนมัติ)
+        const response = await axios.put(`/api/admin-notifications/admin/${notificationId}/read`, {})
         
         console.log('✅ Server response:', response.data)
         
@@ -224,15 +207,8 @@ export default {
         console.log('🔄 Marking all admin notifications as read...')
         console.log('📊 Current unread count:', unreadCount.value)
         
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token')
-        if (!token) {
-          console.error('❌ No token found')
-          return
-        }
-        
-        const response = await axios.put('/api/admin-notifications/admin/mark-all-read', {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        // ใช้ axios interceptor (validate token อัตโนมัติ)
+        const response = await axios.put('/api/admin-notifications/admin/mark-all-read', {})
         
         console.log('✅ Server response:', response.data)
         

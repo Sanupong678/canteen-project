@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { getTokenWithState, clearInvalidToken, TokenState, logTokenState, getTokenFingerprint } from '@/utils/tokenUtils'
 
 export default defineNuxtPlugin((nuxtApp) => {
   // ตั้งค่า base URL และ credentials
@@ -46,11 +47,19 @@ export default defineNuxtPlugin((nuxtApp) => {
   // เพิ่ม interceptor สำหรับเพิ่ม Authorization header
   axios.interceptors.request.use(
     (config) => {
-      // เพิ่ม Authorization header ถ้ามี token ใน sessionStorage
+      // Validate token state ก่อนส่ง
       if (process.client) {
-        const token = sessionStorage.getItem('token')
-        if (token) {
+        const { token, state } = getTokenWithState()
+        
+        if (state === TokenState.VALID && token) {
           config.headers.Authorization = `Bearer ${token}`
+          logTokenState(state, token)
+        } else {
+          // ถ้า token ไม่ valid ให้ clear และไม่ส่ง header
+          logTokenState(state, token)
+          if (state !== TokenState.MISSING) {
+            clearInvalidToken()
+          }
         }
       }
       
@@ -84,18 +93,42 @@ export default defineNuxtPlugin((nuxtApp) => {
         }
       }
 
-      // จัดการ 401 Unauthorized
+      // จัดการ 401 Unauthorized (token invalid, expired, or malformed)
+      // API เป็นตัวแรกที่รู้ว่า token พัง → clear token → disconnect socket → redirect
       if (error.response?.status === 401) {
         if (process.client) {
-          // ถ้า token หมดอายุหรือไม่ถูกต้อง
-          sessionStorage.clear()
-          localStorage.clear()
+          const errorMessage = error.response?.data?.message || error.message || ''
           
-          // Clear cookies
-          document.cookie = 'user_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
-          document.cookie = 'admin_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+          // Determine token state from error message
+          let tokenState = TokenState.MISSING
+          if (errorMessage.includes('malformed') || errorMessage.includes('jwt malformed')) {
+            tokenState = TokenState.MALFORMED
+          } else if (errorMessage.includes('expired') || errorMessage.includes('jwt expired')) {
+            tokenState = TokenState.EXPIRED
+          } else if (errorMessage.includes('Invalid token')) {
+            tokenState = TokenState.MALFORMED
+          }
           
-          // ถ้าไม่ได้อยู่ที่หน้า login หรือ welcome อยู่แล้ว ให้ redirect ไปหน้า login
+          // Log token state with fingerprint
+          const { token } = getTokenWithState()
+          logTokenState(tokenState, token)
+          console.log(`[AUTH] API detected token issue: ${tokenState}, fingerprint: ${getTokenFingerprint(token || '')}`)
+          
+          // Clear invalid token
+          clearInvalidToken()
+          
+          // Disconnect socket (socket should not be the first to know)
+          try {
+            const { $socket } = useNuxtApp()
+            if ($socket && $socket.connected) {
+              console.log('[AUTH] Disconnecting socket due to token issue')
+              $socket.disconnect()
+            }
+          } catch (e) {
+            // Socket not available, ignore
+          }
+          
+          // Redirect to login if not already there
           if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
             window.location.href = '/login'
           }

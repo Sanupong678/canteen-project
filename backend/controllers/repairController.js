@@ -285,16 +285,122 @@ export const updateRepairStatus = async (req, res) => {
   }
 };
 
+// Update repair (user can update their own repairs if status is pending)
+export const updateRepair = async (req, res) => {
+  const { id } = req.params;
+  const { category, issue } = req.body;
+  const userId = req.user.userId;
+  const shopId = req.user.shopId;
+
+  try {
+    const repair = await Repair.findById(id);
+    if (!repair) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'ไม่พบรายการแจ้งซ่อมนี้' 
+      });
+    }
+
+    // ตรวจสอบว่าเป็นเจ้าของ repair หรือไม่
+    if (repair.userId.toString() !== userId.toString() || repair.shopId.toString() !== shopId.toString()) {
+      return res.status(403).json({ 
+        success: false,
+        message: 'คุณไม่มีสิทธิ์แก้ไขรายการนี้' 
+      });
+    }
+
+    // ตรวจสอบว่าสถานะเป็น pending หรือไม่ (แก้ไขได้เฉพาะรายการที่ยังรอดำเนินการ)
+    if (repair.status !== 'pending' && repair.status !== 'รอดำเนินการ') {
+      return res.status(400).json({ 
+        success: false,
+        message: 'ไม่สามารถแก้ไขรายการที่กำลังดำเนินการหรือเสร็จสิ้นแล้ว' 
+      });
+    }
+
+    // อัปเดตข้อมูลหมวดหมู่และรายละเอียดปัญหา
+    if (category) {
+      repair.category = category;
+    }
+    if (issue) {
+      repair.issue = issue;
+    }
+
+    // จัดการรูปภาพ
+    // ถ้ามีรูปใหม่ที่อัปโหลดมา ให้เพิ่มเข้าไปใน imagePaths
+    if (req.files && req.files.length > 0) {
+      // เก็บรูปเดิมไว้ (ถ้ามี)
+      const existingImagePaths = repair.imagePaths || [];
+      const existingImages = repair.images || [];
+      
+      // เพิ่มรูปใหม่เข้าไป
+      const newImagePaths = req.files.map(file => file.path);
+      
+      // รวมรูปเดิมกับรูปใหม่
+      repair.imagePaths = [...existingImagePaths, ...newImagePaths];
+      
+      // อัปเดต images array ด้วย (สำหรับ backward compatibility)
+      // เพิ่ม path ของรูปใหม่เข้าไปใน images array
+      repair.images = [...existingImages, ...newImagePaths];
+    }
+
+    // เปลี่ยนสถานะกลับเป็นรออนุมัติ (pending) เพื่อให้ admin ตรวจสอบใหม่
+    repair.status = 'pending';
+
+    await repair.save();
+
+    // ดึงข้อมูล repair ใหม่เพื่อให้แน่ใจว่าข้อมูลครบถ้วน
+    const updatedRepair = await Repair.findById(id).lean();
+
+    // แปลง _id เป็น string เพื่อให้ frontend ใช้งานได้
+    if (updatedRepair) {
+      updatedRepair._id = updatedRepair._id.toString();
+    }
+
+    res.json({ 
+      success: true,
+      message: 'อัปเดตรายการแจ้งซ่อมเรียบร้อยแล้ว',
+      data: updatedRepair 
+    });
+  } catch (error) {
+    console.error('❌ Error updating repair:', error);
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
+  }
+};
+
 // Delete repair
 export const deleteRepair = async (req, res) => {
   const { id } = req.params;
+  const userId = req.user.userId;
+  const shopId = req.user.shopId;
+
   try {
-    const deletedRepair = await Repair.findByIdAndDelete(id);
-    if (!deletedRepair) {
-      return res.status(404).json({ message: 'Repair not found' });
+    const repair = await Repair.findById(id);
+    if (!repair) {
+      return res.status(404).json({ message: 'ไม่พบรายการแจ้งซ่อมนี้' });
     }
-    res.json({ message: 'Repair deleted successfully' });
+
+    // ตรวจสอบว่าเป็นเจ้าของ repair หรือไม่
+    if (repair.userId.toString() !== userId.toString() || repair.shopId.toString() !== shopId.toString()) {
+      return res.status(403).json({ message: 'คุณไม่มีสิทธิ์ลบรายการนี้' });
+    }
+
+    // ตรวจสอบว่าสถานะเป็น pending หรือไม่ (ลบได้เฉพาะรายการที่ยังรอดำเนินการ)
+    if (repair.status !== 'pending' && repair.status !== 'รอดำเนินการ') {
+      return res.status(400).json({ 
+        message: 'ไม่สามารถลบรายการที่กำลังดำเนินการหรือเสร็จสิ้นแล้ว' 
+      });
+    }
+
+    await Repair.findByIdAndDelete(id);
+    res.json({ 
+      success: true,
+      message: 'ลบรายการแจ้งซ่อมเรียบร้อยแล้ว' 
+    });
   } catch (error) {
+    console.error('❌ Error deleting repair:', error);
     res.status(500).json({ message: error.message });
   }
 }; 

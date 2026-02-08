@@ -1,618 +1,824 @@
 <template>
   <LayoutUser>
-    <div class="page-container">
-      <div class="content-wrapper">
-        <div class="header-section">
-          <div class="header-content">
+    <div class="bill-history-page">
+      <!-- Header -->
+      <div class="page-header">
+        <div class="header-content">
+          <div>
             <h1 class="page-title">ประวัติบิลค่าบริการ</h1>
-            <p class="page-subtitle">รายการบิลที่ชำระเสร็จสิ้นแล้ว</p>
+            <p class="page-subtitle">รายการบิลที่ตรวจสอบแล้วและรอตรวจสอบ</p>
           </div>
           <div class="header-actions">
-            <select id="paymentTypeSelect" v-model="selectedType" class="header-select-type">
-              <option value="water">ค่าน้ำ</option>
-              <option value="electricity">ค่าไฟ</option>
-            </select>
-            <router-link to="/user/bill" class="back-button">
-              <i class="fas fa-arrow-left"></i>
+            <v-btn
+              variant="outlined"
+              class="filter-btn"
+              @click="showFilterDialog = true"
+            >
+              <v-icon left size="small">mdi-filter</v-icon>
+              กรองข้อมูล
+            </v-btn>
+            <router-link to="/user/bill" class="back-link">
+              <v-icon left size="small">mdi-arrow-left</v-icon>
               กลับไปหน้ารายการปัจจุบัน
             </router-link>
           </div>
         </div>
+      </div>
 
-        <div class="bill-container">
+      <!-- Tabs -->
+      <div class="tabs-container">
+        <button
+          :class="['tab-button', { active: selectedType === 'water' }]"
+          @click="selectedType = 'water'"
+        >
+          💧 ค่าน้ำ
+        </button>
+        <button
+          :class="['tab-button', { active: selectedType === 'electricity' }]"
+          @click="selectedType = 'electricity'"
+        >
+          ⚡ ค่าไฟ
+        </button>
+      </div>
 
-          <!-- Bill List -->
-          <div class="bills-list">
-            <div v-if="filteredBills.length === 0" class="no-bills-message">
-              <div class="no-bills-icon">
-                <i class="fas fa-receipt"></i>
-              </div>
-              <h3>ไม่มีประวัติบิล</h3>
-              <p>ยังไม่มีรายการบิลที่เสร็จสิ้นในประเภทที่เลือก</p>
-            </div>
-            
-            <div v-for="bill in filteredBills" :key="bill.id" class="bill-card history-card">
-              <div class="bill-details">
-                <div class="left-section">
-                  <div class="bill-period">
-                    <h3>{{ getBillTypeText(bill.type) }}ประจำเดือน {{ formatMonth(bill.billMonth) }}</h3>
-                    <p class="date">วันที่ {{ formatDate(bill.createdAt) }}</p>
-                  </div>
+      <!-- Card -->
+      <v-card class="bill-history-card" elevation="2">
+        <v-card-text class="card-content">
+          <!-- Search -->
+          <div class="search-section">
+            <v-text-field
+              v-model="searchQuery"
+              placeholder="ค้นหารายการ..."
+              variant="outlined"
+              density="compact"
+              prepend-inner-icon="mdi-magnify"
+              hide-details
+              class="search-input"
+            ></v-text-field>
+          </div>
 
-                  <div class="due-date">
-                    <p>วันครบกำหนดชำระ: {{ formatDate(bill.dueDate) }}</p>
-                    <p v-if="bill.paymentDate">วันที่ชำระ: {{ formatDate(bill.paymentDate) }}</p>
-                  </div>
+          <!-- Table -->
+          <div class="table-wrapper">
+            <table class="bill-history-table">
+              <thead>
+                <tr>
+                  <th class="text-left">วันที่ออกบิล</th>
+                  <th class="text-left">ประเภท</th>
+                  <th class="text-left">จำนวนเงิน</th>
+                  <th class="text-left">สถานะ</th>
+                  <th class="text-right">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="loading">
+                  <td colspan="5" class="text-center py-4">
+                    <v-progress-circular indeterminate color="primary"></v-progress-circular>
+                  </td>
+                </tr>
+                <tr v-else-if="filteredBills.length === 0">
+                  <td colspan="5" class="text-center py-4 text-gray-500">
+                    <p class="mb-2">ไม่มีประวัติบิล</p>
+                    <p class="text-sm text-gray-400">ยังไม่มีรายการบิลที่เสร็จสิ้นในประเภทที่เลือก</p>
+                  </td>
+                </tr>
+                <tr v-else v-for="bill in paginatedBills" :key="bill.id">
+                  <td class="date-cell">
+                    {{ formatDateOnly(bill.createdAt) }}
+                    <br />
+                    <span class="time-text">{{ formatTime(bill.createdAt) }}</span>
+                  </td>
+                  <td>
+                    <v-chip small class="type-chip">
+                      {{ getBillTypeText(bill.type) }}ประจำเดือน {{ formatMonth(bill.billMonth) }}
+                    </v-chip>
+                  </td>
+                  <td class="amount-cell">
+                    <span v-if="bill.amount && bill.amount > 0" class="amount-text">฿{{ formatAmount(bill.amount) }}</span>
+                    <span v-else class="amount-text text-gray-400">รอการคำนวณ</span>
+                  </td>
+                  <td>
+                    <v-chip
+                      small
+                      :class="getStatusChipClass(bill.status)"
+                    >
+                      {{ getStatusText(bill.status) }}
+                    </v-chip>
+                  </td>
+                  <td class="text-right">
+                    <v-menu location="bottom end">
+                      <template v-slot:activator="{ props }">
+                        <v-btn
+                          icon
+                          size="small"
+                          v-bind="props"
+                          variant="text"
+                        >
+                          <v-icon>mdi-dots-horizontal</v-icon>
+                        </v-btn>
+                      </template>
+                      <v-list density="compact">
+                        <v-list-item 
+                          value="view"
+                          @click="viewBillDetails(bill)"
+                        >
+                          <template v-slot:prepend>
+                            <v-icon size="small">mdi-eye</v-icon>
+                          </template>
+                          <v-list-item-title>ดูรายละเอียด</v-list-item-title>
+                        </v-list-item>
+                        <v-list-item 
+                          v-if="bill.image" 
+                          value="slip"
+                          @click="viewSlip(bill)"
+                        >
+                          <template v-slot:prepend>
+                            <v-icon size="small">mdi-image</v-icon>
+                          </template>
+                          <v-list-item-title>ดูสลิปการชำระ</v-list-item-title>
+                        </v-list-item>
+                      </v-list>
+                    </v-menu>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-                  <div class="status-section">
-                    <span class="status-badge status-completed">
-                      <i class="fas fa-check-circle"></i>
-                      {{ getStatusText(bill) }}
-                    </span>
-                  </div>
-                </div>
-
-                <div class="right-section">
-                  <div class="payment-info">
-                    <h3 class="amount">฿{{ formatAmount(bill.amount) }}</h3>
-                    <div class="account-info">
-                      <p>เลขบัญชี: {{ bill.accountNumber }}</p>
-                      <p>ชื่อบัญชี: {{ bill.accountName }}</p>
-                    </div>
-                    
-                    <!-- แสดงรูปภาพสลิปถ้ามี -->
-                    <div v-if="bill.image" class="slip-image-section">
-                      <button 
-                        class="view-slip-button"
-                        @click="viewSlip(bill)"
-                      >
-                        <i class="fas fa-image"></i>
-                        ดูสลิปการชำระ
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+          <!-- Footer Pagination -->
+          <div class="table-footer" v-if="filteredBills.length > 0">
+            <span class="footer-text">
+              แสดง {{ startIndex }} ถึง {{ endIndex }} จาก {{ filteredBills.length }} รายการ
+            </span>
+            <div class="pagination">
+              <v-btn
+                v-for="page in visiblePages"
+                :key="page"
+                size="small"
+                :variant="page === currentPage ? 'flat' : 'outlined'"
+                :color="page === currentPage ? 'primary' : ''"
+                class="page-btn"
+                @click="goToPage(page)"
+              >
+                {{ page }}
+              </v-btn>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
+        </v-card-text>
+      </v-card>
 
-    <!-- Modal สำหรับดูสลิป -->
-    <div v-if="showSlipModal" class="modal-overlay" @click="closeSlipModal">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h3>สลิปการชำระ</h3>
-          <button class="close-button" @click="closeSlipModal">
-            <i class="fas fa-times"></i>
-          </button>
-        </div>
-        <div class="modal-body">
-          <img 
-            v-if="currentSlipImage" 
-            :src="currentSlipImage" 
-            alt="สลิปการชำระ"
-            class="slip-image"
-          />
-        </div>
-      </div>
+      <!-- Dialog สำหรับดูรายละเอียด -->
+      <v-dialog v-model="showDetailsDialog" max-width="700px" :scrim="true">
+        <v-card v-if="selectedBill">
+          <v-card-title class="dialog-header">
+            <span>รายละเอียดบิล</span>
+            <v-spacer></v-spacer>
+            <v-btn icon="mdi-close" size="small" variant="text" @click="showDetailsDialog = false"></v-btn>
+          </v-card-title>
+          <v-card-text>
+            <div class="detail-section">
+              <div class="detail-item">
+                <span class="detail-label">ประเภทบิล:</span>
+                <span class="detail-value">{{ getBillTypeText(selectedBill.type) }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">ประจำเดือน:</span>
+                <span class="detail-value">{{ formatMonth(selectedBill.billMonth) }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">วันที่ออกบิล:</span>
+                <span class="detail-value">{{ formatDate(selectedBill.createdAt) }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">วันครบกำหนดชำระ:</span>
+                <span class="detail-value">{{ formatDate(selectedBill.dueDate) }}</span>
+              </div>
+              <div class="detail-item" v-if="selectedBill.paymentDate">
+                <span class="detail-label">วันที่ชำระ:</span>
+                <span class="detail-value">{{ formatDate(selectedBill.paymentDate) }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">จำนวนเงิน:</span>
+                <span v-if="selectedBill.amount && selectedBill.amount > 0" class="detail-value amount-highlight">฿{{ formatAmount(selectedBill.amount) }}</span>
+                <span v-else class="detail-value text-gray-400">รอการคำนวณ</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">เลขบัญชี:</span>
+                <span class="detail-value">{{ selectedBill.accountNumber }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">ชื่อบัญชี:</span>
+                <span class="detail-value">{{ selectedBill.accountName }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">สถานะ:</span>
+                <v-chip
+                  small
+                  :class="getStatusChipClass(selectedBill.status)"
+                >
+                  {{ getStatusText(selectedBill.status) }}
+                </v-chip>
+              </div>
+            </div>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn variant="text" @click="showDetailsDialog = false">ปิด</v-btn>
+            <v-btn
+              v-if="selectedBill.image"
+              color="primary"
+              @click="viewSlip(selectedBill)"
+            >
+              ดูสลิปการชำระ
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <!-- Dialog สำหรับดูสลิป -->
+      <v-dialog v-model="showSlipDialog" max-width="900px" :scrim="true">
+        <v-card>
+          <v-card-title class="dialog-header">
+            <span>สลิปการชำระ</span>
+            <v-spacer></v-spacer>
+            <v-btn icon="mdi-close" size="small" variant="text" @click="closeSlipDialog"></v-btn>
+          </v-card-title>
+          <v-card-text>
+            <div class="slip-image-container">
+              <img 
+                v-if="currentSlipImage" 
+                :src="currentSlipImage" 
+                alt="สลิปการชำระ"
+                class="slip-image"
+              />
+              <div v-else class="loading-container">
+                <v-progress-circular indeterminate color="primary"></v-progress-circular>
+                <p class="mt-4">กำลังโหลดรูปภาพ...</p>
+              </div>
+            </div>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn variant="text" @click="closeSlipDialog">ปิด</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <!-- Dialog สำหรับกรองข้อมูล -->
+      <v-dialog v-model="showFilterDialog" max-width="500px" :scrim="true">
+        <v-card>
+          <v-card-title class="dialog-header">
+            <span>กรองข้อมูล</span>
+            <v-spacer></v-spacer>
+            <v-btn icon="mdi-close" size="small" variant="text" @click="showFilterDialog = false"></v-btn>
+          </v-card-title>
+          <v-card-text>
+            <v-select
+              v-model="filterStatus"
+              :items="statusOptions"
+              label="สถานะ"
+              variant="outlined"
+              density="compact"
+              clearable
+              class="mb-3"
+            ></v-select>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn variant="text" @click="clearFilter">ล้างตัวกรอง</v-btn>
+            <v-btn color="primary" @click="showFilterDialog = false">ตกลง</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </div>
   </LayoutUser>
 </template>
 
-<script>
-import { ref, computed, onMounted } from 'vue'
+<script setup>
+import { ref, onMounted, computed, watch } from 'vue'
+import LayoutUser from '@/components/LayoutUser.vue'
+import axios from 'axios'
 import { format } from 'date-fns'
 import { th } from 'date-fns/locale'
-import axios from 'axios'
 
-export default {
-  name: 'BillHistoryPage',
-  setup() {
-    const selectedType = ref('water')
-    const bills = ref([])
-    const showSlipModal = ref(false)
-    const currentSlipImage = ref('')
+// Data
+const selectedType = ref('water')
+const bills = ref([])
+const loading = ref(false)
+const searchQuery = ref('')
+const filterStatus = ref(null)
+const showDetailsDialog = ref(false)
+const showSlipDialog = ref(false)
+const showFilterDialog = ref(false)
+const selectedBill = ref(null)
+const currentSlipImage = ref('')
 
-    const filteredBills = computed(() => {
-      return bills.value.filter(bill => 
-        bill.type === selectedType.value && 
-        bill.status === 'เสร็จสิ้น'
-      )
+// Pagination
+const pageSize = 10
+const currentPage = ref(1)
+
+// Options
+const statusOptions = [
+  { title: 'เสร็จสิ้น', value: 'เสร็จสิ้น' },
+  { title: 'รอตรวจสอบ', value: 'รอตรวจสอบ' },
+  { title: 'รอดำเนินการ', value: 'รอดำเนินการ' },
+  { title: 'เลยกำหนด', value: 'เลยกำหนด' }
+]
+
+// Computed
+const filteredBills = computed(() => {
+  // แสดงบิลที่ admin ตรวจเช็คแล้ว (เสร็จสิ้น) หรือรอตรวจสอบ
+  // ไม่ต้องรอให้ผ่านเดือน เพราะถ้า admin ตรวจเช็คและยืนยันแล้วก็ควรแสดงในประวัติได้เลย
+  let result = bills.value.filter(bill => 
+    bill.type === selectedType.value && 
+    (bill.status === 'เสร็จสิ้น' || bill.status === 'รอตรวจสอบ')
+  )
+
+  // Filter by search query
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
+    result = result.filter(bill => {
+      const billTypeText = getBillTypeText(bill.type).toLowerCase()
+      const monthText = formatMonth(bill.billMonth).toLowerCase()
+      const amountText = bill.amount && bill.amount > 0 ? formatAmount(bill.amount) : 'รอการคำนวณ'
+      return billTypeText.includes(query) || 
+             monthText.includes(query) || 
+             amountText.toLowerCase().includes(query)
+    })
+  }
+
+  // Filter by status
+  if (filterStatus.value) {
+    result = result.filter(bill => bill.status === filterStatus.value)
+  }
+
+  // Sort by date (newest first)
+  return result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredBills.value.length / pageSize)))
+
+const paginatedBills = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return filteredBills.value.slice(start, start + pageSize)
+})
+
+const startIndex = computed(() => {
+  if (filteredBills.value.length === 0) return 0
+  return (currentPage.value - 1) * pageSize + 1
+})
+
+const endIndex = computed(() => {
+  return Math.min(currentPage.value * pageSize, filteredBills.value.length)
+})
+
+const visiblePages = computed(() => {
+  const pages = []
+  const maxVisible = 5
+  let start = Math.max(1, currentPage.value - Math.floor(maxVisible / 2))
+  let end = Math.min(totalPages.value, start + maxVisible - 1)
+  
+  if (end - start < maxVisible - 1) {
+    start = Math.max(1, end - maxVisible + 1)
+  }
+  
+  for (let i = start; i <= end; i++) {
+    pages.push(i)
+  }
+  
+  return pages
+})
+
+// Watch selectedType to reset page
+watch(selectedType, () => {
+  currentPage.value = 1
+})
+
+// Methods
+const formatDate = (date) => {
+  return format(new Date(date), 'dd/MM/yyyy', { locale: th })
+}
+
+const formatDateOnly = (date) => {
+  return format(new Date(date), 'dd/MM/yyyy', { locale: th })
+}
+
+const formatTime = (date) => {
+  return format(new Date(date), 'HH:mm น.', { locale: th })
+}
+
+const formatMonth = (date) => {
+  return format(new Date(date), 'MMMM yyyy', { locale: th })
+}
+
+const formatAmount = (amount) => {
+  if (amount === null || amount === undefined || isNaN(amount)) {
+    return '-'
+  }
+  return amount.toLocaleString('th-TH', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
+}
+
+const getBillTypeText = (type) => {
+  if (type === 'water') return 'ค่าน้ำ'
+  if (type === 'electricity') return 'ค่าไฟ'
+  return type
+}
+
+const getStatusText = (status) => {
+  return status || 'เสร็จสิ้น'
+}
+
+const getStatusChipClass = (status) => {
+  const statusClassMap = {
+    'เสร็จสิ้น': 'status-completed',
+    'รอตรวจสอบ': 'status-review',
+    'รอดำเนินการ': 'status-pending',
+    'เลยกำหนด': 'status-expired'
+  }
+  return statusClassMap[status] || 'status-pending'
+}
+
+const viewBillDetails = (bill) => {
+  selectedBill.value = bill
+  showDetailsDialog.value = true
+}
+
+const viewSlip = async (bill) => {
+  try {
+    showSlipDialog.value = true
+    currentSlipImage.value = ''
+    
+    // ใช้ axios interceptor (validate token อัตโนมัติ)
+    const response = await axios.get(`/api/bills/image/${bill.id}`, {
+      responseType: 'blob'
     })
 
-    const formatDate = (date) => {
-      return format(new Date(date), 'dd/MM/yyyy', { locale: th })
-    }
-
-    const formatMonth = (date) => {
-      return format(new Date(date), 'MMMM yyyy', { locale: th })
-    }
-
-    const formatAmount = (amount) => {
-      return amount.toLocaleString('th-TH', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      })
-    }
-
-    const getBillTypeText = (type) => {
-      if (type === 'water') return 'ค่าน้ำ'
-      if (type === 'electricity') return 'ค่าไฟ'
-      return type
-    }
-
-    const getStatusText = (bill) => {
-      return bill.status || 'เสร็จสิ้น'
-    }
-
-    const viewSlip = async (bill) => {
-      try {
-        const token = localStorage.getItem('token')
-        if (!token) {
-          alert('กรุณาเข้าสู่ระบบใหม่')
-          return
-        }
-
-        const response = await axios.get(`/api/bills/image/${bill.id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: 'blob'
-        })
-
-        const imageUrl = URL.createObjectURL(response.data)
-        currentSlipImage.value = imageUrl
-        showSlipModal.value = true
-      } catch (error) {
-        console.error('Error loading slip image:', error)
-        alert('ไม่สามารถโหลดรูปภาพสลิปได้')
-      }
-    }
-
-    const closeSlipModal = () => {
-      showSlipModal.value = false
-      if (currentSlipImage.value) {
-        URL.revokeObjectURL(currentSlipImage.value)
-        currentSlipImage.value = ''
-      }
-    }
-
-    const fetchBills = async () => {
-      try {
-        const token = localStorage.getItem('token')
-        if (!token) {
-          bills.value = []
-          return
-        }
-
-        const response = await axios.get(`/api/bills/history`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        
-        if (response.data && response.data.success && Array.isArray(response.data.data)) {
-          bills.value = response.data.data.map(bill => ({
-            id: bill._id,
-            type: bill.billType,
-            amount: bill.amount,
-            billMonth: new Date(bill.year, bill.month ? bill.month-1 : 0),
-            createdAt: bill.createdAt,
-            dueDate: bill.dueDate || bill.contractEndDate,
-            accountNumber: 'XXX-X-XXXXX-X',
-            accountName: bill.shopName || localStorage.getItem('displayName') || 'มหาวิทยาลัย',
-            paymentDate: bill.payment_date || null,
-            status: bill.status || 'รอดำเนินการ',
-            image: bill.image || null
-          }))
-        } else {
-          bills.value = []
-        }
-      } catch (error) {
-        console.error('Error fetching bills:', error)
-        bills.value = []
-      }
-    }
-
-    onMounted(() => {
-      fetchBills()
-    })
-
-    return {
-      selectedType,
-      filteredBills,
-      formatDate,
-      formatMonth,
-      formatAmount,
-      getBillTypeText,
-      getStatusText,
-      viewSlip,
-      showSlipModal,
-      currentSlipImage,
-      closeSlipModal
-    }
+    const imageUrl = URL.createObjectURL(response.data)
+    currentSlipImage.value = imageUrl
+  } catch (error) {
+    console.error('Error loading slip image:', error)
+    alert('ไม่สามารถโหลดรูปภาพสลิปได้')
+    showSlipDialog.value = false
   }
 }
+
+const closeSlipDialog = () => {
+  showSlipDialog.value = false
+  if (currentSlipImage.value) {
+    URL.revokeObjectURL(currentSlipImage.value)
+    currentSlipImage.value = ''
+  }
+}
+
+const clearFilter = () => {
+  filterStatus.value = null
+  searchQuery.value = ''
+  currentPage.value = 1
+}
+
+const goToPage = (page) => {
+  currentPage.value = page
+}
+
+const fetchBills = async () => {
+  loading.value = true
+  try {
+    // ใช้ axios interceptor (validate token อัตโนมัติ)
+    const response = await axios.get(`/api/bills/history`)
+    
+    if (response.data && response.data.success && Array.isArray(response.data.data)) {
+      bills.value = response.data.data.map(bill => {
+        let amount = bill.amount
+        if (amount === null || amount === undefined) {
+          amount = null
+        } else if (typeof amount === 'string') {
+          const trimmed = amount.trim()
+          if (trimmed === '' || trimmed === '-') {
+            amount = null
+          } else {
+            const parsed = parseFloat(trimmed)
+            amount = isNaN(parsed) ? null : parsed
+          }
+        } else if (typeof amount === 'number') {
+          amount = isNaN(amount) ? null : amount
+        } else {
+          amount = null
+        }
+        
+        return {
+          id: bill._id,
+          type: bill.billType,
+          amount: amount,
+          billMonth: new Date(bill.year, bill.month ? bill.month-1 : 0),
+          createdAt: bill.createdAt,
+          dueDate: bill.dueDate || bill.contractEndDate,
+          accountNumber: 'XXX-X-XXXXX-X',
+          accountName: bill.shopName || localStorage.getItem('displayName') || 'มหาวิทยาลัย',
+          paymentDate: bill.payment_date || null,
+          status: bill.status || 'รอดำเนินการ',
+          image: bill.image || null
+        }
+      })
+    } else {
+      bills.value = []
+    }
+  } catch (error) {
+    console.error('Error fetching bills:', error)
+    bills.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  fetchBills()
+})
 </script>
 
 <style scoped>
-.page-container {
-  padding: 2rem;
-  background-color: #f0f2f5;
+.bill-history-page {
+  padding: 1.5rem;
+  background-color: #f9fafb;
   min-height: calc(100vh - 64px);
-  overflow: hidden;
 }
 
-.content-wrapper {
-  max-width: 1200px;
-  margin: 0 auto;
-  overflow: hidden;
-}
-
-.header-section {
-  background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
-  color: white;
-  padding: 24px;
-  border-radius: 12px;
-  margin-bottom: 24px;
-  box-shadow: 0 4px 20px rgba(39, 174, 96, 0.15);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.page-header {
+  margin-bottom: 1.5rem;
 }
 
 .header-content {
-  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
 }
 
 .page-title {
-  font-size: 2rem;
-  font-weight: 700;
-  color: white;
-  margin: 0 0 8px 0;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 0.25rem 0;
 }
 
 .page-subtitle {
-  font-size: 1rem;
-  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.875rem;
+  color: #6b7280;
   margin: 0;
 }
 
 .header-actions {
   display: flex;
-  gap: 12px;
+  gap: 0.75rem;
   align-items: center;
 }
 
-.header-select-type {
-  padding: 12px 20px;
-  font-size: 16px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  min-width: 150px;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  transition: all 0.3s ease;
-  font-weight: 600;
-  backdrop-filter: blur(10px);
+.filter-btn {
+  text-transform: none;
 }
 
-.header-select-type:focus {
-  outline: none;
-  border-color: rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.3);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
-}
-
-.header-select-type option {
-  background: #27ae60;
-  color: white;
-}
-
-.back-button {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  text-decoration: none;
-  padding: 12px 20px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  backdrop-filter: blur(10px);
-}
-
-.back-button:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: translateY(-2px);
-}
-
-.bill-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0;
-}
-
-.bills-list {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.bill-card {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 4px 20px rgba(39, 174, 96, 0.1);
-  transition: all 0.3s ease;
-  border-left: 4px solid #27ae60;
-}
-
-.history-card {
-  border-left-color: #27ae60;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fff9 100%);
-}
-
-.bill-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 25px rgba(39, 174, 96, 0.15);
-}
-
-.bill-details {
-  display: flex;
-  justify-content: space-between;
-  gap: 30px;
-}
-
-.left-section {
-  flex: 2;
-}
-
-.right-section {
-  flex: 1;
-  padding-left: 30px;
-  border-left: 1px solid #e2e8f0;
-}
-
-.bill-period h3 {
-  font-size: 20px;
-  color: #2d3748;
-  margin-bottom: 8px;
-  font-weight: 700;
-}
-
-.date {
-  color: #718096;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.due-date {
-  margin: 20px 0;
-  color: #4a5568;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.due-date p {
-  margin: 4px 0;
-}
-
-.status-badge {
+.back-link {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-radius: 9999px;
-  font-weight: 600;
-  font-size: 14px;
-  min-width: 120px;
-  text-align: center;
-  transition: all 0.3s ease;
-}
-
-.status-completed {
-  background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%);
-  color: #065F46;
-}
-
-.payment-info {
-  text-align: right;
-}
-
-.amount {
-  font-size: 28px;
-  color: #27ae60;
-  margin-bottom: 20px;
-  font-weight: 700;
-  text-shadow: 0 2px 4px rgba(39, 174, 96, 0.1);
-}
-
-.account-info {
-  color: #4a5568;
-  margin-bottom: 24px;
-  font-size: 14px;
+  color: #2563eb;
+  text-decoration: none;
+  font-size: 0.875rem;
   font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  transition: all 0.2s;
 }
 
-.account-info p {
-  margin: 4px 0;
+.back-link:hover {
+  background-color: #eff6ff;
+  text-decoration: none;
 }
 
-.slip-image-section {
-  margin-top: 16px;
+/* Tabs */
+.tabs-container {
+  display: inline-flex;
+  background-color: #f3f4f6;
+  border-radius: 0.75rem;
+  padding: 0.25rem;
+  margin-bottom: 1.5rem;
 }
 
-.view-slip-button {
-  background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
-  color: white;
+.tab-button {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
   border: none;
-  padding: 12px 20px;
-  border-radius: 8px;
+  background: transparent;
+  color: #4b5563;
   cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-button.active {
+  background-color: #2563eb;
+  color: white;
+}
+
+/* Card */
+.bill-history-card {
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.card-content {
+  padding: 1rem;
+}
+
+.search-section {
+  margin-bottom: 1rem;
+}
+
+.search-input {
+  max-width: 24rem;
+}
+
+/* Table */
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.bill-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.bill-history-table thead {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.bill-history-table th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 500;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.bill-history-table tbody tr {
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.2s;
+}
+
+.bill-history-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.bill-history-table td {
+  padding: 0.75rem 1rem;
+}
+
+.date-cell {
+  white-space: nowrap;
+}
+
+.time-text {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.type-chip {
+  background-color: #e0e7ff;
+  color: #3730a3;
+}
+
+.amount-cell {
   font-weight: 600;
-  font-size: 14px;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(39, 174, 96, 0.2);
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
-.view-slip-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(39, 174, 96, 0.3);
-}
-
-.no-bills-message {
-  text-align: center;
-  padding: 60px 20px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(39, 174, 96, 0.1);
-}
-
-.no-bills-icon {
-  font-size: 4rem;
-  color: #bdc3c7;
-  margin-bottom: 20px;
-}
-
-.no-bills-message h3 {
-  color: #2d3748;
-  margin-bottom: 12px;
-  font-size: 1.5rem;
-}
-
-.no-bills-message p {
-  color: #718096;
+.amount-text {
+  color: #059669;
   font-size: 1rem;
 }
 
-/* Modal Styles */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
+.status-completed {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.status-review {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.status-pending {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.status-expired {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+/* Footer */
+.table-footer {
   display: flex;
   align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
+  justify-content: space-between;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+  font-size: 0.875rem;
+  color: #6b7280;
 }
 
-.modal-content {
-  background: white;
-  border-radius: 12px;
-  max-width: 90vw;
-  max-height: 90vh;
-  overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+.pagination {
+  display: flex;
+  gap: 0.25rem;
 }
 
-.modal-header {
+.page-btn {
+  min-width: 2rem;
+}
+
+/* Dialog */
+.dialog-header {
+  display: flex;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.detail-section {
+  padding: 0.5rem 0;
+}
+
+.detail-item {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid #e2e8f0;
-  background: #f8f9fa;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #f3f4f6;
 }
 
-.modal-header h3 {
-  margin: 0;
-  color: #2d3748;
+.detail-item:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.detail-value {
+  color: #1f2937;
+  font-weight: 500;
+}
+
+.amount-highlight {
+  color: #059669;
   font-size: 1.25rem;
+  font-weight: 600;
 }
 
-.close-button {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  color: #718096;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-}
-
-.close-button:hover {
-  background: #e2e8f0;
-  color: #2d3748;
-}
-
-.modal-body {
-  padding: 24px;
+.slip-image-container {
   text-align: center;
+  padding: 1rem;
 }
 
 .slip-image {
   max-width: 100%;
   max-height: 70vh;
-  border-radius: 8px;
+  border-radius: 0.5rem;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
-/* Responsive Design */
+.loading-container {
+  padding: 3rem;
+  text-align: center;
+  color: #6b7280;
+}
+
+/* Responsive */
 @media (max-width: 768px) {
-  .page-container {
+  .bill-history-page {
     padding: 1rem;
   }
 
-  .header-section {
+  .header-content {
     flex-direction: column;
-    gap: 16px;
-    text-align: center;
+    align-items: flex-start;
+    gap: 1rem;
   }
 
   .header-actions {
     width: 100%;
-    justify-content: center;
     flex-wrap: wrap;
   }
 
-  .header-select-type {
-    width: 100%;
-    max-width: 200px;
-  }
-
-  .back-button {
-    width: 100%;
-    max-width: 200px;
-    justify-content: center;
-  }
-
-  .bill-card {
-    padding: 20px;
-  }
-
-  .bill-details {
+  .table-footer {
     flex-direction: column;
-    gap: 20px;
-  }
-
-  .right-section {
-    padding-left: 0;
-    padding-top: 20px;
-    border-left: none;
-    border-top: 1px solid #e2e8f0;
-  }
-
-  .payment-info {
-    text-align: left;
-  }
-
-  .amount {
-    font-size: 24px;
-  }
-
-  .view-slip-button {
-    width: 100%;
-    justify-content: center;
+    gap: 1rem;
+    align-items: flex-start;
   }
 }
 </style>

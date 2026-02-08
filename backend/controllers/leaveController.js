@@ -233,33 +233,143 @@ function getCanteenName(canteenId) {
   return canteenMap[canteenId] || 'ไม่ระบุ';
 }
 
+// Update leave (user can update their own leaves if status is pending)
 export const updateLeave = async (req, res) => {
   const { id } = req.params;
-  const { startDate, endDate, reason } = req.body;
+  const { startDate, endDate, issue } = req.body;
+  const userId = req.user.userId;
+  const shopId = req.user.shopId;
+
   try {
-    const updatedLeave = await Leave.findByIdAndUpdate(
-      id,
-      { startDate, endDate, reason },
-      { new: true }
-    );
-    if (!updatedLeave) {
-      return res.status(404).json({ message: 'Leave not found' });
+    const leave = await Leave.findById(id);
+    if (!leave) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'ไม่พบรายการลานี้' 
+      });
     }
-    res.json(updatedLeave);
+
+    // ตรวจสอบว่าเป็นเจ้าของ leave หรือไม่
+    if (leave.userId.toString() !== userId.toString() || leave.shopId.toString() !== shopId.toString()) {
+      return res.status(403).json({ 
+        success: false,
+        message: 'คุณไม่มีสิทธิ์แก้ไขรายการนี้' 
+      });
+    }
+
+    // ตรวจสอบว่าสถานะเป็น pending หรือไม่ (แก้ไขได้เฉพาะรายการที่ยังรออนุมัติ)
+    if (leave.status !== 'pending') {
+      return res.status(400).json({ 
+        success: false,
+        message: 'ไม่สามารถแก้ไขรายการที่อนุมัติหรือไม่อนุมัติแล้ว' 
+      });
+    }
+
+    // ตรวจสอบวันที่
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      if (start > end) {
+        return res.status(400).json({
+          success: false,
+          message: 'วันที่เริ่มต้นต้องไม่มากกว่าวันที่สิ้นสุด'
+        });
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (start < today) {
+        return res.status(400).json({
+          success: false,
+          message: 'ไม่สามารถลาย้อนหลังได้'
+        });
+      }
+
+      const diffTime = Math.abs(end - start);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+      if (diffDays > 3) {
+        return res.status(400).json({
+          success: false,
+          message: 'ระยะเวลาในการลาสูงสุดได้ 3 วันเท่านั้น'
+        });
+      }
+    }
+
+    // อัปเดตข้อมูล
+    if (startDate) leave.startDate = startDate;
+    if (endDate) leave.endDate = endDate;
+    if (issue) leave.issue = issue;
+
+    // เปลี่ยนสถานะกลับเป็นรออนุมัติ (pending) เพื่อให้ admin ตรวจสอบใหม่
+    leave.status = 'pending';
+
+    await leave.save();
+
+    // ดึงข้อมูล leave ใหม่
+    const updatedLeave = await Leave.findById(id).lean();
+
+    if (updatedLeave) {
+      updatedLeave._id = updatedLeave._id.toString();
+    }
+
+    res.json({ 
+      success: true,
+      message: 'อัปเดตรายการลารีบร้อยแล้ว',
+      data: updatedLeave 
+    });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error('❌ Error updating leave:', error);
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
   }
 };
 
+// Delete leave (user can delete their own leaves if status is pending)
 export const deleteLeave = async (req, res) => {
   const { id } = req.params;
+  const userId = req.user.userId;
+  const shopId = req.user.shopId;
+
   try {
-    const deletedLeave = await Leave.findByIdAndDelete(id);
-    if (!deletedLeave) {
-      return res.status(404).json({ message: 'Leave not found' });
+    const leave = await Leave.findById(id);
+    if (!leave) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'ไม่พบรายการลานี้' 
+      });
     }
-    res.json({ message: 'Leave deleted successfully' });
+
+    // ตรวจสอบว่าเป็นเจ้าของ leave หรือไม่
+    if (leave.userId.toString() !== userId.toString() || leave.shopId.toString() !== shopId.toString()) {
+      return res.status(403).json({ 
+        success: false,
+        message: 'คุณไม่มีสิทธิ์ลบรายการนี้' 
+      });
+    }
+
+    // ตรวจสอบว่าสถานะเป็น pending หรือไม่ (ลบได้เฉพาะรายการที่ยังรออนุมัติ)
+    if (leave.status !== 'pending') {
+      return res.status(400).json({ 
+        success: false,
+        message: 'ไม่สามารถลบรายการที่อนุมัติหรือไม่อนุมัติแล้ว' 
+      });
+    }
+
+    await Leave.findByIdAndDelete(id);
+    res.json({ 
+      success: true,
+      message: 'ลบรายการลารีบร้อยแล้ว' 
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('❌ Error deleting leave:', error);
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
   }
 }; 

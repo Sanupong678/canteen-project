@@ -831,10 +831,22 @@ export const getBillImage = async (req, res) => {
     const isDev = process.env.NODE_ENV === 'development';
     const billId = req.params.billId;
     
+    if (isDev) console.log('🔍 getBillImage called with billId:', billId);
+    
     const bill = await Bill.findById(billId);
     if (!bill) {
       if (isDev) console.log('❌ Bill not found:', billId);
       return res.status(404).json({ success: false, error: 'Bill not found' });
+    }
+    
+    if (isDev) {
+      console.log('✅ Bill found:', {
+        id: bill._id,
+        hasImage: !!bill.image,
+        hasImagePath: !!bill.imagePath,
+        imagePath: bill.imagePath,
+        slip_image_url: bill.slip_image_url
+      });
     }
     
     // ตรวจสอบว่า user มีสิทธิ์เข้าถึง bill นี้หรือไม่

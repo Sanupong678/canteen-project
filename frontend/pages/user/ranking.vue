@@ -57,9 +57,11 @@
                 </td>
               </tr>
               <tr v-if="moneyHistory.length === 0">
-                <td colspan="5" class="no-data">
-                  <i class="fas fa-inbox"></i>
-                  <p>ยังไม่มีข้อมูลประวัติรายได้และคะแนน</p>
+                <td colspan="5" class="no-data-cell">
+                  <div class="no-data">
+                    <i class="fas fa-inbox"></i>
+                    <p>ยังไม่มีข้อมูลประวัติรายได้และคะแนน</p>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -75,6 +77,7 @@
 import { ref, onMounted } from 'vue'
 import LayoutUser from '~/components/LayoutUser.vue'
 import axios from 'axios'
+import { getTokenWithState, getTokenFingerprint } from '@/utils/tokenUtils'
 
 // Reactive data
 const currentData = ref({
@@ -198,9 +201,9 @@ const fetchCurrentData = async () => {
     console.log('👤 userId from sessionStorage:', userId)
     console.log('📝 displayName from sessionStorage:', displayName)
     
-    // 5. ลองหาจาก token
-    const token = sessionStorage.getItem('token')
-    console.log('🔐 token exists:', !!token)
+    // 5. ลองหาจาก token (ใช้ fingerprint สำหรับ debug)
+    const { token, state } = getTokenWithState()
+    console.log('🔐 token state:', state, 'fingerprint:', getTokenFingerprint(token || ''))
     
     // 6. เลือก shopId ที่มีค่า
     const shopId = shopIdFromUserData || shopIdFromShopData || userId
@@ -533,19 +536,32 @@ onMounted(async () => {
   color: #dc3545; /* Red for rank */
 }
 
-.no-data {
+.no-data-cell {
+  padding: 0 !important;
   text-align: center;
-  padding: 30px;
+  vertical-align: middle;
+}
+
+.no-data {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
   color: #6c757d;
+  min-height: 200px;
 }
 
 .no-data i {
-  font-size: 40px;
-  margin-bottom: 10px;
+  font-size: 48px;
+  margin-bottom: 16px;
+  color: #adb5bd;
 }
 
 .no-data p {
-  margin-top: 10px;
+  margin: 0;
+  font-size: 16px;
+  color: #6c757d;
 }
 
 .update-info {

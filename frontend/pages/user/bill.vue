@@ -2,99 +2,182 @@
   <LayoutUser>
     <div class="page-container">
       <div class="content-wrapper">
+        <!-- Header -->
         <div class="header-section">
           <div class="header-content">
             <h1 class="page-title">บิลค่าบริการ</h1>
             <p class="page-subtitle">รายการบิลที่ต้องดำเนินการ</p>
           </div>
-          <div class="header-actions">
-            <select id="paymentTypeSelect" v-model="selectedType" class="header-select-type">
-              <option value="water">ค่าน้ำ</option>
-              <option value="electricity">ค่าไฟ</option>
-            </select>
-            <router-link to="/user/bill-history" class="history-button">
-              <i class="fas fa-history"></i>
-              ดูประวัติ
-            </router-link>
+          <router-link to="/user/bill-history" class="history-link">
+            ดูประวัติทั้งหมด →
+          </router-link>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs-container">
+          <button
+            :class="['tab-button', { active: selectedType === 'water' }]"
+            @click="selectedType = 'water'"
+          >
+            💧 ค่าน้ำ
+          </button>
+          <button
+            :class="['tab-button', { active: selectedType === 'electricity' }]"
+            @click="selectedType = 'electricity'"
+          >
+            ⚡ ค่าไฟ
+          </button>
+        </div>
+
+        <!-- Current Bill Card -->
+        <div v-if="currentBill" class="current-bill-card">
+          <!-- Card Header -->
+          <div class="card-header">
+            <div class="header-left">
+              <div class="icon-circle">
+                📅
+              </div>
+              <div>
+                <p class="bill-title">{{ getBillTypeText(currentBill.type) }}ประจำเดือน {{ formatMonth(currentBill.billMonth) }}</p>
+                <p class="bill-id">{{ currentBill.id }}</p>
+              </div>
+            </div>
+            <span :class="['status-badge-new', getStatusClass(currentBill)]">
+              ● {{ getStatusText(currentBill) }}
+            </span>
+          </div>
+
+          <!-- Bill Info Grid -->
+          <div class="bill-info-grid">
+            <div class="info-item">
+              <p class="info-label">วันที่ออกบิล</p>
+              <p class="info-value">{{ formatDate(currentBill.createdAt) }}</p>
+            </div>
+            <div class="info-item">
+              <p class="info-label">เลขบัญชี</p>
+              <p class="info-value">{{ currentBill.accountNumber }}</p>
+            </div>
+            <div class="info-item">
+              <p class="info-label">วันครบกำหนด</p>
+              <p class="info-value due-date-text">{{ formatDate(currentBill.dueDate) }}</p>
+            </div>
+            <div class="info-item">
+              <p class="info-label">ชื่อบัญชี</p>
+              <p class="info-value">{{ currentBill.accountName }}</p>
+            </div>
+          </div>
+
+          <!-- Waiting Section or Upload Section -->
+          <div v-if="!hasAmount(currentBill)" class="waiting-section">
+            <div class="waiting-content">
+              <div class="waiting-icon">
+                <v-progress-circular
+                  v-if="!currentBill.image && currentBill.status !== 'รอตรวจสอบ'"
+                  indeterminate
+                  color="primary"
+                  size="24"
+                  width="3"
+                ></v-progress-circular>
+                <div v-else class="check-icon">✓</div>
+              </div>
+              <div>
+                <p class="waiting-title">
+                  <span v-if="!currentBill.image && currentBill.status !== 'รอตรวจสอบ'">รอการอัปโหลดสลิปการโอนเงิน</span>
+                  <span v-else>อัปโหลดสลิปสำเร็จ</span>
+                </p>
+                <p class="waiting-subtitle">
+                  <span v-if="!currentBill.image && currentBill.status !== 'รอตรวจสอบ'">รอการคำนวณจากผู้ดูแลระบบ</span>
+                  <span v-else>รอการตรวจสอบจากผู้ดูแลระบบ</span>
+                </p>
+              </div>
+            </div>
+            <input
+              type="file"
+              :id="'fileInput_' + currentBill.id"
+              :ref="'fileInput_' + currentBill.id"
+              accept="image/*"
+              class="hidden-file-input"
+              @change="handleFileChange($event, currentBill)"
+            />
+            <button
+              v-if="!selectedFiles[currentBill.id] && !currentBill.image && currentBill.status !== 'รอตรวจสอบ'"
+              class="pay-button-active"
+              @click="triggerFileInput(currentBill.id)"
+            >
+              อัปโหลดสลิป
+            </button>
+            <button
+              v-else-if="selectedFiles[currentBill.id]"
+              class="pay-button-confirm"
+              @click="confirmUpload(currentBill)"
+            >
+              ยืนยันอัปโหลด
+            </button>
+            <button
+              v-else-if="currentBill.image || currentBill.status === 'รอตรวจสอบ'"
+              class="pay-button-disabled"
+              disabled
+            >
+              รอตรวจสอบ
+            </button>
+          </div>
+          <div v-else class="upload-section">
+            <div class="amount-display">
+              <h3 class="amount-text">฿{{ formatAmount(currentBill.amount) }}</h3>
+            </div>
+            <input
+              type="file"
+              :id="'fileInput_' + currentBill.id"
+              :ref="'fileInput_' + currentBill.id"
+              accept="image/*"
+              class="hidden-file-input"
+              @change="handleFileChange($event, currentBill)"
+            />
+            <button
+              v-if="canUploadSlip(currentBill) && !currentBill.image && !selectedFiles[currentBill.id]"
+              class="pay-button-active"
+              @click="triggerFileInput(currentBill.id)"
+            >
+              แจ้งชำระเงิน
+            </button>
+            <button
+              v-else-if="selectedFiles[currentBill.id]"
+              class="pay-button-confirm"
+              @click="confirmUpload(currentBill)"
+            >
+              ยืนยันอัปโหลด
+            </button>
+            <button
+              v-else-if="currentBill.image || currentBill.status === 'รอตรวจสอบ'"
+              class="pay-button-disabled"
+              disabled
+            >
+              รอตรวจสอบ
+            </button>
           </div>
         </div>
 
-        <div class="bill-container">
+        <!-- No Current Bill Message -->
+        <div v-if="!currentBill && filteredBills.length === 0" class="no-bills-message">
+          <div class="no-bills-icon">
+            <i class="fas fa-check-circle"></i>
+          </div>
+          <h3>ไม่มีรายการที่ต้องดำเนินการ</h3>
+          <p>ยอดเยี่ยม! คุณได้ชำระบิลทั้งหมดแล้ว</p>
+        </div>
 
-          <!-- Bill List -->
-          <div class="bills-list">
-            <div v-if="filteredBills.length === 0" class="no-bills-message">
-              <div class="no-bills-icon">
-                <i class="fas fa-check-circle"></i>
+        <!-- Previous Bills -->
+        <div v-for="bill in previousBills" :key="bill.id" class="previous-bill-card">
+          <div class="previous-bill-content">
+            <div class="previous-bill-left">
+              <div class="previous-icon">✓</div>
+              <div>
+                <p class="previous-bill-title">{{ getBillTypeText(bill.type) }}ประจำเดือน {{ formatMonth(bill.billMonth) }}</p>
+                <p class="previous-bill-date">ชำระแล้วเมื่อ {{ formatDate(bill.paymentDate) }}</p>
               </div>
-              <h3>ไม่มีรายการที่ต้องดำเนินการ</h3>
-              <p>ยอดเยี่ยม! คุณได้ชำระบิลทั้งหมดแล้ว</p>
-              <router-link to="/user/bill-history" class="view-history-link">
-                <i class="fas fa-history"></i>
-                ดูประวัติการชำระ
-              </router-link>
             </div>
-            
-            <div v-for="bill in filteredBills" :key="bill.id" class="bill-card">
-              <div class="bill-details">
-                <div class="left-section">
-                  <div class="bill-period">
-                    <h3>{{ getBillTypeText(bill.type) }}ประจำเดือน {{ formatMonth(bill.billMonth) }}</h3>
-                    <p class="date">วันที่ {{ formatDate(bill.createdAt) }}</p>
-                  </div>
-
-                  <div class="due-date">
-                    <p>วันครบกำหนดชำระ: {{ formatDate(bill.dueDate) }}</p>
-                    <p v-if="bill.paymentDate">วันที่ชำระ: {{ formatDate(bill.paymentDate) }}</p>
-                  </div>
-
-                  <div class="status-section">
-                    <span :class="['status-badge', getStatusClass(bill)]">
-                      {{ getStatusText(bill) }}
-                    </span>
-                  </div>
-                </div>
-
-                <div class="right-section">
-                  <div class="payment-info">
-                    <h3 v-if="bill.amount !== null && bill.amount !== undefined && typeof bill.amount === 'number' && !isNaN(bill.amount) && bill.amount > 0" class="amount">฿{{ formatAmount(bill.amount) }}</h3>
-                    <h3 v-else class="amount amount-pending">รอการกำหนดจำนวนเงิน</h3>
-                    <div class="account-info">
-                      <p>เลขบัญชี: {{ bill.accountNumber }}</p>
-                      <p>ชื่อบัญชี: {{ bill.accountName }}</p>
-                    </div>
-                    <input
-                      type="file"
-                      :id="'fileInput_' + bill.id"
-                      :ref="'fileInput_' + bill.id"
-                      accept="image/*"
-                      class="hidden-file-input"
-                      @change="handleFileChange($event, bill)"
-                    />
-                    <button
-                      v-if="canUploadSlip(bill)"
-                      class="pay-button"
-                      :style="bill.image ? 'background: #bdbdbd; cursor: not-allowed;' : ''"
-                      :disabled="!!bill.image"
-                      @click="triggerFileInput(bill.id)"
-                    >
-                      อัปโหลดสลิป
-                    </button>
-                    <div v-else-if="!bill.amount || bill.amount === null || bill.amount === undefined || typeof bill.amount !== 'number' || isNaN(bill.amount) || bill.amount <= 0" class="waiting-message">
-                      <p>รอการกำหนดจำนวนเงินจากผู้ดูแลระบบ</p>
-                    </div>
-                    <!-- ปุ่มยืนยันอัปโหลด -->
-                    <button
-                      v-if="selectedFiles[bill.id]"
-                      class="pay-button"
-                      style="margin-top: 8px; background: #27ae60;"
-                      @click="confirmUpload(bill)"
-                    >
-                      ยืนยันอัปโหลด
-                    </button>
-                  </div>
-                </div>
-              </div>
+            <div class="previous-bill-amount">
+              <p class="previous-amount-text">฿{{ formatAmount(bill.amount) }}</p>
             </div>
           </div>
         </div>
@@ -161,7 +244,11 @@ export default {
                          !isNaN(bill.amount) &&
                          bill.amount > 0
         
-        const shouldShow = hasAmount || bill.status === 'รอดำเนินการ' || bill.status === 'เลยกำหนด'
+        // แสดงบิลที่มี amount หรือ status เป็น 'รอดำเนินการ', 'เลยกำหนด', หรือ 'รอตรวจสอบ'
+        const shouldShow = hasAmount || 
+                          bill.status === 'รอดำเนินการ' || 
+                          bill.status === 'เลยกำหนด' ||
+                          bill.status === 'รอตรวจสอบ'
         
         console.log('✅ Bill passed filter:', {
           id: bill.id,
@@ -170,13 +257,40 @@ export default {
           shouldShow
         })
         
-        // แสดงบิลที่มี amount หรือ status เป็น 'รอดำเนินการ' หรือ 'เลยกำหนด'
+        // แสดงบิลที่มี amount หรือ status เป็น 'รอดำเนินการ', 'เลยกำหนด', หรือ 'รอตรวจสอบ'
         return shouldShow
       })
       
       console.log('✅ Filtered bills count:', filtered.length)
       return filtered
     })
+
+    // Current bill (บิลปัจจุบันที่ต้องดำเนินการ)
+    const currentBill = computed(() => {
+      return filteredBills.value.length > 0 ? filteredBills.value[0] : null
+    })
+
+    // Previous bills (บิลที่ชำระแล้ว)
+    const previousBills = computed(() => {
+      return bills.value
+        .filter(bill => 
+          bill.type === selectedType.value && 
+          bill.status === 'เสร็จสิ้น' &&
+          bill.paymentDate &&
+          hasAmount(bill)
+        )
+        .sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate))
+        .slice(0, 5) // แสดงแค่ 5 รายการล่าสุด
+    })
+
+    // Helper function to check if bill has amount
+    const hasAmount = (bill) => {
+      return bill.amount !== null && 
+             bill.amount !== undefined && 
+             typeof bill.amount === 'number' &&
+             !isNaN(bill.amount) &&
+             bill.amount > 0
+    }
 
     const formatDate = (date) => {
       return format(new Date(date), 'dd/MM/yyyy', { locale: th })
@@ -257,23 +371,14 @@ export default {
         status: bill.status
       })
       
-      // ไม่แสดงปุ่มเมื่อยังไม่มี amount (รอ admin อัปโหลด Excel)
-      if (!hasAmount) {
-        return false
-      }
-      
-      // แสดงปุ่มเมื่อ status เป็น 'รอดำเนินการ' หรือ 'เลยกำหนด'
-      if (bill.status === 'รอดำเนินการ' || bill.status === 'เลยกำหนด') {
-        return true
-      }
-      
-      // ซ่อนปุ่มเมื่อ status เป็น 'รอตรวจสอบ' หรือ 'เสร็จสิ้น'
+      // อนุญาตให้อัปโหลดได้แม้ยังไม่มี amount (เพื่อให้สามารถอัปโหลดสลิปก่อนได้)
+      // แต่ต้องไม่ใช่ status 'รอตรวจสอบ' หรือ 'เสร็จสิ้น'
       if (bill.status === 'รอตรวจสอบ' || bill.status === 'เสร็จสิ้น') {
         return false
       }
       
-      // กรณีไม่มี status แต่มี amount ให้แสดงปุ่ม (เพื่อให้สามารถอัปโหลดสลิปได้)
-      if (!bill.status && hasAmount) {
+      // แสดงปุ่มเมื่อ status เป็น 'รอดำเนินการ' หรือ 'เลยกำหนด' หรือไม่มี status
+      if (bill.status === 'รอดำเนินการ' || bill.status === 'เลยกำหนด' || !bill.status) {
         return true
       }
       
@@ -323,18 +428,7 @@ export default {
         formData.append('transferDate', new Date().toISOString())
         formData.append('billType', bill.type)
         
-        // ตรวจสอบ token จากทั้ง localStorage และ sessionStorage
-        let token = localStorage.getItem('token')
-        if (!token) {
-          token = sessionStorage.getItem('token')
-        }
-        console.log('Token status:', token ? 'Present' : 'Missing')
-        
-        // ตรวจสอบ token
-        if (!token) {
-          throw new Error('ไม่พบ token กรุณาเข้าสู่ระบบใหม่')
-        }
-        
+        // ใช้ axios interceptor (validate token อัตโนมัติ)
         // แสดง FormData contents
         console.log('FormData contents:')
         for (let [key, value] of formData.entries()) {
@@ -343,7 +437,6 @@ export default {
         
         const response = await axios.post('/api/bills/upload', formData, {
           headers: {
-            Authorization: `Bearer ${token}`,
             'Content-Type': 'multipart/form-data'
           },
           timeout: 30000 // 30 วินาที timeout
@@ -382,25 +475,9 @@ export default {
     const fetchBills = async () => {
       console.log('🚀 fetchBills() called')
       try {
-        // ตรวจสอบ token จากทั้ง localStorage และ sessionStorage
-        let token = localStorage.getItem('token')
-        if (!token) {
-          token = sessionStorage.getItem('token')
-          console.log('🔑 Token from sessionStorage:', token ? 'Present' : 'Missing')
-        } else {
-          console.log('🔑 Token from localStorage:', 'Present')
-        }
-        
-        if (!token) {
-          console.log('❌ No token found in localStorage or sessionStorage')
-          bills.value = []
-          return
-        }
+        // ใช้ axios interceptor (validate token อัตโนมัติ)
         console.log('📡 Calling API: /api/bills/history')
-        // เรียก API backend พร้อมแนบ token
-        const response = await axios.get(`/api/bills/history`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        const response = await axios.get(`/api/bills/history`)
         console.log('📥 API Response received:', {
           success: response.data?.success,
           dataLength: response.data?.data?.length,
@@ -569,6 +646,8 @@ export default {
     return {
       selectedType,
       filteredBills,
+      currentBill,
+      previousBills,
       uploading,
       formatDate,
       formatMonth,
@@ -581,7 +660,8 @@ export default {
       triggerFileInput,
       handleFileChange,
       confirmUpload,
-      selectedFiles
+      selectedFiles,
+      hasAmount
     }
   }
 }
@@ -589,28 +669,22 @@ export default {
 
 <style scoped>
 .page-container {
-  padding: 2rem;
-  background-color: #f0f2f5;
+  padding: 2.5rem 1.5rem;
+  background-color: #f9fafb;
   min-height: calc(100vh - 64px);
-  overflow: hidden;
 }
 
 .content-wrapper {
-  max-width: 1200px;
+  max-width: 48rem;
   margin: 0 auto;
-  overflow: hidden;
 }
 
+/* Header Section */
 .header-section {
-  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-  color: white;
-  padding: 24px;
-  border-radius: 12px;
-  margin-bottom: 24px;
-  box-shadow: 0 4px 20px rgba(231, 76, 60, 0.15);
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
 }
 
 .header-content {
@@ -618,239 +692,327 @@ export default {
 }
 
 .page-title {
-  font-size: 2rem;
-  font-weight: 700;
-  color: white;
-  margin: 0 0 8px 0;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 0.25rem 0;
 }
 
 .page-subtitle {
-  font-size: 1rem;
-  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.875rem;
+  color: #6b7280;
   margin: 0;
 }
 
-.header-actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.header-select-type {
-  padding: 12px 20px;
-  font-size: 16px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  min-width: 150px;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  transition: all 0.3s ease;
-  font-weight: 600;
-  backdrop-filter: blur(10px);
-}
-
-.header-select-type:focus {
-  outline: none;
-  border-color: rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.3);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
-}
-
-.header-select-type option {
-  background: #c0392b;
-  color: white;
-}
-
-.history-button {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
+.history-link {
+  color: #2563eb;
+  font-size: 0.875rem;
+  font-weight: 500;
   text-decoration: none;
-  padding: 12px 20px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 0.3s ease;
+  transition: color 0.2s;
+}
+
+.history-link:hover {
+  text-decoration: underline;
+}
+
+/* Tabs */
+.tabs-container {
+  display: inline-flex;
+  background-color: #f3f4f6;
+  border-radius: 0.75rem;
+  padding: 0.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.tab-button {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-button.active {
+  background-color: #2563eb;
+  color: white;
+}
+
+/* Current Bill Card */
+.current-bill-card {
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.card-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  backdrop-filter: blur(10px);
+  justify-content: space-between;
+  margin-bottom: 1rem;
 }
 
-.history-button:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: translateY(-2px);
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
-.bill-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0;
+.icon-circle {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background-color: #dbeafe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
 }
 
-.bills-list {
+.bill-title {
+  font-weight: 500;
+  color: #1f2937;
+  margin: 0;
+}
+
+.bill-id {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0.25rem 0 0 0;
+}
+
+.status-badge-new {
+  font-size: 0.875rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-weight: 500;
+}
+
+.status-badge-new.status-pending {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.status-badge-new.status-review {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.status-badge-new.status-paid {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.status-badge-new.status-expired {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+/* Bill Info Grid */
+.bill-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+}
+
+.info-item {
   display: flex;
   flex-direction: column;
-  gap: 24px;
 }
 
-.bill-card {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 4px 20px rgba(231, 76, 60, 0.1);
-  transition: all 0.3s ease;
-  border-left: 4px solid #e74c3c;
+.info-label {
+  color: #6b7280;
+  margin: 0 0 0.25rem 0;
+  font-size: 0.875rem;
 }
 
-.bill-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 25px rgba(231, 76, 60, 0.15);
+.info-value {
+  font-weight: 500;
+  color: #1f2937;
+  margin: 0;
 }
 
-.bill-details {
+.due-date-text {
+  color: #ef4444;
+}
+
+/* Waiting Section */
+.waiting-section {
+  border: 1px dashed #d1d5db;
+  border-radius: 0.75rem;
+  padding: 1rem;
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: 30px;
 }
 
-.left-section {
-  flex: 2;
+.waiting-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #6b7280;
 }
 
-.right-section {
-  flex: 1;
-  padding-left: 30px;
-  border-left: 1px solid #e2e8f0;
+.waiting-icon {
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.bill-period h3 {
-  font-size: 20px;
-  color: #2d3748;
-  margin-bottom: 8px;
-  font-weight: 700;
-}
-
-.date {
-  color: #718096;
-  font-size: 14px;
+.waiting-title {
   font-weight: 500;
+  color: #4b5563;
+  margin: 0 0 0.125rem 0;
 }
 
-.due-date {
-  margin: 20px 0;
-  color: #4a5568;
-  font-size: 14px;
-  font-weight: 500;
+.waiting-subtitle {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0;
 }
 
-.due-date p {
-  margin: 4px 0;
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 8px 16px;
-  border-radius: 9999px;
+.check-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background-color: #d1fae5;
+  color: #059669;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-weight: 600;
-  font-size: 14px;
-  min-width: 120px;
+  font-size: 1rem;
+}
+
+/* Upload Section */
+.upload-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.amount-display {
   text-align: center;
-  transition: all 0.3s ease;
 }
 
-.status-pending {
-  background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
-  color: #92400E;
-}
-
-.status-paid {
-  background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%);
-  color: #065F46;
-}
-
-.status-expired {
-  background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%);
-  color: #991B1B;
-}
-
-.status-review {
-  background: linear-gradient(135deg, #BEE3F8 0%, #90CDF4 100%);
-  color: #2B6CB0;
-}
-
-.payment-info {
-  text-align: right;
-}
-
-.amount {
-  font-size: 28px;
-  color: #e74c3c;
-  margin-bottom: 20px;
-  font-weight: 700;
-  text-shadow: 0 2px 4px rgba(231, 76, 60, 0.1);
-}
-
-.amount-pending {
-  color: #f39c12;
-  font-size: 20px;
+.amount-text {
+  font-size: 1.75rem;
   font-weight: 600;
-}
-
-.account-info {
-  color: #4a5568;
-  margin-bottom: 24px;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.account-info p {
-  margin: 4px 0;
+  color: #1f2937;
+  margin: 0;
 }
 
 .hidden-file-input {
   display: none;
 }
 
-.pay-button {
-  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+.pay-button-active {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  background-color: #2563eb;
   color: white;
+  font-size: 0.875rem;
+  font-weight: 500;
   border: none;
-  padding: 12px 24px;
-  border-radius: 8px;
   cursor: pointer;
-  font-weight: 600;
-  font-size: 16px;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.2);
-  min-width: 140px;
+  transition: background-color 0.2s;
 }
 
-.pay-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(231, 76, 60, 0.3);
+.pay-button-active:hover {
+  background-color: #1d4ed8;
 }
 
-.pay-button:disabled {
-  background: #cbd5e0;
+.pay-button-confirm {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  background-color: #10b981;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.pay-button-confirm:hover {
+  background-color: #059669;
+}
+
+.pay-button-disabled {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  background-color: #e5e7eb;
+  color: #9ca3af;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
   cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
 }
 
-.waiting-message {
-  background: linear-gradient(135deg, #FFF3CD 0%, #FEF3C7 100%);
-  border: 1px solid #FDE68A;
-  border-radius: 8px;
-  padding: 12px 16px;
-  text-align: center;
-  margin-top: 8px;
+/* Previous Bill Card */
+.previous-bill-card {
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  padding: 1rem 1.5rem;
+  margin-bottom: 0.75rem;
 }
 
-.waiting-message p {
-  color: #92400E;
+.previous-bill-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.previous-bill-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.previous-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background-color: #d1fae5;
+  color: #059669;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+}
+
+.previous-bill-title {
+  font-weight: 500;
+  color: #1f2937;
+  margin: 0;
+}
+
+.previous-bill-date {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0.25rem 0 0 0;
+}
+
+.previous-bill-amount {
+  text-align: right;
+}
+
+.previous-amount-text {
   font-weight: 600;
-  font-size: 14px;
+  color: #1f2937;
   margin: 0;
 }
 

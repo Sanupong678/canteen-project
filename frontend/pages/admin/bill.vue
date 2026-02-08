@@ -343,7 +343,7 @@
           <v-card-text>
             <img
               v-if="currentBill && (currentBill.imageData || currentBill.image)"
-              :src="getImageUrl(currentBill._id)"
+              :src="getImageUrl(currentBill._id || currentBill.id)"
               class="preview-image"
               style="max-width:100%;max-height:60vh;width:auto;height:auto;object-fit:unset;display:block;margin:1rem auto;background:#f8f8f8;border-radius:4px;"
               loading="lazy"
@@ -774,6 +774,7 @@ export default {
             // ดึงข้อมูล amount จาก MongoDB
             amount: bill.amount || null,
             image: bill.image || null,
+            imagePath: bill.imagePath || null,
             slip_image_url: bill.slip_image_url || null
           }
         })
@@ -800,33 +801,82 @@ export default {
       debouncedFetchBills()
     })
 
+    // Hybrid: REST API (source of truth) + Socket (lightweight sync)
+    // Optimistic update function - update local state without full refetch
+    const optimisticUpdateBill = (billId, updates) => {
+      const index = bills.value.findIndex(b => b._id === billId || b.id === billId)
+      if (index !== -1) {
+        bills.value[index] = { ...bills.value[index], ...updates }
+        console.log('✅ Optimistic update applied:', billId, updates)
+      } else {
+        // ถ้าไม่พบใน local state ให้ fetch ใหม่ (อาจเป็น bill ใหม่)
+        console.log('⚠️ Bill not found in local state, triggering full fetch')
+        fetchBills()
+      }
+    }
+
+    // Handle socket events - lightweight sync only
+    const handleSocketEvent = (event, payload) => {
+      console.log('📡 Socket event received:', event, payload)
+      
+      // ใช้ optimistic update แทนการ fetch ทั้งหมด
+      if (event === 'admin:bill:newUpload' && payload?.billId) {
+        // Bill ใหม่ถูกอัปโหลด - fetch เฉพาะ bill ใหม่หรือ refresh ทั้งหมด
+        // เนื่องจากเป็น bill ใหม่ที่ยังไม่มีใน local state
+        fetchBills()
+      } else if (event === 'user:bill:updated' && payload?.billId) {
+        // Bill ถูกอัปเดต - optimistic update
+        optimisticUpdateBill(payload.billId, {
+          status: payload.status,
+          updatedAt: new Date().toISOString()
+        })
+      } else if (event === 'user:bill:imageCancelled' && payload?.billId) {
+        // Image ถูกยกเลิก - optimistic update
+        optimisticUpdateBill(payload.billId, {
+          image: null,
+          imagePath: null,
+          status: 'รอดำเนินการ',
+          updatedAt: new Date().toISOString()
+        })
+      } else if (event === 'user:bill:amountUpdated' && payload?.shopId) {
+        // Amount ถูกอัปเดต - refresh bills สำหรับ shop นั้น
+        // หรือ refresh ทั้งหมดถ้าไม่แน่ใจว่า bill ไหน
+        fetchBills()
+      } else if (event === 'admin:bill:importCompleted') {
+        // Excel import เสร็จ - refresh ทั้งหมด
+        fetchBills()
+      }
+    }
+
     // Initial data fetch and realtime updates
     onMounted(async () => {
       await initializeMonthSettings() // Initialize month settings
-      fetchBills()
+      
+      // REST API = Source of Truth - ดึงข้อมูลครั้งแรก
+      await fetchBills()
+      
+      // Socket = Lightweight sync - ฟัง events เบาๆ
       try {
         const { $socket } = useNuxtApp()
         if ($socket) {
-          // Debounce socket refresh เพื่อป้องกันการเรียก API บ่อยเกินไป
-          let socketRefreshTimer = null
-          const debouncedSocketRefresh = () => {
-            clearTimeout(socketRefreshTimer)
-            socketRefreshTimer = setTimeout(() => {
-              fetchBills()
-            }, 1000) // รอ 1 วินาทีหลังจาก event สุดท้าย
-          }
+          // ฟัง socket events สำหรับ sync เบาๆ
+          $socket.on('admin:bill:newUpload', (payload) => handleSocketEvent('admin:bill:newUpload', payload))
+          $socket.on('user:bill:updated', (payload) => handleSocketEvent('user:bill:updated', payload))
+          $socket.on('user:bill:imageCancelled', (payload) => handleSocketEvent('user:bill:imageCancelled', payload))
+          $socket.on('user:bill:amountUpdated', (payload) => handleSocketEvent('user:bill:amountUpdated', payload))
+          $socket.on('admin:bill:importCompleted', (payload) => handleSocketEvent('admin:bill:importCompleted', payload))
           
-          $socket.on('admin:bill:newUpload', debouncedSocketRefresh)
-          $socket.on('user:bill:updated', debouncedSocketRefresh)
-          $socket.on('user:bill:imageCancelled', debouncedSocketRefresh)
           onUnmounted(() => {
-            if (socketRefreshTimer) clearTimeout(socketRefreshTimer)
-            $socket.off('admin:bill:newUpload', debouncedSocketRefresh)
-            $socket.off('user:bill:updated', debouncedSocketRefresh)
-            $socket.off('user:bill:imageCancelled', debouncedSocketRefresh)
+            $socket.off('admin:bill:newUpload')
+            $socket.off('user:bill:updated')
+            $socket.off('user:bill:imageCancelled')
+            $socket.off('user:bill:amountUpdated')
+            $socket.off('admin:bill:importCompleted')
           })
         }
-      } catch (e) { /* no-op */ }
+      } catch (e) {
+        console.warn('⚠️ Socket not available, using REST API only:', e)
+      }
     })
 
     const updateStatus = async (billId, newStatus) => {
@@ -852,7 +902,15 @@ export default {
     }
 
     const openImagePreview = (imageUrl, bill) => {
-      previewImage.value = imageUrl
+      // ใช้ bill object โดยตรง ไม่ต้องใช้ imageUrl
+      // เพราะ getImageUrl จะใช้ bill._id เพื่อเรียก API endpoint
+      console.log('🔍 openImagePreview called with bill:', {
+        _id: bill?._id,
+        id: bill?.id,
+        image: bill?.image,
+        imagePath: bill?.imagePath,
+        slip_image_url: bill?.slip_image_url
+      })
       currentBill.value = bill
       showPreview.value = true
       imageError.value = false
@@ -1000,31 +1058,22 @@ export default {
     }
 
     const getImageUrl = (billId) => {
-      // ใช้ static file URL แทน API endpoint
-      const backendUrl = process.env.NODE_ENV === 'production' 
-        ? 'https://your-production-domain.com' 
-        : ''
-      
-      // หา bill เพื่อดึง image path
-      const bill = bills.value.find(b => b._id === billId)
-      if (bill && bill.image) {
-        // ใช้ static file URL - ใช้ imagePath ที่มี full path
-        if (bill.imagePath) {
-          // แปลง path ให้เป็น URL ที่ถูกต้อง
-          const imagePath = bill.imagePath.replace(/\\/g, '/')
-          // ลบ uploads/ ออกจาก path เพราะ static route มี /uploads อยู่แล้ว
-          const relativePath = imagePath.replace(/^uploads\//, '')
-          console.log('Image URL:', `${backendUrl}/uploads/${relativePath}`)
-          return `${backendUrl}/uploads/${relativePath}`
-        }
-        // fallback ไปใช้ API endpoint
-        console.log('Using API endpoint:', `${backendUrl}/api/bills/image/${billId}`)
-        return `${backendUrl}/api/bills/image/${billId}`
+      // ใช้ API endpoint เสมอเพื่อให้แน่ใจว่าไฟล์ถูกส่งมาได้ถูกต้อง
+      // ใช้วิธีเดียวกับ repair page โดยใช้ $axios.defaults.baseURL
+      if (!billId) {
+        console.error('❌ getImageUrl: billId is missing')
+        return ''
       }
       
-      // fallback ไปใช้ API endpoint
-      console.log('No image found, using API endpoint:', `${backendUrl}/api/bills/image/${billId}`)
-      return `${backendUrl}/api/bills/image/${billId}`
+      // ใช้ baseURL จาก axios config (เหมือน repair page)
+      const baseURL = $axios.defaults.baseURL || (process.env.NODE_ENV === 'production' 
+        ? window.location.origin 
+        : 'http://localhost:4000')
+      
+      const timestamp = new Date().getTime()
+      const url = `${baseURL}/api/bills/image/${billId}?t=${timestamp}`
+      console.log('Getting image URL:', url, 'for billId:', billId)
+      return url
     }
 
     const cancelSlipImage = async (billId) => {
@@ -1644,26 +1693,66 @@ export default {
   -ms-overflow-style: none;
 }
 
-/* ซ่อน Scrollbar ของ v-data-table wrapper โดยเฉพาะ */
+/* ซ่อน Scrollbar แนวนอน แต่แสดง Scrollbar แนวตั้ง */
 .v-data-table :deep(.v-data-table__wrapper) {
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
-  overflow-x: auto !important;
-  overflow-y: hidden !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  /* ซ่อน scrollbar แนวนอน */
+  scrollbar-width: thin !important;
+  scrollbar-color: #cbd5e0 transparent !important;
+  -ms-overflow-style: auto !important;
 }
 
+/* ซ่อน scrollbar แนวนอน แต่แสดง scrollbar แนวตั้ง */
 .v-data-table :deep(.v-data-table__wrapper)::-webkit-scrollbar {
-  display: none !important;
-  width: 0 !important;
+  width: 8px !important;
   height: 0 !important;
 }
 
 .v-data-table :deep(.v-data-table__wrapper)::-webkit-scrollbar-track {
-  display: none !important;
+  background: transparent !important;
 }
 
 .v-data-table :deep(.v-data-table__wrapper)::-webkit-scrollbar-thumb {
+  background-color: #cbd5e0 !important;
+  border-radius: 4px !important;
+}
+
+.v-data-table :deep(.v-data-table__wrapper)::-webkit-scrollbar-thumb:hover {
+  background-color: #a0aec0 !important;
+}
+
+/* ซ่อน Scrollbar ในทุกส่วนของ table */
+.v-data-table :deep(table) {
+  overflow-x: hidden !important;
+}
+
+.v-data-table :deep(.v-data-table__wrapper table) {
+  overflow-x: hidden !important;
+}
+
+.v-data-table :deep(.v-data-table__tr) {
+  overflow-x: hidden !important;
+}
+
+.v-data-table :deep(.v-data-table__tbody) {
+  overflow-x: hidden !important;
+}
+
+.v-data-table :deep(.v-data-table__thead) {
+  overflow-x: hidden !important;
+}
+
+/* ซ่อน scrollbar ในทุก element ภายใน table */
+.v-data-table :deep(*) {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.v-data-table :deep(*)::-webkit-scrollbar {
   display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 /* Responsive Design */

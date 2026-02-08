@@ -313,23 +313,29 @@ export default {
       this.shopData = JSON.parse(sessionStorage.getItem('shopData') || '{}')
       this.userId = sessionStorage.getItem('userId')
       
-      // Debug sessionStorage data
-      console.log('🔍 sessionStorage data:', {
-        displayName: this.displayName,
-        userId: this.userId,
-        shopData: this.shopData,
-        rawShopData: sessionStorage.getItem('shopData'),
-        token: sessionStorage.getItem('token') ? sessionStorage.getItem('token').substring(0, 20) + '...' : 'missing',
-        isAuthenticated: sessionStorage.getItem('isAuthenticated'),
-        userRole: sessionStorage.getItem('userRole')
-      })
+      // Debug sessionStorage data (ใช้ fingerprint แทน token จริง)
+      const { getTokenFingerprint } = await import('@/utils/tokenUtils')
+      const { token, state } = getTokenWithState()
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 sessionStorage data:', {
+          displayName: this.displayName,
+          userId: this.userId,
+          shopData: this.shopData,
+          rawShopData: sessionStorage.getItem('shopData'),
+          tokenState: state,
+          tokenFingerprint: getTokenFingerprint(token || ''),
+          isAuthenticated: sessionStorage.getItem('isAuthenticated'),
+          userRole: sessionStorage.getItem('userRole')
+        })
+      }
       
-      // ตรวจสอบ authentication
+      // ตรวจสอบ authentication (ใช้ token validation)
       const isAuthenticated = sessionStorage.getItem('isAuthenticated')
-      const token = sessionStorage.getItem('token')
       
-      if (!isAuthenticated || !token) {
-        console.log('❌ User not authenticated, redirecting to login')
+      if (!isAuthenticated || state !== TokenState.VALID || !token) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`❌ User not authenticated, token state: ${state}, redirecting to login`)
+        }
         this.$router.push('/login')
         return
       }

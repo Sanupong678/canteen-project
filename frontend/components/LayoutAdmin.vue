@@ -23,6 +23,10 @@
                 <i class="fas fa-edit menu-icon"></i>
                 <span class="menu-text">แก้ไข Welcome Page</span>
               </div>
+              <div class="menu-item" @click="openBannerManagement">
+                <i class="fas fa-image menu-icon"></i>
+                <span class="menu-text">จัดการแบนเนอร์</span>
+              </div>
               <div class="menu-divider"></div>
               <div class="menu-item logout-item" @click="handleLogout">
                 <i class="fas fa-sign-out-alt menu-icon"></i>
@@ -209,6 +213,11 @@ export default {
       this.showWelcomeEditModal = true
       this.showUserMenu = false // ปิด user menu
     },
+    openBannerManagement() {
+      this.showUserMenu = false // ปิด user menu
+      // ไปที่หน้า banner management
+      this.$router.push('/admin/banner')
+    },
     closeWelcomeEditModal() {
       this.showWelcomeEditModal = false
       this.selectedImage = null
@@ -264,12 +273,11 @@ export default {
         const formData = new FormData()
         formData.append('image', this.selectedImage)
         
-        const token = sessionStorage.getItem('token')
-        console.log('Sending request with token:', token ? 'Token exists' : 'No token')
+        // ใช้ axios interceptor (validate token อัตโนมัติ)
+        console.log('Sending request with validated token')
         
         const response = await this.$axios.post('/api/welcome/upload', formData, {
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'multipart/form-data'
           }
         })

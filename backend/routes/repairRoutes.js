@@ -5,6 +5,7 @@ import {
   getRepairs, 
   getUserRepairs,
   createRepair, 
+  updateRepair,
   updateRepairStatus, 
   deleteRepair,
   getRepairImage
@@ -71,9 +72,10 @@ router.get('/admin', isAdmin, getRepairs);
 // User routes
 router.get('/user', getUserRepairs);
 router.post('/', upload.array('images', 5), createRepair); // รองรับการอัปโหลดรูปภาพ
+router.put('/:id', upload.array('images', 5), updateRepair); // User can update their own repairs
+router.delete('/:id', deleteRepair); // User can delete their own repairs
 
 // Admin routes for status update
 router.put('/:id/status', isAdmin, updateRepairStatus);
-router.delete('/:id', deleteRepair);
 
 export default router; 

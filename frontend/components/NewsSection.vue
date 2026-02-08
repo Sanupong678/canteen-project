@@ -340,7 +340,7 @@ export default {
         this.isSubmitting = true
         console.log('🔄 Adding news...')
         
-        const token = localStorage.getItem('token')
+        // ใช้ axios interceptor (validate token อัตโนมัติ)
         const formData = new FormData()
         formData.append('title', this.newNews.title)
         formData.append('content', this.newNews.content)
@@ -348,7 +348,6 @@ export default {
 
         const response = await axios.post(`${this.backendUrl}/api/news`, formData, {
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'multipart/form-data'
           }
         })
@@ -379,10 +378,8 @@ export default {
         this.isDeleting = true
         console.log('🔄 Deleting news...')
         
-        const token = localStorage.getItem('token')
-        const response = await axios.delete(`${this.backendUrl}/api/news/${this.deleteId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        // ใช้ axios interceptor (validate token อัตโนมัติ)
+        const response = await axios.delete(`${this.backendUrl}/api/news/${this.deleteId}`)
         
         if (response.data.success) {
           this.newsList = this.newsList.filter(news => news._id !== this.deleteId)
