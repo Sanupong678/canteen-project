@@ -1,5 +1,7 @@
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import Session from '../models/sessionModel.js';
+import { ensureConnection, isConnectionReady } from '../utils/dbHealthCheck.js';
 
 // Lazy loading JWT_SECRET to ensure dotenv.config() has run first
 let _jwtSecret = null;
@@ -91,22 +93,87 @@ export const verifyToken = async (req, res, next) => {
       return next();
     }
 
-    // ตรวจสอบ session สำหรับ user ทั่วไป
-    const session = await Session.findOne({ 
-      token,
-      status: 'active',
-      logoutTime: null,
-      expiresAt: { $gt: new Date() }
-    });
+    // ตรวจสอบ connection state ก่อน query
+    if (!isConnectionReady()) {
+      // Connection ไม่พร้อม - พยายาม reconnect
+      const reconnected = await ensureConnection();
+      if (!reconnected) {
+        return res.status(503).json({ 
+          message: 'Database connection error. Please try again later.',
+          error: isDev ? 'Failed to reconnect to database' : undefined
+        });
+      }
+    }
+    
+    // ตรวจสอบ session สำหรับ user ทั่วไป - เพิ่ม retry logic
+    let session;
+    const maxRetries = 3;
+    let retryCount = 0;
+    
+    while (retryCount < maxRetries) {
+      try {
+        // ตรวจสอบ connection state อีกครั้งก่อน query
+        if (!isConnectionReady()) {
+          const reconnected = await ensureConnection();
+          if (!reconnected) {
+            throw new Error('MongoDB connection not ready and reconnection failed');
+          }
+        }
+        
+        session = await Session.findOne({ 
+          token,
+          status: 'active',
+          logoutTime: null,
+          expiresAt: { $gt: new Date() }
+        }).maxTimeMS(10000); // timeout 10 วินาที
+        
+        break; // สำเร็จแล้วออกจาก loop
+      } catch (dbError) {
+        retryCount++;
+        const isLastRetry = retryCount >= maxRetries;
+        
+        // Log error
+        if (isDev || isLastRetry) {
+          console.error(`❌ Session lookup error (attempt ${retryCount}/${maxRetries}):`, dbError.message);
+          if (dbError.name === 'MongoServerSelectionError' || dbError.name === 'MongoNetworkError') {
+            console.error('📋 MongoDB connection error - will retry...');
+          }
+        }
+        
+        // ถ้า connection ไม่พร้อม ให้พยายาม reconnect
+        if (!isConnectionReady()) {
+          await ensureConnection();
+        }
+        
+        if (isLastRetry) {
+          // ถ้า retry ทั้งหมดล้มเหลว ให้ return error
+          return res.status(503).json({ 
+            message: 'Database connection error. Please try again later.',
+            error: isDev ? dbError.message : undefined
+          });
+        }
+        
+        // รอ 500ms ก่อน retry
+        await new Promise(resolve => setTimeout(resolve, 500 * retryCount));
+      }
+    }
 
     if (!session) {
       if (isDev) console.log('❌ No valid session found');
       return res.status(401).json({ message: 'Invalid or expired session' });
     }
 
-    // อัพเดท lastActivity
-    session.lastActivity = new Date();
-    await session.save();
+    // อัพเดท lastActivity - เพิ่ม retry logic
+    try {
+      session.lastActivity = new Date();
+      await session.save();
+    } catch (saveError) {
+      // Log error แต่ไม่ block request
+      if (isDev) {
+        console.error('⚠️ Failed to update session lastActivity:', saveError.message);
+      }
+      // ยังให้ request ผ่านได้แม้ update session จะล้มเหลว
+    }
 
     req.user = decoded;
     if (isDev) {

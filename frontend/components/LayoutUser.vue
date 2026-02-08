@@ -372,18 +372,38 @@ export default {
     toggleUserMenu() {
       this.showUserMenu = !this.showUserMenu
     },
-    handleLogout() {
-      if (process.client) {
+    async handleLogout() {
+      try {
+        // เรียก backend logout API
+        const { $axios } = useNuxtApp()
+        if ($axios) {
+          try {
+            await $axios.post('/api/auth/logout', {}, {
+              withCredentials: true
+            })
+            console.log('✅ Backend logout successful')
+          } catch (error) {
+            // แม้ backend logout จะล้มเหลว ก็ยังต้อง clear frontend data
+            console.warn('⚠️ Backend logout failed, but continuing with frontend cleanup:', error.message)
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ Logout API call failed:', error.message)
+      } finally {
         // Clear all session data
-        sessionStorage.clear()
-        
-        // Clear cookies
-        document.cookie = 'user_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
-        document.cookie = 'admin_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
-        
-        console.log('✅ Logged out successfully, cleared session data')
+        if (process.client) {
+          sessionStorage.clear()
+          localStorage.clear()
+          
+          // Clear cookies
+          document.cookie = 'user_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+          document.cookie = 'admin_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+          document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+          
+          console.log('✅ Logged out successfully, cleared all session data')
+        }
+        this.$router.push('/login')
       }
-      this.$router.push('/login')
     },
     openChangePasswordModal() {
       this.showChangePasswordModal = true

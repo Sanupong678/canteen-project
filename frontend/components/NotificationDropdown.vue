@@ -275,7 +275,7 @@ export default {
       }
     }
 
-    onMounted(() => {
+    onMounted(async () => {
       document.addEventListener('click', handleClickOutside)
       
       // Initialize notification store ทันที

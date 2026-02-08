@@ -60,17 +60,19 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
   app.use(morgan('dev'));
 
   // CORS configuration
-  app.use(cors({
+  const corsOptions = {
     origin: ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
     preflightContinue: false,
     optionsSuccessStatus: 200
-  }));
+  };
+  
+  app.use(cors(corsOptions));
 
-  // Handle preflight requests globally
-  app.options('*', cors());
+  // Handle preflight requests globally with same options
+  app.options('*', cors(corsOptions));
 
   // Additional CORS headers for all routes
   app.use((req, res, next) => {
@@ -273,7 +275,29 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
 
   // เพิ่ม error handling สำหรับ server
   server.on('error', (error) => {
-    console.error('❌ Server Error:', error);
+    const timestamp = new Date().toISOString();
+    console.error(`\n${'='.repeat(80)}`);
+    console.error(`❌ [${timestamp}] Server Error occurred:`);
+    console.error(`📋 Error message:`, error.message);
+    console.error(`📋 Error code:`, error.code);
+    console.error(`📋 Error stack:`, error.stack);
+    console.error(`📊 Server state:`, {
+      listening: server.listening,
+      address: server.address(),
+      connections: server.connections || 'N/A'
+    });
+    console.error(`${'='.repeat(80)}\n`);
+  });
+  
+  // Log เมื่อ server ถูกปิดโดยไม่คาดคิด
+  server.on('close', () => {
+    const timestamp = new Date().toISOString();
+    if (!isShuttingDown) {
+      console.error(`\n${'='.repeat(80)}`);
+      console.error(`⚠️ [${timestamp}] Server closed unexpectedly (not via graceful shutdown)`);
+      console.error(`📋 Close stack:`, new Error().stack);
+      console.error(`${'='.repeat(80)}\n`);
+    }
   });
 
   // Tune HTTP server timeouts to avoid premature disconnects (~30s)
@@ -282,52 +306,160 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
   server.requestTimeout = parseInt(process.env.REQUEST_TIMEOUT_MS) || 0; // disable request timeout by default
   try { server.setTimeout(parseInt(process.env.SOCKET_TIMEOUT_MS) || 0); } catch (_) {}
 
-  // เพิ่ม graceful shutdown
-  process.on('SIGTERM', async () => {
-    console.log('🛑 SIGTERM received, shutting down gracefully');
-    server.close(async () => {
-      console.log('✅ Server closed');
+  // เก็บ reference ของ intervals และ timers เพื่อ cleanup
+  const cleanupTasks = [];
+  let isShuttingDown = false; // ป้องกันการเรียก shutdown หลายครั้ง (ประกาศไว้ก่อนเพื่อใช้ใน server.on('close'))
+  
+  const gracefulShutdown = async (signal) => {
+    const timestamp = new Date().toISOString();
+    const stackTrace = new Error().stack;
+    
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`🛑 [${timestamp}] ${signal} received, starting graceful shutdown...`);
+    console.log(`📋 Shutdown triggered from:`, stackTrace);
+    console.log(`📊 Current process state:`, {
+      pid: process.pid,
+      uptime: process.uptime(),
+      memory: {
+        rss: `${Math.round(process.memoryUsage().rss / 1024 / 1024)}MB`,
+        heapTotal: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`,
+        heapUsed: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`
+      },
+      dbState: mongoose.connection.readyState,
+      isShuttingDown
+    });
+    console.log(`${'='.repeat(80)}\n`);
+    
+    if (isShuttingDown) {
+      console.log('⚠️ Shutdown already in progress, ignoring duplicate signal');
+      return;
+    }
+    
+    isShuttingDown = true;
+    
+    // Stop cleanup intervals
+    try {
+      const { stopCleanupInterval } = await import('./controllers/billController.js');
+      stopCleanupInterval();
+      console.log('✅ Cleanup intervals stopped');
+    } catch (e) {
+      console.warn('⚠️ Could not stop cleanup intervals:', e.message);
+    }
+    
+    // Clear all intervals
+    cleanupTasks.forEach((task, index) => {
       try {
+        if (task && typeof task === 'function') {
+          task();
+          console.log(`✅ Cleaned up task ${index}`);
+        } else if (task && typeof task.clear === 'function') {
+          task.clear();
+          console.log(`✅ Cleared interval ${index}`);
+        }
+      } catch (e) {
+        console.error(`❌ Error cleaning up task ${index}:`, e.message);
+      }
+    });
+    
+    // Close server
+    console.log('🔄 Closing HTTP server...');
+    server.close(async () => {
+      const closeTimestamp = new Date().toISOString();
+      console.log(`✅ [${closeTimestamp}] HTTP server closed`);
+      console.log('📋 Server close callback stack:', new Error().stack);
+      
+      try {
+        console.log('🔄 Closing MongoDB connection...');
         await mongoose.connection.close();
-        console.log('✅ MongoDB connection closed');
+        console.log(`✅ [${closeTimestamp}] MongoDB connection closed`);
+        console.log(`\n${'='.repeat(80)}`);
+        console.log(`✅ [${closeTimestamp}] Graceful shutdown completed successfully`);
+        console.log(`${'='.repeat(80)}\n`);
         process.exit(0);
       } catch (error) {
-        console.error('❌ Error closing MongoDB connection:', error);
+        console.error(`❌ [${closeTimestamp}] Error closing MongoDB connection:`, error);
+        console.error('📋 Error stack:', error.stack);
         process.exit(1);
       }
     });
-  });
+    
+    // Force close after 10 seconds
+    setTimeout(() => {
+      const timeoutTimestamp = new Date().toISOString();
+      console.error(`\n${'='.repeat(80)}`);
+      console.error(`❌ [${timeoutTimestamp}] Forcing shutdown after 10 second timeout`);
+      console.error(`📋 This means graceful shutdown did not complete in time`);
+      console.error(`${'='.repeat(80)}\n`);
+      process.exit(1);
+    }, 10000);
+  };
 
-  process.on('SIGINT', async () => {
-    console.log('🛑 SIGINT received, shutting down gracefully');
-    server.close(async () => {
-      console.log('✅ Server closed');
-      try {
-        await mongoose.connection.close();
-        console.log('✅ MongoDB connection closed');
-        process.exit(0);
-      } catch (error) {
-        console.error('❌ Error closing MongoDB connection:', error);
-        process.exit(1);
+  // เพิ่ม graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('📥 SIGTERM signal received');
+    gracefulShutdown('SIGTERM');
+  });
+  
+  process.on('SIGINT', () => {
+    console.log('📥 SIGINT signal received (Ctrl+C)');
+    gracefulShutdown('SIGINT');
+  });
+  
+  // Log process events อื่นๆ
+  process.on('exit', (code) => {
+    const timestamp = new Date().toISOString();
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`🚪 [${timestamp}] Process exiting with code: ${code}`);
+    console.log(`📊 Final process state:`, {
+      pid: process.pid,
+      uptime: process.uptime(),
+      memory: {
+        rss: `${Math.round(process.memoryUsage().rss / 1024 / 1024)}MB`,
+        heapTotal: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`,
+        heapUsed: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`
       }
     });
+    console.log(`${'='.repeat(80)}\n`);
+  });
+  
+  // Log warning เมื่อมี warning
+  process.on('warning', (warning) => {
+    const timestamp = new Date().toISOString();
+    console.warn(`\n${'='.repeat(80)}`);
+    console.warn(`⚠️ [${timestamp}] Process Warning`);
+    console.warn(`📋 Warning name:`, warning.name);
+    console.warn(`📋 Warning message:`, warning.message);
+    console.warn(`📋 Warning stack:`, warning.stack);
+    console.warn(`${'='.repeat(80)}\n`);
   });
 
   // เพิ่ม uncaught exception handler
   process.on('uncaughtException', async (error) => {
-    console.error('❌ Uncaught Exception:', error);
+    const timestamp = new Date().toISOString();
+    console.error(`\n${'='.repeat(80)}`);
+    console.error(`❌ [${timestamp}] UNCAUGHT EXCEPTION - This is a critical error!`);
+    console.error(`📋 Error name:`, error.name);
+    console.error(`📋 Error message:`, error.message);
+    console.error(`📋 Error stack:`, error.stack);
+    console.error(`📊 Process state:`, {
+      pid: process.pid,
+      uptime: process.uptime(),
+      memory: {
+        rss: `${Math.round(process.memoryUsage().rss / 1024 / 1024)}MB`,
+        heapTotal: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`,
+        heapUsed: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`
+      },
+      dbState: mongoose.connection.readyState
+    });
+    console.error(`${'='.repeat(80)}\n`);
+    
+    // ใน production ให้ log error แต่ไม่ exit ทันที
+    // เพื่อให้ server ยังทำงานต่อได้ (อาจมี error handler ที่ดีกว่า)
     if (isProduction) {
-      server.close(async () => {
-        console.log('✅ Server closed due to uncaught exception');
-        try {
-          await mongoose.connection.close();
-          console.log('✅ MongoDB connection closed');
-          process.exit(1);
-        } catch (closeError) {
-          console.error('❌ Error closing MongoDB connection:', closeError);
-          process.exit(1);
-        }
-      });
+      console.error('⚠️ Uncaught exception in production - server will attempt to continue');
+      console.error('⚠️ WARNING: Server may be in an unstable state!');
+      // ไม่ exit เพื่อให้ server ยังทำงานต่อ
+      // แต่ควรตรวจสอบ error และแก้ไข
     } else {
       // In development, log and keep the process alive for easier debugging
       console.warn('⚠️ Continuing after uncaught exception in development');
@@ -335,23 +467,29 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
   });
 
   process.on('unhandledRejection', async (reason, promise) => {
-    console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-    if (isProduction) {
-      server.close(async () => {
-        console.log('✅ Server closed due to unhandled rejection');
-        try {
-          await mongoose.connection.close();
-          console.log('✅ MongoDB connection closed');
-          process.exit(1);
-        } catch (closeError) {
-          console.error('❌ Error closing MongoDB connection:', closeError);
-          process.exit(1);
-        }
-      });
-    } else {
-      // In development, log and continue running
-      console.warn('⚠️ Continuing after unhandled rejection in development');
+    const timestamp = new Date().toISOString();
+    console.error(`\n${'='.repeat(80)}`);
+    console.error(`❌ [${timestamp}] UNHANDLED REJECTION detected`);
+    console.error(`📋 Promise:`, promise);
+    console.error(`📋 Rejection reason:`, reason?.message || reason);
+    if (reason?.name) {
+      console.error(`📋 Error name:`, reason.name);
     }
+    if (reason?.stack) {
+      console.error(`📋 Error stack:`, reason.stack);
+    }
+    console.error(`📊 Process state:`, {
+      pid: process.pid,
+      uptime: process.uptime(),
+      memory: {
+        rss: `${Math.round(process.memoryUsage().rss / 1024 / 1024)}MB`,
+        heapTotal: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`,
+        heapUsed: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`
+      },
+      dbState: mongoose.connection.readyState
+    });
+    console.error(`⚠️ Server will continue running, but this should be fixed!`);
+    console.error(`${'='.repeat(80)}\n`);
   });
 
   // Connect to MongoDB and start server

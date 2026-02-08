@@ -52,7 +52,11 @@ export default {
       try {
         console.log('🔐 Attempting login with:', this.username)
         
-        const response = await axios.post('/api/auth/login', {
+        // ใช้ axios จาก plugin ที่ตั้งค่าไว้แล้ว
+        const { $axios } = useNuxtApp()
+        const axiosInstance = $axios || axios
+        
+        const response = await axiosInstance.post('/api/auth/login', {
           username: this.username,
           password: this.password
         }, {

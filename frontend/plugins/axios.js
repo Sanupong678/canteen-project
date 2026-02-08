@@ -44,11 +44,27 @@ export default defineNuxtPlugin((nuxtApp) => {
     return Promise.reject(error)
   }
 
-  // เพิ่ม interceptor สำหรับเพิ่ม Authorization header
+  // เก็บ pending requests เพื่อยกเลิกเมื่อเปลี่ยน page
+  const pendingRequests = new Map()
+  
+  // เพิ่ม interceptor สำหรับเพิ่ม Authorization header และ request tracking
   axios.interceptors.request.use(
     (config) => {
+      // สร้าง request ID ถ้ายังไม่มี
+      if (!config.requestId) {
+        config.requestId = `${config.method}_${config.url}_${Date.now()}`
+      }
+      
+      // เก็บ request reference
+      if (config.signal) {
+        pendingRequests.set(config.requestId, config)
+      }
+      
+      // ไม่เพิ่ม Authorization header สำหรับ login และ logout endpoints
+      const isAuthEndpoint = config.url?.includes('/api/auth/login') || config.url?.includes('/api/auth/logout')
+      
       // Validate token state ก่อนส่ง
-      if (process.client) {
+      if (process.client && !isAuthEndpoint) {
         const { token, state } = getTokenWithState()
         
         if (state === TokenState.VALID && token) {
@@ -60,12 +76,17 @@ export default defineNuxtPlugin((nuxtApp) => {
           if (state !== TokenState.MISSING) {
             clearInvalidToken()
           }
+          // ลบ Authorization header ถ้ามี (เพื่อป้องกันการส่ง token เก่า)
+          delete config.headers.Authorization
         }
+      } else if (isAuthEndpoint) {
+        // สำหรับ login/logout endpoints ให้ลบ Authorization header ถ้ามี
+        delete config.headers.Authorization
       }
       
       // ตั้งค่า timeout สำหรับ request นี้ (ถ้ายังไม่มี)
       if (!config.timeout) {
-        config.timeout = 60000
+        config.timeout = 30000 // ลด timeout เป็น 30 วินาที
       }
       
       return config
@@ -74,6 +95,61 @@ export default defineNuxtPlugin((nuxtApp) => {
       return Promise.reject(error)
     }
   )
+  
+  // เพิ่ม interceptor สำหรับ cleanup เมื่อ request เสร็จ
+  axios.interceptors.response.use(
+    (response) => {
+      // ลบ request จาก pending list
+      if (response.config?.requestId) {
+        pendingRequests.delete(response.config.requestId)
+      }
+      return response
+    },
+    (error) => {
+      // ลบ request จาก pending list
+      if (error.config?.requestId) {
+        pendingRequests.delete(error.config.requestId)
+      }
+      
+      // ถ้า error เกิดจาก cancellation ไม่ต้อง log
+      if (error.name === 'AbortError' || error.name === 'CanceledError' || error.message === 'canceled') {
+        return Promise.reject(error)
+      }
+      
+      return Promise.reject(error)
+    }
+  )
+  
+  // เพิ่ม function สำหรับยกเลิก requests ทั้งหมด
+  const cancelAllPendingRequests = () => {
+    pendingRequests.forEach((config, requestId) => {
+      if (config.signal && !config.signal.aborted) {
+        config.signal.abort()
+      }
+      pendingRequests.delete(requestId)
+    })
+  }
+  
+  // ยกเลิก requests เมื่อเปลี่ยน route
+  if (process.client) {
+    // Listen to route changes using Nuxt router
+    nuxtApp.hook('app:beforeMount', () => {
+      // Setup route change listener
+      const router = nuxtApp.$router
+      if (router) {
+        router.beforeEach((to, from, next) => {
+          // ยกเลิก requests ที่ยังไม่เสร็จเมื่อเปลี่ยน route
+          cancelAllPendingRequests()
+          next()
+        })
+      }
+    })
+    
+    // Cleanup เมื่อ app unmount
+    nuxtApp.hook('app:beforeUnmount', () => {
+      cancelAllPendingRequests()
+    })
+  }
 
   // เพิ่ม interceptor สำหรับจัดการ error และ retry
   axios.interceptors.response.use(

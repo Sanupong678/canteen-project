@@ -70,7 +70,26 @@ export const useNotificationStore = () => {
       }
 
       // ใช้ axios ที่มี interceptor แล้ว (จะ validate token อัตโนมัติ)
-      const response = await axios.get('/api/notifications/user')
+      // เพิ่ม AbortController เพื่อยกเลิก request เมื่อเปลี่ยน page
+      const controller = new AbortController()
+      let response
+      
+      try {
+        response = await axios.get('/api/notifications/user', {
+          signal: controller.signal
+        })
+      } catch (error) {
+        // ถ้า error เกิดจาก cancellation ไม่ต้อง throw
+        if (error.name === 'AbortError' || error.name === 'CanceledError' || error.message === 'canceled') {
+          return // Exit early if request was canceled
+        }
+        throw error
+      }
+      
+      // ตรวจสอบว่า response มีค่าหรือไม่ (อาจเป็น null ถ้า request ถูก cancel)
+      if (!response) {
+        return
+      }
 
       if (response.data.success) {
         console.log('📋 Raw notification data:', response.data.data)

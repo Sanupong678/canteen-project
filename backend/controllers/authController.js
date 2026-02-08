@@ -295,24 +295,37 @@ export const logout = async (req, res) => {
     const token = adminToken || userToken || legacyToken;
     
     if (token) {
-      // อัพเดทสถานะ session (ถ้ามี)
-      await Session.findOneAndUpdate(
-        { token },
-        { 
-          status: 'logged_out',
-          logoutTime: new Date()
-        }
-      );
+      try {
+        // อัพเดทสถานะ session (ถ้ามี) - ไม่ต้อง throw error ถ้าไม่พบ session
+        await Session.findOneAndUpdate(
+          { token },
+          { 
+            status: 'logged_out',
+            logoutTime: new Date()
+          }
+        );
+      } catch (sessionError) {
+        // Log error แต่ยังคงดำเนินการ logout ต่อ
+        console.warn('⚠️ Session update failed during logout (non-critical):', sessionError.message);
+      }
     }
     
-    // ลบ cookies ทั้งหมด
-    res.clearCookie('admin_token');
-    res.clearCookie('user_token');
-    res.clearCookie('token'); // ลบ legacy cookie ด้วย
+    // ลบ cookies ทั้งหมด (สำคัญ: ต้องทำเสมอแม้ session update จะล้มเหลว)
+    res.clearCookie('admin_token', { path: '/', httpOnly: true, secure: false, sameSite: 'lax' });
+    res.clearCookie('user_token', { path: '/', httpOnly: true, secure: false, sameSite: 'lax' });
+    res.clearCookie('token', { path: '/', httpOnly: true, secure: false, sameSite: 'lax' }); // ลบ legacy cookie ด้วย
     
     res.json({ success: true, message: 'Logged out successfully' });
   } catch (error) {
-    console.error('Error during logout:', error);
+    console.error('❌ Error during logout:', error);
+    // แม้จะเกิด error ก็ยังต้องพยายาม clear cookies
+    try {
+      res.clearCookie('admin_token', { path: '/', httpOnly: true, secure: false, sameSite: 'lax' });
+      res.clearCookie('user_token', { path: '/', httpOnly: true, secure: false, sameSite: 'lax' });
+      res.clearCookie('token', { path: '/', httpOnly: true, secure: false, sameSite: 'lax' });
+    } catch (clearError) {
+      console.error('❌ Failed to clear cookies:', clearError);
+    }
     res.status(500).json({ success: false, message: 'Error during logout' });
   }
 };

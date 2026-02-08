@@ -1048,5 +1048,28 @@ export const cleanupExpiredImages = async () => {
   }
 };
 
-// เรียกใช้ cleanup ทุกวัน
-setInterval(cleanupExpiredImages, 24 * 60 * 60 * 1000); // 24 ชั่วโมง 
+// เรียกใช้ cleanup ทุกวัน - เก็บ reference เพื่อ cleanup เมื่อ server shutdown
+let cleanupInterval = null;
+
+export const startCleanupInterval = () => {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+  }
+  // เรียกครั้งแรกทันที (optional)
+  // cleanupExpiredImages();
+  
+  // เรียกทุก 24 ชั่วโมง
+  cleanupInterval = setInterval(cleanupExpiredImages, 24 * 60 * 60 * 1000);
+  console.log('✅ Cleanup interval started (runs every 24 hours)');
+};
+
+export const stopCleanupInterval = () => {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
+    console.log('✅ Cleanup interval stopped');
+  }
+};
+
+// เริ่ม cleanup interval เมื่อ module ถูก load
+startCleanupInterval(); 
