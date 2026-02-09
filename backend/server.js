@@ -49,17 +49,10 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
   app.use(helmet());
   app.use(compression());
 
-  // Rate limiting
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100 // limit each IP to 100 requests per windowMs
-  });
-  app.use(limiter);
-
-  // Logging middleware
+  // Logging middleware (early for debugging)
   app.use(morgan('dev'));
 
-  // CORS configuration
+  // CORS configuration - MUST be before rate limiting
   const corsOptions = {
     origin: ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001'],
     credentials: true,
@@ -70,24 +63,16 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
   };
   
   app.use(cors(corsOptions));
-
-  // Handle preflight requests globally with same options
   app.options('*', cors(corsOptions));
 
-  // Additional CORS headers for all routes
-  app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-      res.status(200).end();
-      return;
-    }
-    next();
+  // Rate limiting - AFTER CORS so preflight requests pass through
+  // Higher limit for development, lower for production
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: process.env.NODE_ENV === 'production' ? 100 : 1000, // 1000 for dev, 100 for prod
+    skip: (req, res) => req.method === 'OPTIONS' // skip preflight requests
   });
+  app.use(limiter);
 
   // Cookie parser middleware
   app.use(cookieParser());
@@ -95,6 +80,13 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
   // Body parser middleware
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+  // Ensure CORS headers are always present (redundant but safe)
+  app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    next();
+  });
 
   // Prevent 30s drops: increase per-request timeouts
   app.use((req, res, next) => {
@@ -105,30 +97,8 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
     next();
   });
 
-  // Static files with CORS for all uploads subdirectories
-  app.use('/uploads', (req, res, next) => {
-    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
-    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.header('Cross-Origin-Embedder-Policy', 'unsafe-none');
-    
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-      res.status(200).end();
-      return;
-    }
-    next();
-  }, express.static(path.join(__dirname, 'uploads')));
-
-  // Static files for images with CORS
-  app.use('/images', (req, res, next) => {
-    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
-    res.header('Access-Control-Allow-Methods', 'GET');
-    res.header('Access-Control-Allow-Headers', 'Content-Type');
-    next();
-  }, express.static(path.join(__dirname, 'images')));
+  // Static files with CORS for uploads
+  app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
   // Health check endpoint
   app.get('/health', (req, res) => {
@@ -140,7 +110,49 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
     });
   });
 
-  // Routes
+  // Debug endpoint: connections / socket / db pool info
+  app.get('/debug/health/connections', async (req, res) => {
+    try {
+      let socketMetrics = {};
+      try {
+        const { getSocketMetrics } = await import('./socket.js');
+        socketMetrics = getSocketMetrics();
+      } catch (e) {
+        socketMetrics = { error: 'socket not initialized' };
+      }
+
+      let poolInfo = {};
+      try {
+        const dbModule = await import('./config/database.js');
+        const getPoolInfo = dbModule.getPoolInfo;
+        poolInfo = getPoolInfo ? getPoolInfo() : { error: 'pool info unavailable' };
+      } catch (e) {
+        poolInfo = { error: 'database module not available' };
+      }
+
+      res.json({
+        timestamp: new Date().toISOString(),
+        socket: socketMetrics,
+        dbPool: poolInfo
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Debug endpoint: recent metrics log (last 50 entries)
+  app.get('/debug/metrics/recent', async (req, res) => {
+    try {
+      const { readMetricsLog } = await import('./utils/metricsLogger.js');
+      const lines = parseInt(req.query.lines || '50', 10);
+      const metrics = readMetricsLog(Math.min(lines, 500)); // max 500 lines
+      res.json({ metrics });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Routes (placed BEFORE additional CORS middleware for /api)
   app.use('/api/users', userRoutes);
   app.use('/api/leaves', leaveRoutes);
   app.use('/api/repairs', repairRoutes);
@@ -160,23 +172,6 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
   app.use('/api/money-history', moneyHistoryRoutes);
   app.use('/api/welcome', welcomeRoutes);
   app.use('/api/evaluation-topics', evaluationTopicRoutes);
-
-  // Add CORS headers for all API routes
-  app.use('/api', (req, res, next) => {
-    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.header('Cross-Origin-Embedder-Policy', 'unsafe-none');
-    
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-      res.status(200).end();
-      return;
-    }
-    next();
-  });
 
   // MongoDB Connection
   // const connectDB = async () => {
@@ -265,10 +260,23 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
   });
 
   // Initialize Socket.IO
+  let stopMetricsLogging = null;
   try {
-    const { initSocket } = await import('./socket.js');
+    const { initSocket, getSocketMetrics } = await import('./socket.js');
+    const { getPoolInfo } = await import('./config/database.js');
+    const { startPeriodicMetricsLogging, logMetrics } = await import('./utils/metricsLogger.js');
+    
     initSocket(server);
     console.log('🔌 Socket.IO initialized');
+
+    // Start periodic metrics logging (every 30s)
+    stopMetricsLogging = startPeriodicMetricsLogging(() => {
+      return {
+        socket: getSocketMetrics(),
+        dbPool: getPoolInfo()
+      };
+    }, 30000);
+    console.log('📊 Metrics logging started');
   } catch (e) {
     console.warn('⚠️ Failed to initialize Socket.IO:', e.message);
   }

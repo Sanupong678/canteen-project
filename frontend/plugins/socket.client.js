@@ -27,6 +27,13 @@ export default defineNuxtPlugin((nuxtApp) => {
   const MAX_INVALID_TOKEN_ATTEMPTS = 3
   const RECONNECT_DELAY_MS = 2000 // Delay intentional reconnect to prevent storm
 
+  // Prevent duplicate socket instances across navigations / HMR / multi-init
+  if (window.__CANTEEN_SOCKET__ && window.__CANTEEN_SOCKET__.__CANTEEN_BASEURL__ === baseUrl) {
+    // Reuse existing socket
+    nuxtApp.provide('socket', window.__CANTEEN_SOCKET__);
+    return;
+  }
+
   const socket = io(baseUrl, {
     transports: ['websocket', 'polling'], // เพิ่ม polling เป็น fallback
     auth: token ? { token } : {},
@@ -233,6 +240,12 @@ export default defineNuxtPlugin((nuxtApp) => {
 
   // Admin side can listen and refresh lists
   nuxtApp.provide('socket', socket)
+
+  // keep singleton on window for future navigations
+  try {
+    window.__CANTEEN_SOCKET__ = socket;
+    window.__CANTEEN_SOCKET__.__CANTEEN_BASEURL__ = baseUrl;
+  } catch (_) {}
 
   // Cleanup เมื่อ app unmount
   nuxtApp.hook('app:beforeMount', () => {

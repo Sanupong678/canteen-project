@@ -24,6 +24,8 @@ const connectDB = async () => {
       // เพิ่ม options สำหรับความเสถียร
       maxStalenessSeconds: 90, // อนุญาตให้อ่านจาก secondary ที่ stale ไม่เกิน 90 วินาที
       readPreference: 'primaryPreferred', // อ่านจาก primary ก่อน แต่ถ้า primary ไม่มีให้อ่านจาก secondary
+      // wait queue timeout: ป้องกัน connection pool exhaustion
+      waitQueueTimeoutMS: parseInt(process.env.DB_WAIT_QUEUE_TIMEOUT_MS) || 60000, // default 60s
       // เพิ่ม connection pool monitoring
       monitorCommands: process.env.NODE_ENV === 'development' // log commands ใน development
       // Removed deprecated options: keepAlive and keepAliveInitialDelay
@@ -217,3 +219,26 @@ const connectDB = async () => {
 };
 
 export default connectDB; 
+
+export const getPoolInfo = () => {
+  try {
+    const readyState = mongoose.connection.readyState;
+    const readyStateNames = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+    let pool = null;
+    try {
+      pool = mongoose.connection.client?.topology?.s?.pool || mongoose.connection.db?.serverConfig?.s?.pool;
+    } catch (e) {
+      pool = null;
+    }
+
+    return {
+      readyState: readyStateNames[readyState] || readyState,
+      totalConnections: pool?.totalConnectionCount || pool?.size || 'N/A',
+      availableConnections: pool?.availableConnectionCount || pool?.availableCount || 'N/A',
+      waitQueueSize: pool?.waitQueueSize || pool?.waitingCount || 'N/A',
+      maxPoolSize: parseInt(process.env.DB_MAX_POOL_SIZE) || 50
+    };
+  } catch (e) {
+    return { error: String(e) };
+  }
+};
