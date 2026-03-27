@@ -841,12 +841,24 @@ export default {
       }
       
       // ถ้าไม่มีการเรียงตามคะแนน ให้เรียงตามโรงอาหารและชื่อร้านค้า
-      return this.filteredShops.sort((a, b) => {
-        // เรียงตาม canteenId ก่อน แล้วตามชื่อร้านค้า
-        if (a.canteenId !== b.canteenId) {
-          return a.canteenId - b.canteenId
+      // ใช้สำเนา array เพื่อไม่ให้ sort ไปแก้ state ตรง ๆ
+      const shops = this.filteredShops.slice()
+      
+      return shops.sort((a, b) => {
+        // กันค่า null/undefined
+        const canteenA = a?.canteenId ?? 0
+        const canteenB = b?.canteenId ?? 0
+        
+        // เรียงตาม canteenId ก่อน
+        if (canteenA !== canteenB) {
+          return canteenA - canteenB
         }
-        return a.name.localeCompare(b.name, 'th')
+        
+        // แล้วเรียงตามชื่อร้านค้า (กันกรณีไม่มี name)
+        const nameA = (a?.name || '').toString()
+        const nameB = (b?.name || '').toString()
+        
+        return nameA.localeCompare(nameB, 'th')
       })
     },
     
@@ -1698,7 +1710,7 @@ export default {
 
 /* Sidebar */
 .sidebar {
-  width: 260px;
+  width: min(260px, 100%);
   background: #ffffff;
   color: #374151;
   display: flex;
@@ -1716,7 +1728,7 @@ export default {
 
 .sidebar-header h2 {
   margin: 0;
-  font-size: 1.4rem;
+  font-size: clamp(1.1rem, 4vw, 1.4rem);
   font-weight: 600;
   color: #111827;
 }
@@ -1940,6 +1952,8 @@ export default {
   transition: all 0.3s ease;
   min-width: 190px;
   justify-content: center;
+  min-height: 44px;
+  line-height: 1;
 }
 
 .reset-btn:hover {
@@ -1974,7 +1988,7 @@ export default {
 }
 
 .stat-icon {
-  font-size: 24px;
+  font-size: clamp(1.25rem, 4vw, 1.5rem);
   color: #3b82f6;
   margin-bottom: 5px;
 }
@@ -1994,7 +2008,7 @@ export default {
 }
 
 .stat-value {
-  font-size: 24px;
+  font-size: clamp(1.25rem, 4vw, 1.5rem);
   font-weight: 700;
   color: #2c3e50;
   margin-top: 5px;
@@ -2121,6 +2135,9 @@ export default {
   align-items: center;
   gap: 4px;
   box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+  min-height: 44px;
+  justify-content: center;
+  line-height: 1;
 }
 
 .details-btn:hover {
@@ -2159,6 +2176,11 @@ export default {
   transition: all 0.3s ease;
   box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3);
   letter-spacing: 0.3px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .evaluate-btn:hover:not(.disabled) {
@@ -2235,6 +2257,11 @@ export default {
   cursor: pointer;
   transition: all 0.2s ease;
   min-width: 40px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .pagination-btn:hover:not(:disabled) {
@@ -2408,6 +2435,7 @@ input:checked + .slider:before {
   align-items: center;
   gap: 6px;
   box-shadow: 0 2px 4px rgba(108, 117, 125, 0.3);
+  min-height: 44px;
 }
 
 .toggle-btn:hover {
@@ -2696,6 +2724,15 @@ input:checked + .slider:before {
     min-height: auto;
   }
 
+  .sidebar-header {
+    padding: 16px;
+  }
+
+  .menu-item {
+    padding: 10px 14px;
+    margin: 0 8px 6px;
+  }
+
   .filters-section {
     flex-direction: column;
   }
@@ -2852,7 +2889,7 @@ input:checked + .slider:before {
 }
 
 .header-title i {
-  font-size: 28px;
+  font-size: clamp(1.5rem, 6vw, 1.75rem);
   color: #3498db;
   background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
   -webkit-background-clip: text;
@@ -2862,7 +2899,7 @@ input:checked + .slider:before {
 
 .modal-header h3 {
   margin: 0;
-  font-size: 24px;
+  font-size: clamp(1.25rem, 4.5vw, 1.5rem);
   font-weight: 700;
   color: #2d3748;
   line-height: 1.2;
@@ -2949,6 +2986,7 @@ input:checked + .slider:before {
   gap: 8px;
   transition: all 0.3s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  min-height: 44px;
 }
 
 .close-btn:hover {
@@ -3301,7 +3339,7 @@ input:checked + .slider:before {
 }
 
 .no-items i {
-  font-size: 3rem;
+  font-size: clamp(1.9rem, 8vw, 3rem);
   margin-bottom: 15px;
   color: #a0aec0;
   display: block;
@@ -3322,10 +3360,14 @@ input:checked + .slider:before {
   }
 
   .modal-header {
-    padding: 20px;
+    padding: 16px;
     flex-direction: column;
     align-items: stretch;
     gap: 15px;
+  }
+
+  .modal-body {
+    padding: 16px;
   }
 
   .header-title {
@@ -3344,6 +3386,19 @@ input:checked + .slider:before {
 
   .summary-info-grid {
     grid-template-columns: 1fr;
+  }
+
+  /* Import dialog padding on mobile */
+  .import-dialog-overlay {
+    padding: 16px;
+  }
+
+  .import-dialog-header {
+    padding: 16px;
+  }
+
+  .import-dialog-body {
+    padding: 16px;
   }
 }
 
@@ -3381,7 +3436,7 @@ input:checked + .slider:before {
 }
 
 .import-dialog-header i {
-  font-size: 24px;
+  font-size: clamp(1.25rem, 4.5vw, 1.5rem);
 }
 
 .import-dialog-header h3 {
@@ -3403,7 +3458,7 @@ input:checked + .slider:before {
 }
 
 .warning-icon {
-  font-size: 48px;
+  font-size: clamp(2.2rem, 10vw, 3rem);
   color: #f39c12;
   margin-bottom: 12px;
   display: block;

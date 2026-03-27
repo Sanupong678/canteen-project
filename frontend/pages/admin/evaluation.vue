@@ -322,7 +322,7 @@ export default {
 .header h1 {
   color: white;
   margin: 0 0 10px 0;
-  font-size: 28px;
+  font-size: clamp(1.5rem, 4vw, 1.75rem);
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -541,6 +541,7 @@ export default {
   align-items: center;
   gap: 8px;
   transition: all 0.3s ease;
+  min-height: 44px;
 }
 
 .save-btn {
@@ -593,7 +594,7 @@ export default {
 }
 
 .no-data i {
-  font-size: 3rem;
+  font-size: clamp(1.6rem, 8vw, 3rem);
   margin-bottom: 15px;
   color: #d1d5db;
 }
@@ -701,7 +702,7 @@ export default {
 }
 
 .stat-value {
-  font-size: 2rem;
+  font-size: clamp(1.25rem, 4vw, 2rem);
   font-weight: bold;
   color: #333;
   margin-bottom: 4px;
@@ -713,6 +714,23 @@ export default {
 }
 
 @media (max-width: 768px) {
+  .container {
+    padding: 16px;
+  }
+
+  .header {
+    padding: 24px 16px;
+    margin-bottom: 16px;
+  }
+
+  .current-status-card,
+  .control-form-card,
+  .history-card,
+  .stats-card {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
   .form-row {
     grid-template-columns: 1fr;
   }

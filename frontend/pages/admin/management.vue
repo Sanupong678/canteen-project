@@ -331,7 +331,7 @@
   h1 {
     color: #333;
     margin-bottom: 30px;
-    font-size: 28px;
+    font-size: clamp(1.35rem, 4vw, 1.75rem);
   }
   
   /* Search Styles */
@@ -415,7 +415,8 @@
   }
   
   .canteen-image {
-    height: 200px;
+    height: auto;
+    aspect-ratio: 16 / 9;
     overflow: hidden;
     position: relative;
   }
@@ -453,6 +454,10 @@
     cursor: pointer;
     font-size: 14px;
     transition: background-color 0.3s;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
   
   .edit-btn:hover {
@@ -511,13 +516,17 @@
   }
   
   .details-button {
-    padding: 4px 8px;
+    padding: 10px 14px;
     background-color: #4299e1;
     color: white;
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 14px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
   
   .details-button:hover {
@@ -541,6 +550,10 @@
     cursor: pointer;
     font-size: 16px;
     transition: background-color 0.3s;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
   
   .select-btn:hover {
@@ -589,6 +602,12 @@
     font-size: 24px;
     cursor: pointer;
     color: #666;
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .close-btn:hover {
@@ -611,7 +630,8 @@
   .current-image img {
     width: 100%;
     max-width: 300px;
-    height: 200px;
+    height: auto;
+    aspect-ratio: 16 / 9;
     object-fit: cover;
     border-radius: 4px;
   }
@@ -641,7 +661,8 @@
   .preview img {
     width: 100%;
     max-width: 300px;
-    height: 200px;
+    height: auto;
+    aspect-ratio: 16 / 9;
     object-fit: cover;
     border-radius: 4px;
   }
@@ -661,6 +682,10 @@
     border: none;
     border-radius: 4px;
     cursor: pointer;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .cancel-btn:hover {
@@ -674,6 +699,10 @@
     border: none;
     border-radius: 4px;
     cursor: pointer;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .save-btn:hover:not(:disabled) {
@@ -712,5 +741,34 @@
   .loading p {
     color: #666;
     font-size: 16px;
+  }
+
+  /* Mobile padding / spacing */
+  @media (max-width: 768px) {
+    .canteen-management {
+      padding: 16px;
+    }
+
+    h1 {
+      margin-bottom: 16px;
+    }
+
+    .search-container {
+      margin-bottom: 16px;
+    }
+
+    .modal-header,
+    .modal-body,
+    .modal-footer {
+      padding: 16px;
+    }
+
+    .current-image {
+      margin-bottom: 16px;
+    }
+
+    .loading {
+      padding: 24px;
+    }
   }
   </style> 

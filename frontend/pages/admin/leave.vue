@@ -63,6 +63,9 @@
           <template v-slot:header.shopName>
             <span><b>ชื่อร้านค้า</b></span>
           </template>
+          <template v-slot:header.shopCode>
+            <span><b>รหัสร้านค้า</b></span>
+          </template>
           <template v-slot:header.canteen>
             <span><b>โรงอาหาร</b></span>
           </template>
@@ -77,6 +80,14 @@
           </template>
           <template v-slot:header.actions>
             <span><b>การจัดการ</b></span>
+          </template>
+
+          <!-- Shop Name Column -->
+          <!-- Shop Code Column -->
+          <template v-slot:item.shopCode="{ item }">
+            <div class="d-flex align-center">
+              <span class="font-weight-medium">{{ item.shopCode || '—' }}</span>
+            </div>
           </template>
 
           <!-- Shop Name Column -->
@@ -184,6 +195,7 @@ const filters = ref({
 
 // Table headers
 const headers = [
+  { text: 'รหัสร้านค้า', value: 'shopCode', align: 'center' },
   { text: 'ชื่อร้านค้า', value: 'shopName', align: 'center' },
   { text: 'โรงอาหาร', value: 'canteen', align: 'center' },
   { text: 'วันที่ลา', value: 'dateRange', align: 'center' },
@@ -194,10 +206,10 @@ const headers = [
 
 // Options for filters
 const statusOptions = [
-  { text: 'ทั้งหมด', value: '' },
-  { text: 'รออนุมัติ', value: 'pending' },
-  { text: 'อนุมัติแล้ว', value: 'approved' },
-  { text: 'ไม่อนุมัติ', value: 'rejected' }
+  { title: 'ทั้งหมด', value: '' },
+  { title: 'รออนุมัติ', value: 'pending' },
+  { title: 'อนุมัติแล้ว', value: 'approved' },
+  { title: 'ไม่อนุมัติ', value: 'rejected' }
 ]
 
 const canteenOptions = [
@@ -530,7 +542,7 @@ onMounted(() => {
 .items-per-page .fixed-size { padding: 6px 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; min-width: 48px; text-align: center; }
 .items-per-page .range { margin-left: 12px; color: #6b7280; }
 .pagination { display: flex; gap: 6px; }
-.page-num { min-width: 32px; height: 32px; border: 1px solid #e5e7eb; background: #fff; color: #7f1d1d; border-radius: 2px; cursor: pointer; }
+.page-num { min-width: 44px; height: 44px; border: 1px solid #e5e7eb; background: #fff; color: #7f1d1d; border-radius: 2px; cursor: pointer; }
 .page-num.active { background: #7f1d1d; color: #fff; border-color: #7f1d1d; }
 .page-next { border: 1px solid #e5e7eb; background: #fff; color: #7f1d1d; border-radius: 2px; padding: 0 10px; cursor: pointer; }
 

@@ -110,10 +110,6 @@
               <v-icon left>mdi-history</v-icon>
               {{ showHistoryView ? 'ข้อมูลปัจจุบัน' : 'ประวัติ' }}
             </v-btn>
-            <v-btn-toggle v-model="selectedBillType" mandatory>
-              <v-btn value="electricity">ค่าไฟ</v-btn>
-              <v-btn value="water">ค่าน้ำ</v-btn>
-            </v-btn-toggle>
           </div>
         </div>
 
@@ -167,7 +163,7 @@
             <span><b>รายละเอียดวัน</b></span>
           </template>
           <template v-slot:header.special>
-            <span><b>{{ selectedBillType === 'electricity' ? 'ค่าไฟ' : 'ค่าน้ำ' }}</b></span>
+            <span><b>ค่าไฟและค่าน้ำ</b></span>
           </template>
           <template v-slot:header.status>
             <span><b>สถานะ</b></span>
@@ -223,27 +219,40 @@
             </div>
           </template>
 
-          <!-- ค่าไฟ หรือ ค่าน้ำ ตามประเภทที่เลือก -->
+          <!-- ค่าไฟและค่าน้ำ (รวมในแถวเดียว) -->
           <template v-slot:item.special="{ item }">
-            <template v-if="selectedBillType === 'electricity'">
-              <b>ค่าไฟ: {{ item.amount ? item.amount + ' บาท' : '-' }}</b>
-            </template>
-            <template v-else-if="selectedBillType === 'water'">
-              <b>ค่าน้ำ: {{ item.amount ? item.amount + ' บาท' : '-' }}</b>
-            </template>
-            <span
-              v-if="item.image || item.slip_image_url"
-              :class="{'yellow--text': !!item.image || !!item.slip_image_url}"
-              @click="(item.image || item.slip_image_url) && openImagePreview(item.image || item.slip_image_url, item)"
-              style="cursor: pointer; margin-left: 8px;"
-            >
-              <v-icon small>mdi-image</v-icon>
-            </span>
+            <div class="bill-utility-cell">
+              <div class="bill-utility-line">
+                <b>ค่าไฟ: {{ formatCurrency(item.electricityAmount) }} บาท</b>
+                <span
+                  v-if="item.electricityBill && (item.electricityBill.image || item.electricityBill.slip_image_url)"
+                  class="bill-utility-image"
+                  @click="openImagePreview(item.electricityBill.image || item.electricityBill.slip_image_url, item.electricityBill)"
+                  title="ดูสลิปค่าไฟ"
+                >
+                  <v-icon small>mdi-image</v-icon>
+                </span>
+              </div>
+              <div class="bill-utility-line">
+                <b>ค่าน้ำ: {{ formatCurrency(item.waterAmount) }} บาท</b>
+                <span
+                  v-if="item.waterBill && (item.waterBill.image || item.waterBill.slip_image_url)"
+                  class="bill-utility-image"
+                  @click="openImagePreview(item.waterBill.image || item.waterBill.slip_image_url, item.waterBill)"
+                  title="ดูสลิปค่าน้ำ"
+                >
+                  <v-icon small>mdi-image</v-icon>
+                </span>
+              </div>
+              <div class="bill-utility-line bill-utility-total">
+                <b>ยอดรวม: {{ formatCurrency(item.totalAmount) }} บาท</b>
+              </div>
+            </div>
           </template>
 
           <!-- Status -->
           <template v-slot:item.status="{ item }">
-            <v-chip :color="item.image && item.status === 'รอดำเนินการ' ? 'warning' : getStatusColor(item.status)" x-small>
+            <v-chip :color="getStatusColor(item.status)" x-small>
               {{ getStatusText(item.status) }}
             </v-chip>
             <div class="mt-1">
@@ -251,10 +260,10 @@
                 class="show-bill-btn"
                 text
                 small
-                :color="(item.image || item.slip || item.electricityImage || item.waterImage) ? 'primary' : 'grey'"
-                :style="(item.image || item.slip || item.electricityImage || item.waterImage) ? 'color:#1976d2' : 'color:#aaa'"
-                :disabled="!(item.image || item.slip || item.electricityImage || item.waterImage)"
-                @click="openImagePreview(item.image || item.slip || item.electricityImage || item.waterImage, item)"
+                :color="(item.electricityBill?.image || item.electricityBill?.slip_image_url || item.waterBill?.image || item.waterBill?.slip_image_url) ? 'primary' : 'grey'"
+                :style="(item.electricityBill?.image || item.electricityBill?.slip_image_url || item.waterBill?.image || item.waterBill?.slip_image_url) ? 'color:#1976d2' : 'color:#aaa'"
+                :disabled="!(item.electricityBill?.image || item.electricityBill?.slip_image_url || item.waterBill?.image || item.waterBill?.slip_image_url)"
+                @click="openImagePreview((item.electricityBill?.image || item.electricityBill?.slip_image_url || item.waterBill?.image || item.waterBill?.slip_image_url), (item.electricityBill || item.waterBill))"
               >
                 แสดงสลิป
               </v-btn>
@@ -263,10 +272,16 @@
 
           <!-- Actions -->
           <template v-slot:item.actions="{ item }">
-            <template v-if="item.image && item.status !== 'เสร็จสิ้น'">
-              <v-btn color="success" small @click="updateStatus(item._id, 'confirmed')">Approve</v-btn>
-              <v-btn color="error" small @click="cancelSlipImage(item._id)">ยกเลิกสลิป</v-btn>
-            </template>
+            <div class="bill-utility-actions">
+              <div v-if="item.electricityBill && item.electricityBill.image && item.electricityBill.status !== 'เสร็จสิ้น'" class="bill-utility-actions-line">
+                <v-btn color="success" small @click="updateStatus(item.electricityBill._id, 'confirmed')">Approve ไฟ</v-btn>
+                <v-btn color="error" small @click="cancelSlipImage(item.electricityBill._id)">ยกเลิกสลิปไฟ</v-btn>
+              </div>
+              <div v-if="item.waterBill && item.waterBill.image && item.waterBill.status !== 'เสร็จสิ้น'" class="bill-utility-actions-line">
+                <v-btn color="success" small @click="updateStatus(item.waterBill._id, 'confirmed')">Approve น้ำ</v-btn>
+                <v-btn color="error" small @click="cancelSlipImage(item.waterBill._id)">ยกเลิกสลิปน้ำ</v-btn>
+              </div>
+            </div>
           </template>
         </v-data-table>
         <!-- Pagination (10 per page, same as repair admin) -->
@@ -457,7 +472,7 @@ export default {
     LayoutAdmin
   },
   setup() {
-    const { $axios } = useNuxtApp()
+    const { $axios, $socket } = useNuxtApp()
     
     const bills = ref([])
     const loading = ref(false)
@@ -471,9 +486,6 @@ export default {
     const previewImage = ref('')
     const currentBill = ref(null)
     const imageError = ref(false)
-
-    // เพิ่มตัวแปรสำหรับเลือกประเภทบิล (ค่าไฟ/ค่าน้ำ)
-    const selectedBillType = ref('electricity') // 'electricity' | 'water'
 
     // Control Dialog state
     const showControlDialog = ref(false)
@@ -591,7 +603,7 @@ export default {
       { text: 'ID', value: 'shopId', align: 'start' },
       { text: 'ข้อมูลร้านค้า', value: 'guestInfo', align: 'start' },
       { text: 'รายละเอียดวัน', value: 'reservation', align: 'start' },
-      { text: selectedBillType.value === 'electricity' ? 'ค่าไฟ' : 'ค่าน้ำ', value: 'special', align: 'start' },
+      { text: 'ค่าไฟและค่าน้ำ', value: 'special', align: 'start' },
       { text: 'สถานะ', value: 'status', align: 'center' },
       { text: 'การจัดการ', value: 'actions', align: 'center', sortable: false }
     ])
@@ -678,6 +690,13 @@ export default {
 
     const formatAmount = (amount) => {
       return amount.toLocaleString('th-TH')
+    }
+
+    const formatCurrency = (amount) => {
+      if (amount === null || amount === undefined || amount === '') return '-'
+      const num = typeof amount === 'number' ? amount : Number(amount)
+      if (Number.isNaN(num)) return '-'
+      return num.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     }
 
     const getBillTypeText = (type) => {
@@ -857,7 +876,6 @@ export default {
       
       // Socket = Lightweight sync - ฟัง events เบาๆ
       try {
-        const { $socket } = useNuxtApp()
         if ($socket) {
           // ฟัง socket events สำหรับ sync เบาๆ
           $socket.on('admin:bill:newUpload', (payload) => handleSocketEvent('admin:bill:newUpload', payload))
@@ -865,17 +883,24 @@ export default {
           $socket.on('user:bill:imageCancelled', (payload) => handleSocketEvent('user:bill:imageCancelled', payload))
           $socket.on('user:bill:amountUpdated', (payload) => handleSocketEvent('user:bill:amountUpdated', payload))
           $socket.on('admin:bill:importCompleted', (payload) => handleSocketEvent('admin:bill:importCompleted', payload))
-          
-          onUnmounted(() => {
-            $socket.off('admin:bill:newUpload')
-            $socket.off('user:bill:updated')
-            $socket.off('user:bill:imageCancelled')
-            $socket.off('user:bill:amountUpdated')
-            $socket.off('admin:bill:importCompleted')
-          })
         }
       } catch (e) {
         console.warn('⚠️ Socket not available, using REST API only:', e)
+      }
+    })
+
+    // Cleanup socket listeners when component unmounts
+    onUnmounted(() => {
+      try {
+        if ($socket) {
+          $socket.off('admin:bill:newUpload')
+          $socket.off('user:bill:updated')
+          $socket.off('user:bill:imageCancelled')
+          $socket.off('user:bill:amountUpdated')
+          $socket.off('admin:bill:importCompleted')
+        }
+      } catch (e) {
+        console.warn('⚠️ Error cleaning up bill socket listeners:', e)
       }
     })
 
@@ -921,17 +946,90 @@ export default {
       imageError.value = true
     }
 
-    // filter ข้อมูลตามประเภทที่เลือก
+    // รวมค่าไฟและค่าน้ำให้อยู่ในแถวเดียวกัน (group by shopId+month+year)
     const filteredBills = computed(() => {
-      return bills.value.filter(bill => {
-        if (selectedBillType.value === 'electricity') {
-          return bill.billType === 'ค่าไฟ' || bill.billType === 'electricity'
+      const map = new Map()
+
+      for (const bill of bills.value) {
+        const shopKey = bill.shopId || ''
+        const monthKey = bill.month || ''
+        const yearKey = bill.year || ''
+        const key = `${shopKey}|${monthKey}|${yearKey}`
+
+        if (!map.has(key)) {
+          map.set(key, {
+            // Base fields used by existing table slots
+            shopId: bill.shopId,
+            shopName: bill.shopName,
+            canteen: bill.canteen,
+            email: bill.email,
+            phone: bill.phone,
+            createdAt: bill.createdAt,
+            month: bill.month,
+            year: bill.year,
+
+            // Grouped bill details
+            electricityBill: null,
+            waterBill: null,
+            electricityAmount: null,
+            waterAmount: null,
+            totalAmount: null,
+            status: bill.status || null
+          })
         }
-        if (selectedBillType.value === 'water') {
-          return bill.billType === 'ค่าน้ำ' || bill.billType === 'water'
+
+        const group = map.get(key)
+
+        // Prefer the latest createdAt for reservation display
+        if (bill.createdAt && (!group.createdAt || new Date(bill.createdAt) > new Date(group.createdAt))) {
+          group.createdAt = bill.createdAt
         }
-        return false
-      })
+
+        const bt = bill.billType
+        const isElectricity = bt === 'ค่าไฟ' || bt === 'electricity'
+        const isWater = bt === 'ค่าน้ำ' || bt === 'water'
+
+        if (isElectricity) {
+          group.electricityBill = bill
+          group.electricityAmount = bill.amount ?? null
+        } else if (isWater) {
+          group.waterBill = bill
+          group.waterAmount = bill.amount ?? null
+        }
+
+        const e = Number(group.electricityAmount ?? 0)
+        const w = Number(group.waterAmount ?? 0)
+        const hasAny = (group.electricityAmount !== null && group.electricityAmount !== undefined) || (group.waterAmount !== null && group.waterAmount !== undefined)
+        group.totalAmount = hasAny ? (Number.isNaN(e) ? 0 : e) + (Number.isNaN(w) ? 0 : w) : null
+
+        // Aggregate status: one status per row
+        const currentStatus = group.status
+        const newStatus = bill.status
+        if (!newStatus) {
+          // keep existing
+        } else if (!currentStatus) {
+          group.status = newStatus
+        } else if (currentStatus === newStatus) {
+          // no change
+        } else {
+          // ถ้ามีสถานะหลายแบบในเดือนเดียวกัน ใช้กฎง่าย ๆ:
+          // - ถ้ามี 'เลยกำหนด' อย่างน้อย 1 → แสดง 'เลยกำหนด'
+          // - else ถ้าทุกอันเป็น 'เสร็จสิ้น' → 'เสร็จสิ้น'
+          // - else → 'รอดำเนินการ'
+          const set = new Set([currentStatus, newStatus])
+          if (set.has('เลยกำหนด')) {
+            group.status = 'เลยกำหนด'
+          } else if (set.size === 1 && set.has('เสร็จสิ้น')) {
+            group.status = 'เสร็จสิ้น'
+          } else {
+            group.status = 'รอดำเนินการ'
+          }
+        }
+      }
+
+      const grouped = Array.from(map.values())
+      grouped.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+      return grouped
     })
 
     // Pagination (same behavior as repair admin: 10 per page)
@@ -1139,7 +1237,6 @@ export default {
       searchShopName,
       showPreview,
       previewImage,
-      selectedBillType,
       // Control Dialog
       showControlDialog,
       currentControlYear,
@@ -1155,6 +1252,7 @@ export default {
       canteenMap,
       formatDate,
       formatAmount,
+      formatCurrency,
       handleImageError,
       getBillTypeText,
       getBillTypeColor,
@@ -1285,7 +1383,7 @@ export default {
   height: 100% !important;
 }
 
-.filter-input--md { width: 130px; }
+.filter-input--md { width: 100%; max-width: 130px; }
 
 .filter-input--search { width: min(520px, 100%); }
 
@@ -1416,9 +1514,9 @@ export default {
 .items-per-page .fixed-size { padding: 6px 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; min-width: 48px; text-align: center; }
 .items-per-page .range { margin-left: 12px; color: #6b7280; }
 .pagination { display: flex; gap: 6px; }
-.page-num { min-width: 32px; height: 32px; border: 1px solid #e5e7eb; background: #fff; color: #7f1d1d; border-radius: 2px; cursor: pointer; }
+.page-num { min-width: 44px; height: 44px; border: 1px solid #e5e7eb; background: #fff; color: #7f1d1d; border-radius: 2px; cursor: pointer; }
 .page-num.active { background: #7f1d1d; color: #fff; border-color: #7f1d1d; }
-.page-next { border: 1px solid #e5e7eb; background: #fff; color: #7f1d1d; border-radius: 2px; padding: 0 10px; cursor: pointer; }
+.page-next { border: 1px solid #e5e7eb; background: #fff; color: #7f1d1d; border-radius: 2px; padding: 0 10px; cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
 
 .v-chip {
   margin: 4px;
@@ -1437,6 +1535,7 @@ export default {
   text-transform: none !important;
   transition: all 0.3s ease !important;
   min-width: 100px;
+  min-height: 44px;
   margin: 4px;
 }
 
@@ -1550,6 +1649,44 @@ export default {
 .guest-info-value { font-size: 14px; }
 
 /* เพิ่ม CSS สำหรับการแสดงข้อมูลค่าไฟและค่าน้ำ */
+.bill-utility-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: 1.2;
+}
+
+.bill-utility-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bill-utility-image {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  color: #f59e0b; /* amber */
+}
+
+.bill-utility-total {
+  margin-top: 4px;
+}
+
+.bill-utility-status,
+.bill-utility-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bill-utility-status-line,
+.bill-utility-actions-line {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .bills-display {
   display: flex;
   flex-direction: column;
@@ -1695,7 +1832,7 @@ export default {
 
 /* ซ่อน Scrollbar แนวนอน แต่แสดง Scrollbar แนวตั้ง */
 .v-data-table :deep(.v-data-table__wrapper) {
-  overflow-x: hidden !important;
+  overflow-x: auto !important;
   overflow-y: auto !important;
   /* ซ่อน scrollbar แนวนอน */
   scrollbar-width: thin !important;
@@ -1724,23 +1861,23 @@ export default {
 
 /* ซ่อน Scrollbar ในทุกส่วนของ table */
 .v-data-table :deep(table) {
-  overflow-x: hidden !important;
+  overflow-x: auto !important;
 }
 
 .v-data-table :deep(.v-data-table__wrapper table) {
-  overflow-x: hidden !important;
+  overflow-x: auto !important;
 }
 
 .v-data-table :deep(.v-data-table__tr) {
-  overflow-x: hidden !important;
+  overflow-x: auto !important;
 }
 
 .v-data-table :deep(.v-data-table__tbody) {
-  overflow-x: hidden !important;
+  overflow-x: auto !important;
 }
 
 .v-data-table :deep(.v-data-table__thead) {
-  overflow-x: hidden !important;
+  overflow-x: auto !important;
 }
 
 /* ซ่อน scrollbar ในทุก element ภายใน table */
@@ -1905,7 +2042,7 @@ input:checked + .slider:before {
 
 .header-left h2 {
   margin: 0;
-  font-size: 24px;
+  font-size: clamp(1.2rem, 3.2vw, 1.5rem);
   font-weight: 700;
   color: white;
 }

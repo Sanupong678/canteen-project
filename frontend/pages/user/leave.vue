@@ -431,9 +431,9 @@ const currentPage = ref(1)
 
 // Options
 const statusOptions = [
-  { text: 'รออนุมัติ', value: 'pending' },
-  { text: 'อนุมัติแล้ว', value: 'approved' },
-  { text: 'ไม่อนุมัติ', value: 'rejected' }
+  { title: 'รออนุมัติ', value: 'pending' },
+  { title: 'อนุมัติแล้ว', value: 'approved' },
+  { title: 'ไม่อนุมัติ', value: 'rejected' }
 ]
 
 // Rules
@@ -796,7 +796,7 @@ onMounted(async () => {
 }
 
 .page-title {
-  font-size: 24px;
+  font-size: clamp(1.2rem, 3.2vw, 1.5rem);
   font-weight: 600;
   color: #1a1a1a;
   margin-bottom: 4px;
@@ -929,8 +929,9 @@ onMounted(async () => {
 }
 
 .page-btn {
-  min-width: 32px;
-  height: 32px;
+  min-width: 44px;
+  height: 44px;
+  line-height: 1;
 }
 
 /* Dialog Styles */
@@ -1051,6 +1052,17 @@ onMounted(async () => {
 
   .date-inputs {
     flex-direction: column;
+  }
+
+  .status-column {
+    max-width: 220px;
+    min-width: 180px;
+    width: auto;
+  }
+
+  .page-btn {
+    min-width: 44px;
+    height: 44px;
   }
 }
 </style>

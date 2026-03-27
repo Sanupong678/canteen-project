@@ -102,7 +102,7 @@ export default {
 h1 {
   color: #333;
   margin-bottom: 30px;
-  font-size: 28px;
+  font-size: clamp(1.4rem, 5vw, 1.75rem);
 }
 
 .canteen-grid {
@@ -125,7 +125,8 @@ h1 {
 }
 
 .canteen-image {
-  height: 200px;
+  height: auto;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
 }
 
@@ -155,9 +156,32 @@ h1 {
   cursor: pointer;
   font-size: 16px;
   transition: background-color 0.3s;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .select-btn:hover {
   background-color: #c0392b;
+}
+
+@media (max-width: 768px) {
+  .canteen-management {
+    padding: 16px;
+  }
+
+  h1 {
+    margin-bottom: 16px;
+  }
+
+  .canteen-grid {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .canteen-info {
+    padding: 12px;
+  }
 }
 </style> 

@@ -556,7 +556,8 @@ onMounted(() => {
   margin-top: 1rem;
   border-radius: 12px;
   overflow: hidden;
-  max-width: 400px;
+  max-width: 100%;
+  width: 100%;
 }
 
 .image-preview img {
@@ -569,8 +570,8 @@ onMounted(() => {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.6);
   color: white;
@@ -602,7 +603,7 @@ onMounted(() => {
 }
 
 .empty-icon {
-  font-size: 4rem;
+  font-size: clamp(2.2rem, 9vw, 4rem);
   color: #cbd5e0;
   margin-bottom: 1rem;
 }
@@ -648,7 +649,8 @@ onMounted(() => {
 .banner-image-wrapper {
   position: relative;
   width: 100%;
-  height: 200px;
+  height: auto;
+  aspect-ratio: 21 / 9;
   overflow: hidden;
   background: #f8f9fa;
 }
@@ -671,7 +673,7 @@ onMounted(() => {
 }
 
 .banner-placeholder i {
-  font-size: 3rem;
+  font-size: clamp(1.8rem, 6vw, 3rem);
 }
 
 .banner-overlay {

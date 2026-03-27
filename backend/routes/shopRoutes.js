@@ -342,17 +342,32 @@ router.post('/', async (req, res) => {
     const newCustomId = await generateNewCustomId(req.body.canteenId);
     console.log('Generated customId:', newCustomId);
 
+    // Validate and normalize googleEmail if provided
+    let googleEmail = null;
+    if (credentials.googleEmail && typeof credentials.googleEmail === 'string') {
+      const email = credentials.googleEmail.trim().toLowerCase();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (email && emailRegex.test(email)) {
+        googleEmail = email;
+      }
+    }
+
     // Create shop with user reference and hashed password
+    const shopCredentials = {
+      username: credentials.username.trim(), // trim whitespace
+      password: credentials.password, // เก็บไว้สำหรับ fallback (ไม่ควรใช้)
+      password_hash: hashedPassword, // ใช้ password_hash สำหรับ login
+      status: 'active'
+    };
+    if (googleEmail) {
+      shopCredentials.googleEmail = googleEmail;
+    }
+
     const shop = new Shop({
       ...req.body,
       customId: newCustomId,
       canteenId: parseInt(req.body.canteenId), // แปลงเป็น number
-      credentials: {
-        username: credentials.username.trim(), // trim whitespace
-        password: credentials.password, // เก็บไว้สำหรับ fallback (ไม่ควรใช้)
-        password_hash: hashedPassword, // ใช้ password_hash สำหรับ login
-        status: 'active'
-      },
+      credentials: shopCredentials,
       userId: savedUser._id
     });
     

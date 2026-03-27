@@ -516,7 +516,7 @@ export default {
 }
 
 .header-title i {
-  font-size: 28px;
+  font-size: clamp(1.3rem, 6vw, 1.75rem);
   color: #3498db;
   background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
   -webkit-background-clip: text;
@@ -526,7 +526,7 @@ export default {
 
 .modal-header h3 {
   margin: 0;
-  font-size: 24px;
+  font-size: clamp(1.15rem, 4.5vw, 1.5rem);
   font-weight: 700;
   color: #2d3748;
   line-height: 1.2;
@@ -615,6 +615,9 @@ export default {
   box-shadow: 0 4px 15px rgba(72, 187, 120, 0.3);
   position: relative;
   overflow: hidden;
+  min-height: 44px;
+  min-width: 44px;
+  line-height: 1;
 }
 
 .save-evaluation-btn::before {
@@ -667,6 +670,9 @@ export default {
   gap: 8px;
   transition: all 0.3s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  min-height: 44px;
+  min-width: 44px;
+  line-height: 1;
 }
 
 .close-btn:hover {
@@ -689,7 +695,7 @@ export default {
 .evaluation-items h4 {
   margin: 0 0 20px 0;
   color: #2d3748;
-  font-size: 20px;
+  font-size: clamp(1.1rem, 4.2vw, 1.25rem);
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -778,7 +784,7 @@ export default {
 .item-number {
   font-weight: 900;
   color: #3498db;
-  font-size: 20px;
+  font-size: clamp(1.1rem, 4vw, 1.25rem);
   min-width: 40px;
   text-align: center;
   background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
@@ -803,7 +809,7 @@ export default {
 .item-title {
   font-weight: 800;
   color: #1a202c;
-  font-size: 20px;
+  font-size: clamp(1.05rem, 3.8vw, 1.25rem);
   line-height: 1.3;
   margin-bottom: 8px;
 }
@@ -1241,7 +1247,7 @@ export default {
   }
 
   .modal-header {
-    padding: 20px;
+    padding: 16px;
     flex-direction: column;
     align-items: stretch;
     gap: 15px;
@@ -1254,15 +1260,19 @@ export default {
   }
 
   .modal-header h3 {
-    font-size: 20px;
+    font-size: clamp(1.1rem, 4.5vw, 1.25rem);
   }
 
   .header-actions {
     justify-content: center;
   }
 
+  .modal-body {
+    padding: 16px;
+  }
+
   .evaluation-item {
-    padding: 20px;
+    padding: 16px;
   }
 
   .item-header {
@@ -1295,10 +1305,49 @@ export default {
   .option-label {
     width: 100%;
     justify-content: center;
+    min-width: 0;
+    padding: 12px 16px;
   }
 
   .suggestion-textarea {
     min-height: 60px;
+  }
+
+  .evaluation-items h4 {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  /* Table responsiveness: avoid fixed pixel column widths */
+  .evaluation-table th,
+  .evaluation-table td {
+    padding: 12px 8px;
+  }
+
+  .col-order,
+  .col-topic,
+  .col-pass,
+  .col-fail,
+  .col-suggestion,
+  .col-file {
+    width: auto !important;
+  }
+
+  .no-shop-selected {
+    padding: 40px 16px;
+    margin: 16px 0;
+  }
+
+  .no-shop-selected i {
+    font-size: clamp(2rem, 8vw, 3rem);
+  }
+
+  .message-icon {
+    font-size: clamp(2rem, 9vw, 4rem);
+  }
+
+  .message-content h4 {
+    font-size: clamp(1.05rem, 3.8vw, 1.25rem);
   }
 }
 

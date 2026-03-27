@@ -2,58 +2,79 @@
   <LayoutUser>
     <div class="ranking-page">
 
-      <!-- Current Month Summary -->
-      <div class="current-summary">
-        <div class="title-section">
-          <h2 class="main-title">การจัดอันดับ</h2>
-          <h3 class="sub-title">ของเดือนปัจจุบัน</h3>
+      <!-- Header -->
+      <div class="page-header">
+        <div class="header-text">
+          <h1 class="page-title">การจัดอันดับ</h1>
+          <p class="page-subtitle">สรุปคะแนนเฉลี่ยขอเดือน {{ currentMonthName }}</p>
         </div>
-        <div class="summary-grid">
-          <div class="summary-item">
-            <div class="summary-value">{{ formatMoney(currentData.money) }}</div>
-            <div class="summary-label">เงิน</div>
+      </div>
+
+      <!-- Metric Cards -->
+      <div class="metric-grid">
+        <div class="metric-card">
+          <div class="metric-label">รายได้เดือนนี้</div>
+          <div class="metric-value money">
+            {{ currentData.hasCurrentMonthUpdate ? '฿' + formatMoney(currentData.money) : 'รออัปเดต' }}
           </div>
-          <div class="summary-item">
-            <div class="summary-value">{{ formatScore(currentData.score) }}</div>
-            <div class="summary-label">คะแนนเฉลี่ย</div>
-          </div>
-          <div class="summary-item">
-            <div class="summary-value">{{ currentData.rank }}</div>
-            <div class="summary-label">ลำดับ</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">คะแนนเฉลี่ย</div>
+          <div class="metric-value score">{{ formatScore(currentData.score) }}</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">สถานะ</div>
+          <div class="metric-value" style="padding-top: 4px;">
+            <span
+              v-if="currentData.hasCurrentMonthUpdate"
+              class="badge"
+              :class="scoreStatusClass(currentData.score)"
+            >
+              {{ getScoreStatusLabel(currentData.score) }}
+            </span>
+            <span v-else class="badge badge-pending">รออัปเดต</span>
           </div>
         </div>
       </div>
 
-      <!-- Money History Section -->
-      <div class="money-history-section" v-if="moneyHistory && moneyHistory.length >= 0">
-        <h2 class="section-title">ประวัติรายได้และคะแนน</h2>
-        <div class="table-container">
+      <!-- History Table -->
+      <div class="section" v-if="moneyHistory && moneyHistory.length >= 0">
+        <div class="section-header">ประวัติรายได้และคะแนน</div>
+        <div class="table-wrapper">
           <table class="history-table">
             <thead>
               <tr>
                 <th>เดือน/ปี</th>
                 <th>รายได้</th>
                 <th>คะแนน</th>
-                <th>ลำดับ</th>
+                <th>สถานะ</th>
                 <th>วันที่อัปเดต</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="item in moneyHistory" :key="`${item.year}-${item.month}`">
                 <td>{{ getMonthName(item.month) }} {{ item.year }}</td>
-                <td class="revenue-cell">{{ item.revenue ? formatMoney(item.revenue) : '-' }}</td>
-                <td class="score-cell">{{ item.score || '-' }}</td>
-                <td class="rank-cell">{{ item.rank ? `อันดับที่ ${item.rank}` : '-' }}</td>
+                <td class="revenue-cell">
+                  {{ item.revenue === null || item.revenue === undefined ? '—' : '฿' + formatMoney(item.revenue) }}
+                </td>
+                <td class="score-cell">
+                  {{ item.score === null || item.score === undefined ? '—' : formatScore(item.score) }}
+                </td>
                 <td>
-                  <div v-if="item.uploadedAt || item.evaluatedAt">
-                    <div v-if="item.uploadedAt" class="update-info">
-                      <span class="update-label">รายได้:</span> {{ formatDate(item.uploadedAt) }}
+                  <span class="badge" :class="scoreStatusClass(item.score)">
+                    {{ getScoreStatusLabel(item.score) }}
+                  </span>
+                </td>
+                <td>
+                  <div v-if="item.uploadedAt || item.evaluatedAt" class="date-info">
+                    <div v-if="item.uploadedAt">
+                      <span class="date-label">รายได้:</span> {{ formatDate(item.uploadedAt) }}
                     </div>
-                    <div v-if="item.evaluatedAt" class="update-info">
-                      <span class="update-label">คะแนน:</span> {{ formatDate(item.evaluatedAt) }}
+                    <div v-if="item.evaluatedAt">
+                      <span class="date-label">คะแนน:</span> {{ formatDate(item.evaluatedAt) }}
                     </div>
                   </div>
-                  <span v-else>-</span>
+                  <span v-else class="empty-cell">—</span>
                 </td>
               </tr>
               <tr v-if="moneyHistory.length === 0">
@@ -83,7 +104,7 @@ import { getTokenWithState, getTokenFingerprint } from '@/utils/tokenUtils'
 const currentData = ref({
   money: 0,
   score: 0,
-  rank: 0
+  hasCurrentMonthUpdate: false
 })
 
 // Money history data
@@ -99,6 +120,33 @@ const formatScore = (score) => {
     return '0.00'
   }
   return parseFloat(score).toFixed(2)
+}
+
+const normalizeScore = (score) => {
+  const n = Number(score)
+  return Number.isFinite(n) ? n : null
+}
+
+// สถานะตามคะแนนรายเดือน/รายร้าน
+// 100-75 = ดีเยี่ยม (เขียว)
+// 74-50 = ดี (เหลือง)
+// 49-0 = ปรับปรุง (แดง)
+const getScoreStatus = (score) => {
+  const n = normalizeScore(score)
+  if (n === null) return { label: '—', variant: 'unknown' }
+  if (n >= 75) return { label: 'ดีเยี่ยม', variant: 'excellent' }
+  if (n >= 50) return { label: 'ดี', variant: 'good' }
+  return { label: 'ปรับปรุง', variant: 'improve' }
+}
+
+const getScoreStatusLabel = (score) => getScoreStatus(score).label
+
+const scoreStatusClass = (score) => {
+  const { variant } = getScoreStatus(score)
+  if (variant === 'excellent') return 'badge-excellent'
+  if (variant === 'good') return 'badge-good'
+  if (variant === 'improve') return 'badge-improve'
+  return 'badge-unknown'
 }
 
 const formatDate = (dateString) => {
@@ -120,6 +168,8 @@ const getMonthName = (month) => {
   ];
   return monthNames[month - 1];
 }
+
+const currentMonthName = getMonthName(new Date().getMonth() + 1)
 
 const fetchMoneyHistory = async () => {
   try {
@@ -231,12 +281,12 @@ const fetchCurrentData = async () => {
       
       // รวมข้อมูล
       const moneyData = moneyResponse.data.success ? moneyResponse.data.data : { totals: 0 }
-      const rankingData = rankingResponse.data.success ? rankingResponse.data.data : { score: 0, rank: 0 }
+      const rankingData = rankingResponse.data.success ? rankingResponse.data.data : { score: 0, hasCurrentMonthUpdate: false }
       
       currentData.value = {
         money: moneyData.totals || 0,
         score: rankingData.score || 0,
-        rank: rankingData.rank || 0
+        hasCurrentMonthUpdate: !!rankingData.hasCurrentMonthUpdate
       }
       console.log('✅ Data updated successfully:', currentData.value)
       return
@@ -256,12 +306,12 @@ const fetchCurrentData = async () => {
     
     // 9. รวมข้อมูล
     const moneyData = moneyResponse.data.success ? moneyResponse.data.data : { totals: 0 }
-    const rankingData = rankingResponse.data.success ? rankingResponse.data.data : { score: 0, rank: 0 }
+    const rankingData = rankingResponse.data.success ? rankingResponse.data.data : { score: 0, hasCurrentMonthUpdate: false }
     
     currentData.value = {
       money: moneyData.totals || 0,
       score: rankingData.score || 0,
-      rank: rankingData.rank || 0
+      hasCurrentMonthUpdate: !!rankingData.hasCurrentMonthUpdate
     }
     console.log('✅ Data updated successfully:', currentData.value)
     
@@ -276,7 +326,7 @@ const fetchCurrentData = async () => {
     currentData.value = {
       money: 0,
       score: 0,
-      rank: 0
+      hasCurrentMonthUpdate: false
     }
   }
 }
@@ -299,17 +349,90 @@ onMounted(async () => {
 <style scoped>
 .ranking-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-  padding: 20px;
+  padding: 24px 20px;
   font-family: 'Kanit', sans-serif;
+  background: #f5f6f8;
 }
 
-.current-summary {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
+/* Header */
+.page-header {
   margin-bottom: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+.page-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 4px 0;
+}
+.page-subtitle {
+  font-size: 15px;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Metric Cards */
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.metric-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 18px 16px;
+  text-align: center;
+}
+.metric-label {
+  font-size: 13px;
+  color: #6b7280;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.metric-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: #1a1a2e;
+  line-height: 1.2;
+}
+.metric-value.money {
+  color: #059669;
+}
+.metric-value.score {
+  color: #2563eb;
+}
+
+/* Section */
+.section {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+}
+.section-header {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.table-wrapper {
+  overflow-x: auto;
+}
+.date-info {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.7;
+}
+.date-label {
+  font-weight: 600;
+  color: #9ca3af;
+}
+.empty-cell {
+  color: #d1d5db;
 }
 
 .title-section {
@@ -531,9 +654,44 @@ onMounted(async () => {
   color: #007bff; /* Blue for score */
 }
 
-.rank-cell {
-  font-weight: 600;
-  color: #dc3545; /* Red for rank */
+.badge {
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.badge-excellent {
+  background-color: #c6f6d5;
+  color: #2f855a;
+  border: 1px solid rgba(47, 133, 90, 0.25);
+}
+
+.badge-good {
+  background-color: #fefcbf;
+  color: #b7791f;
+  border: 1px solid rgba(183, 121, 31, 0.25);
+}
+
+.badge-improve {
+  background-color: #feb2b2;
+  color: #c53030;
+  border: 1px solid rgba(197, 48, 48, 0.25);
+}
+
+.badge-unknown {
+  background-color: #edf2f7;
+  color: #4a5568;
+  border: 1px solid rgba(74, 85, 104, 0.25);
+}
+
+.badge-pending {
+  background-color: #e2e8f0;
+  color: #4a5568;
+  border: 1px dashed rgba(74, 85, 104, 0.35);
 }
 
 .no-data-cell {
@@ -580,9 +738,13 @@ onMounted(async () => {
     padding: 16px;
   }
   
-  .summary-grid {
+  .metric-grid {
     grid-template-columns: 1fr;
-    gap: 16px;
+    gap: 12px;
+  }
+
+  .metric-value {
+    font-size: 22px;
   }
 
   .history-table th,

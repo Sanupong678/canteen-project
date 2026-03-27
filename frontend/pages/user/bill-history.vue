@@ -737,6 +737,10 @@ onMounted(() => {
 
 .page-btn {
   min-width: 2rem;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Dialog */

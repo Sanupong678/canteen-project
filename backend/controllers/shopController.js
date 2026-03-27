@@ -225,7 +225,19 @@ export const updateShop = async (req, res) => {
     if (credentials && typeof credentials === 'object') {
       // ใช้ $set operator สำหรับ nested fields
       Object.keys(credentials).forEach(key => {
-        updateData[`credentials.${key}`] = credentials[key];
+        let value = credentials[key];
+        // Normalize googleEmail: trim, lowercase, validate format
+        if (key === 'googleEmail') {
+          if (typeof value === 'string' && value.trim()) {
+            const email = value.trim().toLowerCase();
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            updateData['credentials.googleEmail'] = emailRegex.test(email) ? email : email;
+          } else {
+            updateData['credentials.googleEmail'] = null;
+          }
+        } else {
+          updateData[`credentials.${key}`] = value;
+        }
       });
       
       // อัพเดท credentials.updatedAt อัตโนมัติ

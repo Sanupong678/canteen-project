@@ -207,6 +207,7 @@ export default {
 .shop-table {
   width: 100%;
   border-collapse: collapse;
+  overflow-x: auto;
 }
 
 .table-header {
@@ -281,8 +282,8 @@ export default {
   color: white;
   transition: opacity 0.2s;
   padding: 6px 10px;
-  height: 32px;
-  min-width: 90px;
+  min-height: 44px;
+  min-width: 44px;
 }
 
 .action-btn span {
@@ -306,9 +307,17 @@ export default {
 }
 
 @media (max-width: 768px) {
+  .empty-state {
+    padding: 16px;
+  }
+
+  .section-title {
+    padding: 12px 16px;
+  }
+
   .table-header,
   .shop-row {
-    grid-template-columns: 40px 2fr 1fr 1.5fr 1fr 1fr 1fr 1fr;
+    grid-template-columns: 48px 2fr 1fr 1.5fr 1fr 1fr 1fr 1fr;
     padding: 8px 12px;
     font-size: 0.9rem;
   }
@@ -319,8 +328,10 @@ export default {
   }
 
   .action-btn {
-    width: 28px;
-    height: 28px;
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    min-width: 44px;
   }
 }
 </style> 

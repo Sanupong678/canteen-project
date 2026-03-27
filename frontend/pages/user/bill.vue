@@ -927,6 +927,10 @@ export default {
   border: none;
   cursor: pointer;
   transition: background-color 0.2s;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .pay-button-active:hover {
@@ -943,6 +947,10 @@ export default {
   border: none;
   cursor: pointer;
   transition: background-color 0.2s;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .pay-button-confirm:hover {
@@ -958,6 +966,10 @@ export default {
   font-weight: 500;
   border: none;
   cursor: not-allowed;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Previous Bill Card */
@@ -1025,7 +1037,7 @@ export default {
 }
 
 .no-bills-icon {
-  font-size: 4rem;
+  font-size: clamp(2.2rem, 8vw, 4rem);
   color: #27ae60;
   margin-bottom: 20px;
 }
@@ -1122,12 +1134,53 @@ export default {
   }
 
   .amount {
-    font-size: 24px;
+    font-size: clamp(1.2rem, 4vw, 1.5rem);
   }
 
   .pay-button {
     width: 100%;
     padding: 14px 24px;
+  }
+}
+
+/* Extra-small mobile: prevent slip upload button text wrapping */
+@media (max-width: 640px) {
+  .waiting-section,
+  .upload-section {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .waiting-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .waiting-title,
+  .waiting-subtitle {
+    font-size: 12px;
+    line-height: 1.4;
+    color: #6b7280;
+    margin: 0;
+  }
+
+  .pay-button-active,
+  .pay-button-confirm,
+  .pay-button-disabled {
+    flex-shrink: 0;
+    width: auto !important;
+    min-width: 80px !important;
+    max-width: 90px;
+    height: 44px;
+    font-size: 12px !important;
+    padding: 8px 10px !important;
+    white-space: nowrap;
+    border-radius: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 </style>

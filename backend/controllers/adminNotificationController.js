@@ -221,11 +221,43 @@ export const getAdminNotifications = async (req, res) => {
     console.log('📋 Query filter:', JSON.stringify(query, null, 2));
     
     // Query ข้อมูลใหม่สุดก่อน (เพราะดึงเฉพาะที่ยังไม่อ่านแล้ว ไม่ต้อง sort ใหม่)
-    const notifications = await Notification.find(query)
+    // และ populate ข้อมูล user / shop เพื่อใช้เติม details ให้ครบ
+    const rawNotifications = await Notification.find(query)
       .sort({ createdAt: -1 }) // ดึงข้อมูลใหม่สุดก่อน
-      .limit(50); // จำกัด 50 รายการ
+      .limit(50) // จำกัด 50 รายการ
+      .populate({ path: 'shopId', select: 'name canteenId' })
+      .populate({ path: 'userId', select: 'username displayName name email' });
     
-    console.log('📋 Total unread notifications found:', notifications.length);
+    console.log('📋 Total unread notifications found:', rawNotifications.length);
+    
+    // เติม details ให้ครบกรณี notification เก่าๆ ที่ยังไม่มีฟิลด์เหล่านี้
+    const notifications = rawNotifications.map((doc) => {
+      const notification = doc.toObject();
+      const details = notification.details || {};
+      
+      // เติมชื่อผู้ใช้ (ผู้ส่ง) ถ้ายังไม่มีใน details
+      if ((!details.userDisplayName && !details.userName) && notification.userId) {
+        details.userDisplayName =
+          notification.userId.displayName ||
+          notification.userId.name ||
+          undefined;
+        details.userName =
+          notification.userId.username ||
+          notification.userId.email ||
+          undefined;
+      }
+      
+      // เติมชื่อร้านค้า / โรงอาหาร ถ้ายังไม่มีใน details
+      if (!details.shopName && notification.shopId?.name) {
+        details.shopName = notification.shopId.name;
+      }
+      if (!details.canteenName && typeof notification.shopId?.canteenId === 'number') {
+        details.canteenName = `โรงอาหาร${getCanteenName(notification.shopId.canteenId)}`;
+      }
+      
+      notification.details = details;
+      return notification;
+    });
     
     console.log('📋 Final unread admin notifications:', notifications.length);
     

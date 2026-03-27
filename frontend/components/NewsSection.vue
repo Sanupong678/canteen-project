@@ -442,7 +442,7 @@ export default {
 .title {
   color: #111827;
   margin: 0;
-  font-size: 28px;
+  font-size: clamp(1.5rem, 5vw, 1.75rem);
   font-weight: 800;
 }
 
@@ -474,6 +474,39 @@ export default {
   }
 }
 
+/* Extra-small mobile (320-640px): scale down cards */
+@media (max-width: 640px) {
+  .news-container {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .news-image-container {
+    border-radius: 8px;
+  }
+
+  .news-text h3 {
+    font-size: clamp(13px, 3.5vw, 15px);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .news-text p {
+    font-size: 13px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .news-meta {
+    font-size: 12px;
+    color: #6b7280;
+  }
+}
+
 .view-all-wrapper {
   margin-top: 16px;
   display: flex;
@@ -487,6 +520,10 @@ export default {
   padding: 10px 16px;
   border-radius: 999px;
   cursor: pointer;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .news-item {
@@ -526,7 +563,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 3rem;
+  font-size: clamp(1.8rem, 9vw, 3rem);
   color: #ccc;
   background: #f5f5f5;
 }
@@ -571,8 +608,8 @@ export default {
   position: absolute;
   top: 10px;
   right: 10px;
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
   background-color: rgba(220, 53, 69, 0.9);
   border-radius: 50%;
   display: flex;
@@ -680,6 +717,10 @@ export default {
   cursor: pointer;
   font-size: 16px;
   transition: all 0.3s;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .confirm-btn {
@@ -763,8 +804,8 @@ export default {
   position: absolute;
   top: -40px;
   right: -40px;
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
   background-color: rgba(255, 255, 255, 0.9);
   border-radius: 50%;
   display: flex;
@@ -811,8 +852,17 @@ export default {
 .cropper-title { margin: 0; font-weight: 800; font-size: 18px; color: #111827; }
 .cropper-body { max-height: 70vh; overflow: hidden; }
 .cropper-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
-.btn { padding: 8px 14px; border-radius: 8px; border: none; cursor: pointer; }
+.btn { padding: 8px 14px; border-radius: 8px; border: none; cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
 .btn-secondary { background: #e5e7eb; color: #111827; }
 .btn-primary { background: #e74c3c; color: #fff; }
 .cropper-img { max-width: 100%; display: block; }
+
+@media (max-width: 768px) {
+  .add-news-form { padding: 16px; }
+  .form-group { margin-bottom: 16px; }
+  .modal-content { padding: 16px; }
+  .modal-buttons { margin-top: 16px; gap: 8px; }
+  .delete-btn { top: 8px; right: 8px; }
+  .close-preview-btn { top: -36px; right: -36px; }
+}
 </style> 

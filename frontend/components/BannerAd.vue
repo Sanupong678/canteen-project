@@ -328,7 +328,8 @@ export default {
 
 .banner-display {
   width: 100%;
-  height: 420px;
+  height: auto;
+  aspect-ratio: 21 / 9;
   border: none;
   border-radius: 0;
   overflow: hidden;
@@ -366,6 +367,7 @@ export default {
   z-index: 2;
   transition: all 0.2s ease;
   border: none;
+  min-height: 44px;
 }
 
 .delete-btn:hover {
@@ -394,6 +396,7 @@ export default {
   justify-content: center;
   gap: 6px;
   cursor: pointer;
+  min-height: 44px;
 }
 
 /* Indicators */
@@ -429,13 +432,19 @@ export default {
 
 @media (min-width: 1280px) {
   .banner-display {
-    height: 480px;
+    aspect-ratio: 21 / 8;
   }
 }
 
 @media (min-width: 1536px) {
   .banner-display {
-    height: 560px;
+    aspect-ratio: 21 / 7;
+  }
+}
+
+@media (max-width: 768px) {
+  .add-btn {
+    right: 70px;
   }
 }
 

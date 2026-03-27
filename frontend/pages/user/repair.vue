@@ -601,10 +601,10 @@ const categoryOptions = [
 ]
 
 const statusOptions = [
-  { text: 'รอดำเนินการ', value: 'pending' },
-  { text: 'กำลังดำเนินการ', value: 'in_progress' },
-  { text: 'เสร็จสิ้น', value: 'completed' },
-  { text: 'ยกเลิก', value: 'cancelled' }
+  { title: 'รอดำเนินการ', value: 'pending' },
+  { title: 'กำลังดำเนินการ', value: 'in_progress' },
+  { title: 'เสร็จสิ้น', value: 'completed' },
+  { title: 'ยกเลิก', value: 'cancelled' }
 ]
 
 // Rules
@@ -971,7 +971,7 @@ onMounted(async () => {
 }
 
 .page-title {
-  font-size: 24px;
+  font-size: clamp(1.2rem, 3.2vw, 1.5rem);
   font-weight: 600;
   color: #1a1a1a;
   margin-bottom: 4px;
@@ -1097,8 +1097,9 @@ onMounted(async () => {
 }
 
 .page-btn {
-  min-width: 32px;
-  height: 32px;
+  min-width: 44px;
+  height: 44px;
+  line-height: 1;
 }
 
 /* Dialog Styles */

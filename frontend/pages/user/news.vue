@@ -298,7 +298,7 @@ const filterByYearMonth = (y, m) => {
 
 .header h1 {
   margin: 0 0 10px 0;
-  font-size: 2.5rem;
+  font-size: clamp(1.6rem, 4vw, 2.5rem);
   font-weight: 700;
 }
 
@@ -310,7 +310,15 @@ const filterByYearMonth = (y, m) => {
 
 /* Section header like reference style */
 .section-header { display: block; margin: 0 0 16px 0; }
-.section-title { font-size: 28px; font-weight: 800; color: #111827; margin: 0; line-height: 1; padding-bottom: 6px; border-bottom: 6px solid #dc2626; }
+.section-title {
+  font-size: clamp(1.25rem, 3.2vw, 1.75rem);
+  font-weight: 800;
+  color: #111827;
+  margin: 0;
+  line-height: 1;
+  padding-bottom: 6px;
+  border-bottom: 6px solid #dc2626;
+}
 
 .loading {
   text-align: center;
@@ -339,7 +347,7 @@ const filterByYearMonth = (y, m) => {
 }
 
 .no-news-icon {
-  font-size: 4rem;
+  font-size: clamp(2.2rem, 8vw, 4rem);
   display: block;
   margin-bottom: 20px;
 }
@@ -413,7 +421,7 @@ const filterByYearMonth = (y, m) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
+  font-size: clamp(1.2rem, 4vw, 2rem);
   color: #ccc;
 }
 
@@ -429,6 +437,9 @@ const filterByYearMonth = (y, m) => {
 .sdg-badge { background: #eef2ff; color: #3730a3; border: 1px solid #e0e7ff; padding: 2px 6px; border-radius: 6px; font-weight: 600; }
 
 .card-title { margin: 0; color: #0f172a; font-size: 1.05rem; font-weight: 700; line-height: 1.4; }
+.card-title {
+  font-size: clamp(0.98rem, 2.6vw, 1.05rem);
+}
 .card-excerpt { margin: 0; color: #475569; line-height: 1.6; font-size: 0.95rem; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .card-meta { display: flex; gap: 12px; flex-wrap: wrap; color: #64748b; font-size: 0.85rem; margin-top: 4px; }
 .meta-item { display: inline-flex; align-items: center; gap: 4px; }
@@ -458,6 +469,12 @@ const filterByYearMonth = (y, m) => {
   border: 1px solid #e5e7eb;
   border-radius: 6px;
   cursor: pointer;
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .page-btn:disabled {
@@ -466,12 +483,17 @@ const filterByYearMonth = (y, m) => {
 }
 
 .page-num {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
   border: 1px solid #e5e7eb;
   border-radius: 6px;
   background: #fff;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
 
 .page-num.active {

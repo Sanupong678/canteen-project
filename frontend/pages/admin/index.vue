@@ -4,7 +4,7 @@
       <div class="full-bleed-banner">
         <BannerAd :read-only="false" />
       </div>
-      <NewsSection />
+      <NewsSection :read-only="true" :show-all-link="true" all-link-path="/admin/news" />
     </div>
   </LayoutAdmin>
 </template>

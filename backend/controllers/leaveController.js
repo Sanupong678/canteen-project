@@ -20,7 +20,7 @@ export const getLeaves = async (req, res) => {
     // Query shops และ users ทั้งหมดในครั้งเดียว (batch query)
     const [shops, users] = await Promise.all([
       Shop.find({ _id: { $in: shopIds } })
-        .select('name canteenId') // เลือกเฉพาะ fields ที่จำเป็น
+        .select('name canteenId customId') // เลือกเฉพาะ fields ที่จำเป็น (รวม customId เพื่อส่ง shopCode)
         .lean(),
       User.find({ _id: { $in: userIds } })
         .select('name department position') // เลือกเฉพาะ fields ที่จำเป็น
@@ -45,6 +45,7 @@ export const getLeaves = async (req, res) => {
       return {
         ...leave,
         shopName: shop ? shop.name : 'ไม่ระบุร้านค้า',
+        shopCode: shop ? shop.customId : 'ไม่ระบุรหัส',
         canteen: shop ? `โรงอาหาร${getCanteenName(shop.canteenId)}` : 'ไม่ระบุโรงอาหาร',
         userName: user ? user.name : 'ไม่ระบุชื่อผู้ใช้',
         department: user ? user.department : 'ไม่ระบุแผนก',
@@ -92,6 +93,7 @@ export const getUserLeaves = async (req, res) => {
       return {
         ...leave.toObject(),
         shopName: shop ? shop.name : 'ไม่ระบุร้านค้า',
+        shopCode: shop ? shop.customId : 'ไม่ระบุรหัส',
         canteen: shop ? `โรงอาหาร${getCanteenName(shop.canteenId)}` : 'ไม่ระบุโรงอาหาร'
       };
     }));
@@ -137,6 +139,7 @@ export const createLeave = async (req, res) => {
     const leaveWithDetails = {
       ...savedLeave.toObject(),
       shopName: shop ? shop.name : 'ไม่ระบุร้านค้า',
+      shopCode: shop ? shop.customId : 'ไม่ระบุรหัส',
       canteen: shop ? `โรงอาหาร${getCanteenName(shop.canteenId)}` : 'ไม่ระบุโรงอาหาร'
     };
 
@@ -207,6 +210,7 @@ export const updateLeaveStatus = async (req, res) => {
     const leaveWithDetails = {
       ...leave.toObject(),
       shopName: shop ? shop.name : 'ไม่ระบุร้านค้า',
+      shopCode: shop ? shop.customId : 'ไม่ระบุรหัส',
       canteen: shop ? `โรงอาหาร${getCanteenName(shop.canteenId)}` : 'ไม่ระบุโรงอาหาร'
     };
     

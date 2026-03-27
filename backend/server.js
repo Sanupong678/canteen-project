@@ -35,6 +35,7 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
   import welcomeRoutes from './routes/welcomeRoutes.js';
   import evaluationTopicRoutes from './routes/evaluationTopicRoutes.js';
   import connectDB from './config/database.js';
+  import { sanitizeInputs, auditLoggingMiddleware } from './middleware/securityMiddleware.js';
   const app = express();
   const isProduction = process.env.NODE_ENV === 'production';
 
@@ -45,8 +46,31 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
   // Trust proxy for rate limiting
   app.set('trust proxy', 1);
 
-  // Security middleware
-  app.use(helmet());
+  // 🛡️ Enhanced Security Headers with Helmet
+  // Include CSP (Content Security Policy), HSTS, and other security headers
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"], // ⚠️ Consider removing unsafe-inline in production
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        fontSrc: ["'self'"],
+        connectSrc: ["'self'", 'http://localhost:*', 'ws://localhost:*'],
+        frameSrc: ["'none'"],
+        objectSrc: ["'none'"],
+        upgradeInsecureRequests: [] // Only in production
+      }
+    },
+    hsts: {
+      maxAge: 31536000, // 1 year
+      includeSubDomains: true,
+      preload: true
+    },
+    noSniff: true,
+    xssFilter: true,
+    referrerPolicy: { policy: 'no-referrer' }
+  }));
   app.use(compression());
 
   // Logging middleware (early for debugging)
@@ -77,9 +101,14 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
   // Cookie parser middleware
   app.use(cookieParser());
 
-  // Body parser middleware
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  // 🛡️ Body parser middleware with reduced limits to prevent DoS attacks
+  // BEFORE: 10mb - Now: 1mb (prevents large payload attacks)
+  app.use(express.json({ limit: '1mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+  // 🛡️ Input Sanitization Middleware - Prevents XSS Attacks
+  // Sanitizes all user inputs from body, query, and params
+  app.use(sanitizeInputs);
 
   // Ensure CORS headers are always present (redundant but safe)
   app.use((req, res, next) => {
@@ -97,8 +126,28 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
     next();
   });
 
-  // Static files with CORS for uploads
-  app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+ // Static files with CORS and CORP/COEP overrides for uploads
+ // NOTE:
+ // - helmet() above sets strict defaults like Cross-Origin-Resource-Policy: same-origin
+ // - For image assets that are loaded from a different origin, we need to relax this
+ // - This middleware overrides those headers specifically for /uploads/*
+ app.use(
+   '/uploads',
+   (req, res, next) => {
+     // Allow your frontend origin to load these resources
+     res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
+     res.setHeader('Access-Control-Allow-Credentials', 'true');
+ 
+     // Relax cross-origin resource policy so images can be embedded
+     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+ 
+     // Make sure embedder policy doesn't block these resources
+     res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+ 
+     next();
+   },
+   express.static(path.join(__dirname, 'uploads'))
+ );
 
   // Health check endpoint
   app.get('/health', (req, res) => {
@@ -151,6 +200,10 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
       res.status(500).json({ error: error.message });
     }
   });
+
+  // 🛡️ Audit Logging Middleware - Track Admin Actions
+  // Must be applied AFTER routes are defined but logs are applied to all API routes
+  app.use('/api', auditLoggingMiddleware);
 
   // Routes (placed BEFORE additional CORS middleware for /api)
   app.use('/api/users', userRoutes);

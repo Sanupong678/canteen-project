@@ -7,6 +7,7 @@ import mongoose from 'mongoose';
 import { createRepairNotification } from './notificationController.js';
 import { createAdminRepairNotification } from './adminNotificationController.js';
 import { emitToShop, emitToAdmin } from '../socket.js';
+import { validateFilePath, safePathJoin, logAuditEvent } from '../middleware/securityMiddleware.js';
 
 // สร้างโฟลเดอร์ uploads/repairs ถ้ายังไม่มี
 const uploadDir = path.join(process.cwd(), 'uploads', 'repairs');
@@ -291,8 +292,20 @@ export const updateRepair = async (req, res) => {
   const { category, issue } = req.body;
   const userId = req.user.userId;
   const shopId = req.user.shopId;
+  const userRole = req.user.role;
 
   try {
+    // 🔴 SECURITY: Validate ID format to prevent NoSQL injection
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      logAuditEvent({
+        action: 'INVALID_REPAIR_ID',
+        userId,
+        repairId: id,
+        attemptedAction: 'updateRepair'
+      });
+      return res.status(400).json({ success: false, message: 'Invalid repair ID format' });
+    }
+
     const repair = await Repair.findById(id);
     if (!repair) {
       return res.status(404).json({ 
@@ -301,8 +314,20 @@ export const updateRepair = async (req, res) => {
       });
     }
 
-    // ตรวจสอบว่าเป็นเจ้าของ repair หรือไม่
-    if (repair.userId.toString() !== userId.toString() || repair.shopId.toString() !== shopId.toString()) {
+    // 🔴 SECURITY: IDOR Protection - Enhanced authorization check
+    const isOwner = repair.userId?.toString() === userId.toString();
+    const isShopMatch = repair.shopId?.toString() === shopId.toString();
+    const isAdmin = userRole === 'admin';
+
+    if (!isAdmin && (!isOwner || !isShopMatch)) {
+      logAuditEvent({
+        action: 'IDOR_ATTEMPT_UPDATE',
+        userId,
+        repairId: id,
+        actualOwner: repair.userId,
+        attemptedAction: 'updateRepair',
+        reason: `isOwner: ${isOwner}, isShopMatch: ${isShopMatch}`
+      });
       return res.status(403).json({ 
         success: false,
         message: 'คุณไม่มีสิทธิ์แก้ไขรายการนี้' 
@@ -317,7 +342,7 @@ export const updateRepair = async (req, res) => {
       });
     }
 
-    // อัปเดตข้อมูลหมวดหมู่และรายละเอียดปัญหา
+    // 🔴 SECURITY: Validate and sanitize input (category and issue already sanitized by middleware)
     if (category) {
       repair.category = category;
     }
@@ -356,6 +381,14 @@ export const updateRepair = async (req, res) => {
       updatedRepair._id = updatedRepair._id.toString();
     }
 
+    // 🟢 SECURITY: Log successful update
+    logAuditEvent({
+      action: 'REPAIR_UPDATE',
+      userId,
+      repairId: id,
+      fieldsUpdated: Object.keys({ category, issue }).filter(k => arguments[1][k])
+    });
+
     res.json({ 
       success: true,
       message: 'อัปเดตรายการแจ้งซ่อมเรียบร้อยแล้ว',
@@ -363,45 +396,105 @@ export const updateRepair = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error updating repair:', error);
+    logAuditEvent({
+      action: 'REPAIR_UPDATE_ERROR',
+      userId,
+      repairId: id,
+      error: error.message
+    });
     res.status(500).json({ 
       success: false,
       message: error.message 
     });
   }
 };
+  
+
 
 // Delete repair
 export const deleteRepair = async (req, res) => {
   const { id } = req.params;
   const userId = req.user.userId;
   const shopId = req.user.shopId;
+  const userRole = req.user.role;
 
   try {
-    const repair = await Repair.findById(id);
-    if (!repair) {
-      return res.status(404).json({ message: 'ไม่พบรายการแจ้งซ่อมนี้' });
+    // 🔴 SECURITY: Validate ID format to prevent NoSQL injection
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      logAuditEvent({
+        action: 'INVALID_REPAIR_ID',
+        userId,
+        repairId: id,
+        attemptedAction: 'deleteRepair'
+      });
+      return res.status(400).json({ success: false, message: 'Invalid repair ID format' });
     }
 
-    // ตรวจสอบว่าเป็นเจ้าของ repair หรือไม่
-    if (repair.userId.toString() !== userId.toString() || repair.shopId.toString() !== shopId.toString()) {
-      return res.status(403).json({ message: 'คุณไม่มีสิทธิ์ลบรายการนี้' });
+    const repair = await Repair.findById(id);
+    if (!repair) {
+      return res.status(404).json({ success: false, message: 'ไม่พบรายการแจ้งซ่อมนี้' });
+    }
+
+    // 🔴 SECURITY: IDOR Protection - Enhanced authorization check
+    const isOwner = repair.userId?.toString() === userId.toString();
+    const isShopMatch = repair.shopId?.toString() === shopId.toString();
+    const isAdmin = userRole === 'admin';
+
+    if (!isAdmin && (!isOwner || !isShopMatch)) {
+      logAuditEvent({
+        action: 'IDOR_ATTEMPT_DELETE',
+        userId,
+        repairId: id,
+        actualOwner: repair.userId,
+        attemptedAction: 'deleteRepair',
+        reason: `isOwner: ${isOwner}, isShopMatch: ${isShopMatch}`
+      });
+      return res.status(403).json({ success: false, message: 'คุณไม่มีสิทธิ์ลบรายการนี้' });
     }
 
     // ตรวจสอบว่าสถานะเป็น pending หรือไม่ (ลบได้เฉพาะรายการที่ยังรอดำเนินการ)
     if (repair.status !== 'pending' && repair.status !== 'รอดำเนินการ') {
       return res.status(400).json({ 
+        success: false,
         message: 'ไม่สามารถลบรายการที่กำลังดำเนินการหรือเสร็จสิ้นแล้ว' 
       });
     }
 
+    // 🟡 SECURITY: Optional - Delete associated files from filesystem
+    // const imagePaths = repair.imagePaths || [];
+    // imagePaths.forEach(imagePath => {
+    //   if (fs.existsSync(imagePath)) {
+    //     try {
+    //       fs.unlinkSync(imagePath);
+    //     } catch (err) {
+    //       console.error('Error deleting file:', imagePath, err);
+    //     }
+    //   }
+    // });
+
     await Repair.findByIdAndDelete(id);
+
+    // 🟢 SECURITY: Log successful deletion
+    logAuditEvent({
+      action: 'REPAIR_DELETE',
+      userId,
+      repairId: id,
+      status: repair.status
+    });
+
     res.json({ 
       success: true,
       message: 'ลบรายการแจ้งซ่อมเรียบร้อยแล้ว' 
     });
   } catch (error) {
     console.error('❌ Error deleting repair:', error);
-    res.status(500).json({ message: error.message });
+    logAuditEvent({
+      action: 'REPAIR_DELETE_ERROR',
+      userId,
+      repairId: id,
+      error: error.message
+    });
+    res.status(500).json({ success: false, message: error.message });
   }
 }; 
 
@@ -409,50 +502,148 @@ export const deleteRepair = async (req, res) => {
 export const getRepairImage = async (req, res) => {
   try {
     const { repairId, imageIndex } = req.params;
-    
-    const repair = await Repair.findById(repairId);
-    if (!repair) {
-      return res.status(404).send('Repair not found');
+    const userId = req.user?.userId;
+
+    // 🔴 SECURITY: Validate repairId is a valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(repairId)) {
+      logAuditEvent({
+        action: 'INVALID_REPAIR_ID',
+        userId,
+        repairId,
+        attemptedAccess: 'getRepairImage'
+      });
+      return res.status(400).json({ error: 'Invalid repair ID format' });
     }
 
-    // ไม่ต้องตรวจสอบสิทธิ์เพื่อให้เข้าถึงได้ง่าย
-    // (ในอนาคตอาจเพิ่มการตรวจสอบเพิ่มเติม)
+    // 🔴 SECURITY: Validate imageIndex is a valid number
+    const imageIndexNum = parseInt(imageIndex, 10);
+    if (isNaN(imageIndexNum) || imageIndexNum < 0) {
+      logAuditEvent({
+        action: 'INVALID_IMAGE_INDEX',
+        userId,
+        repairId,
+        imageIndex
+      });
+      return res.status(400).json({ error: 'Invalid image index' });
+    }
+
+    // Find repair and verify ownership
+    const repair = await Repair.findById(repairId);
+    if (!repair) {
+      logAuditEvent({
+        action: 'REPAIR_NOT_FOUND',
+        userId,
+        repairId
+      });
+      return res.status(404).json({ error: 'Repair not found' });
+    }
+
+    // 🔴 SECURITY: If a user is authenticated, enforce IDOR checks.
+    // If no authentication provided (public image access), allow serving the image.
+    const userRole = req.user?.role;
+    const isOwner = repair.userId?.toString() === userId;
+    const isAdmin = userRole === 'admin';
+
+    if (req.user) {
+      if (!isOwner && !isAdmin) {
+        logAuditEvent({
+          action: 'IDOR_ATTEMPT',
+          userId,
+          repairId,
+          actualOwner: repair.userId,
+          attemptedAccess: 'getRepairImage'
+        });
+        return res.status(403).json({ error: 'Unauthorized access to this repair' });
+      }
+    } else {
+      // No auth: allow public access but record the event for auditing
+      logAuditEvent({
+        action: 'PUBLIC_IMAGE_ACCESS',
+        userId: null,
+        repairId,
+        imageIndex: imageIndexNum
+      });
+    }
 
     const imagePaths = repair.imagePaths || [];
-    const imageIndexNum = parseInt(imageIndex);
-    
-    if (imageIndexNum < 0 || imageIndexNum >= imagePaths.length) {
-      return res.status(404).send('Image not found');
+    if (imageIndexNum >= imagePaths.length) {
+      return res.status(404).json({ error: 'Image not found' });
     }
 
     const imagePath = imagePaths[imageIndexNum];
-    
-    if (!fs.existsSync(imagePath)) {
-      console.log('Image file not found:', imagePath);
-      return res.status(404).send('Image file not found');
+
+    // 🔴 SECURITY: Path Traversal Protection
+    // Validate filename to prevent directory traversal attacks
+    const filename = path.basename(imagePath);
+    const validation = validateFilePath(filename);
+
+    if (!validation.valid) {
+      logAuditEvent({
+        action: 'PATH_TRAVERSAL_ATTEMPT',
+        userId,
+        repairId,
+        imagePath,
+        reason: validation.reason
+      });
+      return res.status(400).json({ error: 'Invalid file path' });
     }
 
-    // ส่งรูปภาพแบบปลอดภัยด้วยการดักจับ error ของ stream
+    // 🔴 SECURITY: Ensure file exists and is readable
+    if (!fs.existsSync(imagePath)) {
+      console.log('❌ Image file not found:', imagePath);
+      return res.status(404).json({ error: 'Image file not found' });
+    }
+
+    // 🔴 SECURITY: Set cache headers
+    res.set('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+
+    // Determine content type based on file extension
     const ext = path.extname(imagePath).toLowerCase();
-    let contentType = 'image/jpeg';
-    if (ext === '.png') contentType = 'image/png';
-    else if (ext === '.gif') contentType = 'image/gif';
-    else if (ext === '.webp') contentType = 'image/webp';
+    const contentTypeMap = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp'
+    };
+
+    const contentType = contentTypeMap[ext] || 'image/jpeg';
     res.set('Content-Type', contentType);
 
+    // Stream the file safely
     const stream = fs.createReadStream(imagePath);
+
     stream.on('error', (err) => {
       console.error('❌ Stream error while sending repair image:', err);
+      logAuditEvent({
+        action: 'STREAM_ERROR',
+        userId,
+        repairId,
+        error: err.message
+      });
       if (!res.headersSent) {
-        res.status(500).send('Error streaming image');
+        res.status(500).json({ error: 'Error streaming image' });
       } else {
-        try { res.end(); } catch (_) {}
+        res.end();
       }
     });
+
+    // 🟢 SECURITY: Log successful image access for audit trail
+    logAuditEvent({
+      action: 'IMAGE_ACCESS',
+      userId,
+      repairId,
+      imageIndex
+    });
+
     stream.pipe(res);
-    
   } catch (error) {
-    console.error('Error getting repair image:', error);
-    res.status(500).send('Error loading image');
+    console.error('❌ Error getting repair image:', error);
+    logAuditEvent({
+      action: 'GET_IMAGE_ERROR',
+      userId: req.user?.userId,
+      error: error.message
+    });
+    res.status(500).json({ error: 'Error loading image' });
   }
 }; 

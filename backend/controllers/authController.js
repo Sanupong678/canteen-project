@@ -3,6 +3,7 @@ import Shop from '../models/shopModel.js';
 import { generateToken } from '../middleware/authMiddleware.js';
 import bcrypt from 'bcryptjs';
 import Session from '../models/sessionModel.js';
+import { OAuth2Client } from 'google-auth-library';
 
 // Helper function to hash password
 const hashPassword = async (password) => {
@@ -86,6 +87,146 @@ export const updateShopPassword = async (req, res) => {
       success: false,
       message: 'Error updating shop password'
     });
+  }
+};
+
+/**
+ * Authorization Code Flow - Step 1: Redirect user ไป Google
+ * User กด Login with Google → Backend redirect ไป Google
+ */
+export const googleAuthRedirect = (req, res) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+
+  if (!clientId || !redirectUri) {
+    console.error('GOOGLE_CLIENT_ID or GOOGLE_REDIRECT_URI is not set');
+    return res.status(500).json({
+      success: false,
+      message: 'ระบบยังไม่ได้ตั้งค่า Google Login กรุณาติดต่อผู้ดูแลระบบ'
+    });
+  }
+
+  const scopes = ['openid', 'email', 'profile'];
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+    `client_id=${encodeURIComponent(clientId)}` +
+    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+    `&response_type=code` +
+    `&scope=${encodeURIComponent(scopes.join(' '))}` +
+    `&access_type=offline` +
+    `&prompt=consent`;
+
+  res.redirect(authUrl);
+};
+
+/**
+ * Authorization Code Flow - Step 2: Google redirect กลับมาพร้อม code
+ * Backend ใช้ code + Client ID + Client Secret แลก access_token และ id_token
+ */
+export const googleAuthCallback = async (req, res) => {
+  const { code } = req.query;
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+  if (!code) {
+    return res.redirect(`${frontendUrl}/login?error=missing_code`);
+  }
+
+  if (!clientId || !clientSecret || !redirectUri) {
+    console.error('GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET or GOOGLE_REDIRECT_URI is not set');
+    return res.redirect(`${frontendUrl}/login?error=config_missing`);
+  }
+
+  try {
+    const client = new OAuth2Client(clientId, clientSecret, redirectUri);
+    const { tokens } = await client.getToken(code);
+    const idToken = tokens.id_token;
+
+    if (!idToken) {
+      return res.redirect(`${frontendUrl}/login?error=no_id_token`);
+    }
+
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: clientId
+    });
+    const payload = ticket.getPayload();
+    const email = (payload.email || '').trim().toLowerCase();
+
+    if (!email) {
+      return res.redirect(`${frontendUrl}/login?error=no_email`);
+    }
+
+    const shop = await Shop.findOne({
+      'credentials.googleEmail': { $regex: new RegExp(`^${email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+    });
+
+    if (!shop) {
+      return res.redirect(`${frontendUrl}/login?error=shop_not_found&email=${encodeURIComponent(email)}`);
+    }
+
+    const token = generateToken({
+      username: shop.credentials.username,
+      role: 'user',
+      shopId: shop._id,
+      userId: shop.userId,
+      displayName: shop.name,
+      email
+    });
+
+    const session = new Session({
+      userId: shop.userId,
+      shopId: shop._id,
+      token,
+      deviceInfo: {
+        userAgent: req.headers['user-agent'],
+        ipAddress: req.ip
+      },
+      status: 'active',
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+    });
+    await session.save();
+
+    const loginRecord = new Login({
+      username: shop.credentials.username,
+      role: 'user',
+      userId: shop.userId,
+      displayName: shop.name,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      token,
+      deviceInfo: { userAgent: req.headers['user-agent'] },
+      status: 'active'
+    });
+    await loginRecord.save();
+
+    const userData = {
+      id: shop._id,
+      name: shop.name,
+      username: shop.credentials.username,
+      type: shop.type,
+      description: shop.description,
+      location: shop.location,
+      contractStartDate: shop.contractStartDate,
+      contractEndDate: shop.contractEndDate,
+      canteenId: shop.canteenId,
+      customId: shop.customId
+    };
+
+    const params = new URLSearchParams({
+      google_success: '1',
+      token,
+      role: 'user',
+      displayName: shop.name,
+      userData: JSON.stringify(userData)
+    });
+
+    res.redirect(`${frontendUrl}/login?${params.toString()}`);
+  } catch (error) {
+    console.error('Google auth callback error:', error);
+    const message = error.message || 'auth_failed';
+    return res.redirect(`${frontendUrl}/login?error=${encodeURIComponent(message)}`);
   }
 };
 

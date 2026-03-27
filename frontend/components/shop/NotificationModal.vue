@@ -193,7 +193,7 @@ export default {
 }
 
 .modal-header h3 {
-  font-size: 1.4rem;
+  font-size: clamp(1.1rem, 4.5vw, 1.25rem);
   color: #2c3e50;
   margin: 0;
   font-weight: 600;
@@ -266,6 +266,11 @@ export default {
   transition: all 0.2s ease;
   font-size: 0.95rem;
   min-width: 120px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .cancel-btn:hover {
@@ -287,6 +292,8 @@ export default {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  min-height: 44px;
+  line-height: 1;
 }
 
 .send-btn:hover:not(:disabled) {
@@ -305,10 +312,11 @@ export default {
   background: none;
   border: none;
   color: #666;
-  font-size: 24px;
+  font-size: clamp(1.05rem, 6vw, 1.5rem);
   cursor: pointer;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -325,6 +333,7 @@ export default {
 @media (max-width: 768px) {
   .modal-content {
     margin: 1rem;
+    padding: 16px;
     max-height: calc(100vh - 2rem);
   }
 
@@ -333,8 +342,16 @@ export default {
     height: auto;
   }
 
+  .modal-header {
+    padding: 16px;
+  }
+
   .notification-form {
     padding: 1rem;
+  }
+
+  .form-group {
+    margin-bottom: 1rem;
   }
 
   .form-actions {

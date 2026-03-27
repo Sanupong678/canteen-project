@@ -359,8 +359,10 @@ export default {
           contractStartDate: new Date(shopData.contractStartDate).toISOString(),
           contractEndDate: new Date(shopData.contractEndDate).toISOString(),
           image: shopData.imagePreview || (this.shopToEdit ? this.shopToEdit.image : ''),
-          // ใช้ credentials เดิมเมื่อแก้ไขร้านค้า
-          credentials: this.shopToEdit ? this.shopToEdit.credentials : shopData.credentials
+          // เมื่อแก้ไข: รวม credentials เดิมกับ googleEmail จากฟอร์ม
+          credentials: this.shopToEdit
+            ? { ...this.shopToEdit.credentials, ...(shopData.credentials?.googleEmail ? { googleEmail: shopData.credentials.googleEmail } : {}) }
+            : shopData.credentials
         }
         console.log('Formatted data:', formattedData)
 
@@ -537,7 +539,7 @@ export default {
 
 h1 {
   color: #333;
-  font-size: 28px;
+  font-size: clamp(1.5rem, 6vw, 1.75rem);
 }
 
 .header-actions {
@@ -572,7 +574,7 @@ h1 {
 
 h2 {
   color: #444;
-  font-size: 20px;
+  font-size: clamp(1.1rem, 4vw, 1.25rem);
 }
 
 .search-container {
@@ -617,7 +619,8 @@ h2 {
   font-size: 14px;
   min-width: 120px;
   background-color: white;
-  height: 38px;
+  min-height: 44px;
+  height: auto;
 }
 
 .add-btn {
@@ -630,7 +633,8 @@ h2 {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 38px;
+  min-height: 44px;
+  height: auto;
   white-space: nowrap;
 }
 
@@ -701,7 +705,8 @@ h2 {
   background: white;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   margin-top: 20px;
 }
 
@@ -794,6 +799,7 @@ h2 {
   gap: 6px;
   width: 120px;
   margin: 0 auto;
+  min-height: 44px;
 }
 
 .action-btn span {
@@ -822,6 +828,14 @@ h2 {
 }
 
 @media (max-width: 768px) {
+  .canteen-detail {
+    padding: 16px;
+  }
+
+  .shop-management {
+    padding: 16px;
+  }
+
   .shop-header {
     flex-direction: column;
     gap: 15px;
@@ -846,7 +860,7 @@ h2 {
 
   .table-header,
   .shop-row {
-    grid-template-columns: 40px 2fr 1fr 1.5fr 1fr 1fr 1fr;
+    grid-template-columns: 48px 2fr 1fr 1.5fr 1fr 1fr 1fr;
     padding: 8px 12px;
     font-size: 0.9rem;
   }
@@ -857,8 +871,9 @@ h2 {
   }
 
   .action-btn {
-    width: 28px;
-    height: 28px;
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
   }
 }
 
@@ -896,21 +911,25 @@ h2 {
 
 .modal-header h3 {
   margin: 0;
-  font-size: 20px;
+  font-size: clamp(1.1rem, 4.5vw, 1.25rem);
   color: #333;
 }
 
 .close-btn {
   background: none;
   border: none;
-  font-size: 20px;
+  font-size: clamp(1.05rem, 5vw, 1.25rem);
   color: #666;
   cursor: pointer;
-  padding: 5px;
+  padding: 0;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: color 0.2s;
+  line-height: 1;
 }
 
 .close-btn:hover {
@@ -921,6 +940,10 @@ h2 {
   .modal-content {
     width: 95%;
     margin: 10px;
+  }
+
+  .modal-header {
+    padding: 16px;
   }
 }
 </style>

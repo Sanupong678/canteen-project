@@ -145,6 +145,18 @@
                 </div>
               </div>
 
+              <div v-if="isEditMode" class="form-group">
+                <label for="editGoogleEmail">อีเมล Gmail (สำหรับ Login ด้วย Google)</label>
+                <input
+                  type="email"
+                  id="editGoogleEmail"
+                  v-model="shop.credentials.googleEmail"
+                  class="form-input"
+                  placeholder="เช่น shopowner@gmail.com"
+                >
+                <p class="field-hint">อีเมลนี้ต้องตรงกับบัญชี Gmail ที่เจ้าของร้านจะใช้เข้าสู่ระบบด้วยปุ่ม "Login with Google"</p>
+              </div>
+
               <div class="form-actions">
                 <button type="button" @click="$emit('close')" class="cancel-button">
                   ยกเลิก
@@ -163,6 +175,20 @@
               <div class="login-section">
                 <label>ข้อมูลการเข้าสู่ระบบ <span class="required">*</span></label>
                 <div class="login-credentials">
+                  <div class="credential-group">
+                    <label for="googleEmail">อีเมล Gmail (สำหรับ Login ด้วย Google)</label>
+                    <input
+                      type="email"
+                      id="googleEmail"
+                      v-model="shop.credentials.googleEmail"
+                      class="form-input"
+                      placeholder="เช่น shopowner@gmail.com"
+                    >
+                    <p class="field-hint">อีเมลนี้ต้องตรงกับบัญชี Gmail ที่เจ้าของร้านจะใช้เข้าสู่ระบบด้วยปุ่ม "Login with Google"</p>
+                    <div v-if="shop.credentials.googleEmail && !isValidEmail(shop.credentials.googleEmail)" class="error-message">
+                      กรุณากรอกอีเมลที่ถูกต้อง
+                    </div>
+                  </div>
                   <div class="credential-group">
                     <label for="username">ชื่อผู้ใช้</label>
                     <input
@@ -258,11 +284,18 @@ const shop = ref({
   contractEndDate: '',
   credentials: {
     username: '',
-    password: ''
+    password: '',
+    googleEmail: ''
   },
   confirmPassword: '',
   canteenId: props.canteenId
 })
+
+const isValidEmail = (email) => {
+  if (!email || typeof email !== 'string') return true
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return re.test(email.trim())
+}
 
 const updateInterval = ref(null)
 
@@ -298,8 +331,9 @@ onMounted(() => {
       ...props.shopToEdit,
       imagePreview: props.shopToEdit.image,
       credentials: {
-        username: '',
-        password: ''
+        username: props.shopToEdit.credentials?.username || '',
+        password: '',
+        googleEmail: props.shopToEdit.credentials?.googleEmail || ''
       },
       confirmPassword: '',
       canteenId: props.shopToEdit.canteenId || props.canteenId
@@ -367,6 +401,10 @@ const handleSubmit = () => {
       alert('กรุณากรอกข้อมูลการเข้าสู่ระบบให้ครบถ้วน')
       return
     }
+    if (shop.value.credentials.googleEmail && !isValidEmail(shop.value.credentials.googleEmail)) {
+      alert('กรุณากรอกอีเมล Gmail ที่ถูกต้อง')
+      return
+    }
 
     if (shop.value.credentials.password !== shop.value.confirmPassword) {
       alert('กรุณาตรวจสอบรหัสผ่านให้ตรงกัน')
@@ -396,13 +434,17 @@ const handleSubmit = () => {
   }
 
   // ส่งข้อมูลร้านค้าไปยัง parent component
+  const creds = {
+    username: shop.value.credentials.username,
+    password: shop.value.credentials.password
+  }
+  if (shop.value.credentials.googleEmail && isValidEmail(shop.value.credentials.googleEmail)) {
+    creds.googleEmail = shop.value.credentials.googleEmail.trim().toLowerCase()
+  }
   const shopData = {
     ...shop.value,
     canteenId: props.canteenId || shop.value.canteenId,
-    credentials: {
-      username: shop.value.credentials.username,
-      password: shop.value.credentials.password
-    }
+    credentials: creds
   }
   
   console.log('Sending shop data:', shopData) // เพิ่ม log เพื่อตรวจสอบข้อมูล
@@ -420,7 +462,8 @@ const handleSubmit = () => {
     contractEndDate: '',
     credentials: {
       username: '',
-      password: ''
+      password: '',
+      googleEmail: ''
     },
     confirmPassword: '',
     canteenId: ''
@@ -474,7 +517,7 @@ const handleSubmit = () => {
 
 .modal-header h2 {
   margin: 0;
-  font-size: 1.3rem;
+  font-size: clamp(1.1rem, 4vw, 1.3rem);
   color: #2d3748;
   font-weight: 600;
 }
@@ -485,7 +528,14 @@ const handleSubmit = () => {
   font-size: 1.5rem;
   color: #718096;
   cursor: pointer;
-  padding: 0.5rem;
+  padding: 0;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .modal-body {
@@ -566,6 +616,10 @@ const handleSubmit = () => {
   font-weight: 500;
   font-size: 0.95rem;
   transition: all 0.3s ease;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .cancel-button:hover {
@@ -583,6 +637,10 @@ const handleSubmit = () => {
   font-weight: 500;
   font-size: 0.95rem;
   transition: all 0.3s ease;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .submit-button:hover {
@@ -617,6 +675,13 @@ const handleSubmit = () => {
   color: #e53e3e;
   font-size: 0.85rem;
   margin-top: 0.25rem;
+}
+
+.field-hint {
+  color: #718096;
+  font-size: 0.8rem;
+  margin-top: 0.35rem;
+  line-height: 1.4;
 }
 
 .required {
@@ -690,6 +755,11 @@ const handleSubmit = () => {
   font-weight: 500;
   font-size: 0.95rem;
   transition: all 0.3s ease;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .next-button:hover {
@@ -707,6 +777,11 @@ const handleSubmit = () => {
   font-weight: 500;
   font-size: 0.95rem;
   transition: all 0.3s ease;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .prev-button:hover {
@@ -744,8 +819,12 @@ const handleSubmit = () => {
     margin: 1rem;
   }
   
+  .modal-header {
+    padding: 1rem;
+  }
+  
   .modal-body {
-    padding: 1.5rem;
+    padding: 1rem;
   }
   
   .form-input {

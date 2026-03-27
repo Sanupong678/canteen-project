@@ -146,10 +146,19 @@ const getCurrentRankingData = async (req, res) => {
         data: {
           money: 0,
           score: 0,
-          rank: 0
+          rank: 0,
+          hasCurrentMonthUpdate: false
         }
       });
     }
+
+    // ใช้ตัวนี้เพื่อบอก frontend ว่า “เดือนปัจจุบันของร้านนี้” ถูกอัปเดต/ประเมินแล้วหรือยัง
+    // (ถ้ายังไม่ evaluationSent หรือไม่มี totalScore จะถือว่า “รออัปเดต”)
+    const hasCurrentMonthUpdate = !!(
+      evaluation.evaluationSent &&
+      evaluation.totalScore !== null &&
+      evaluation.totalScore !== undefined
+    );
     
     // คำนวณลำดับในโรงอาหารเดียวกัน
     // ใช้ canteenId จาก Shop แทน canteenName จาก Evaluation
@@ -263,7 +272,8 @@ const getCurrentRankingData = async (req, res) => {
     const currentData = {
       money: evaluation.revenue || 0,
       score: currentShopAverageScore, // คะแนนเฉลี่ยของร้านค้านี้
-      rank: rank // อันดับจากการเปรียบเทียบคะแนนเฉลี่ย
+      rank: rank, // อันดับจากการเปรียบเทียบคะแนนเฉลี่ย
+      hasCurrentMonthUpdate
     };
     
     console.log('✅ Current ranking data:', currentData);

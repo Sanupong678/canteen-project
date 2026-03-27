@@ -65,6 +65,12 @@ const shopSchema = new mongoose.Schema({
       enum: ['active', 'expired'],
       default: 'active'
     },
+    // Gmail สำหรับ Login ด้วย Google - ต้องตรงกับบัญชี Google ที่ใช้ล็อกอิน
+    googleEmail: {
+      type: String,
+      trim: true,
+      lowercase: true
+    },
     // เพิ่ม userId ใน credentials สำหรับ populate (จาก shopModel.js แต่ไม่ required)
     userId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -106,6 +112,7 @@ shopSchema.index({ canteenId: 1 });
 shopSchema.index({ customId: 1 }); // unique index already exists, but adding for reference
 shopSchema.index({ userId: 1 }); // unique index already exists, but adding for reference
 shopSchema.index({ 'credentials.username': 1 }); // unique index already exists, but adding for reference
+shopSchema.index({ 'credentials.googleEmail': 1 }, { sparse: true }); // สำหรับค้นหา shop เมื่อ login ด้วย Google
 shopSchema.index({ contractEndDate: 1 });
 shopSchema.index({ type: 1 });
 shopSchema.index({ createdAt: -1 });

@@ -29,6 +29,19 @@
           {{ error }}
         </div>
         <button type="submit" class="login-btn">เข้าสู่ระบบ</button>
+
+        <div class="login-divider">
+          <span>หรือ</span>
+        </div>
+        <a :href="googleAuthUrl" class="google-login-btn">
+          <svg class="google-icon" width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
+            <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/>
+            <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/>
+            <path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/>
+          </svg>
+          Login with Google
+        </a>
       </form>
     </div>
   </div>
@@ -36,6 +49,15 @@
 
 <script>
 import axios from 'axios'
+
+const ERROR_MESSAGES = {
+  missing_code: 'ไม่ได้รับ authorization code จาก Google',
+  config_missing: 'ระบบยังไม่ได้ตั้งค่า Google Login',
+  no_id_token: 'ไม่ได้รับ id token จาก Google',
+  no_email: 'ไม่สามารถดึงอีเมลจาก Google ได้',
+  shop_not_found: 'ไม่พบร้านค้าที่ลงทะเบียนด้วยอีเมลนี้',
+  auth_failed: 'ไม่สามารถยืนยันตัวตนกับ Google ได้'
+}
 
 export default {
   name: 'LoginPage',
@@ -46,7 +68,72 @@ export default {
       error: ''
     }
   },
+  computed: {
+    googleAuthUrl() {
+      const config = typeof useRuntimeConfig === 'function' ? useRuntimeConfig() : {}
+      const apiBase = config?.public?.apiBase || 'http://localhost:4000'
+      return `${apiBase}/api/auth/google`
+    }
+  },
+  mounted() {
+    this.handleGoogleCallback()
+  },
   methods: {
+    handleGoogleCallback() {
+      if (typeof window === 'undefined') return
+      const params = new URLSearchParams(window.location.search)
+      const googleSuccess = params.get('google_success')
+      const token = params.get('token')
+      const error = params.get('error')
+      const email = params.get('email')
+
+      if (error) {
+        this.error = ERROR_MESSAGES[error] || (error === 'shop_not_found' && email
+          ? `ไม่พบร้านค้าที่ลงทะเบียนด้วยอีเมล ${email} กรุณาติดต่อผู้ดูแลระบบ`
+          : 'ไม่สามารถเข้าสู่ระบบด้วย Google ได้ กรุณาลองใหม่')
+        window.history.replaceState({}, document.title, window.location.pathname)
+        return
+      }
+
+      if (googleSuccess === '1' && token) {
+        const role = params.get('role') || 'user'
+        const displayName = params.get('displayName') || ''
+        let userData = {}
+        try {
+          const userDataStr = params.get('userData')
+          if (userDataStr) userData = JSON.parse(userDataStr)
+        } catch (_) {}
+
+        sessionStorage.clear()
+        sessionStorage.setItem('token', token)
+        sessionStorage.setItem('displayName', displayName)
+        sessionStorage.setItem('isAuthenticated', 'true')
+        sessionStorage.setItem('userRole', role)
+        if (userData.id) {
+          sessionStorage.setItem('userId', userData.id)
+          const essentialShopData = {
+            id: userData.id,
+            name: userData.name,
+            username: userData.username,
+            type: userData.type,
+            description: userData.description,
+            location: userData.location,
+            contractStartDate: userData.contractStartDate,
+            contractEndDate: userData.contractEndDate,
+            canteenId: userData.canteenId,
+            customId: userData.customId
+          }
+          sessionStorage.setItem('shopData', JSON.stringify(essentialShopData))
+        }
+        axios.defaults.withCredentials = true
+        window.history.replaceState({}, document.title, window.location.pathname)
+        if (role === 'admin') {
+          this.$router.push('/admin')
+        } else {
+          this.$router.push('/user')
+        }
+      }
+    },
     async handleLogin() {
       this.error = ''
       try {
@@ -246,5 +333,48 @@ input:focus {
 
 .login-btn:active {
   transform: translateY(0);
+}
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  margin: 1rem 0;
+  gap: 1rem;
+}
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #ddd;
+}
+.login-divider span {
+  color: #888;
+  font-size: 0.9rem;
+}
+
+.google-login-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #333;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.google-login-btn:hover {
+  background: #f8f9fa;
+  border-color: #ccc;
+  transform: translateY(-1px);
+}
+.google-icon {
+  flex-shrink: 0;
 }
 </style> 

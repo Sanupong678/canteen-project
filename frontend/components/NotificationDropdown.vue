@@ -591,4 +591,56 @@ export default {
   align-items: center;
   justify-content: center;
 }
+
+/* Mobile: make dropdown fixed and full-width */
+@media (max-width: 640px) {
+  .notification-dropdown {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-height: 60vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 9999;
+    border-radius: 0 0 12px 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    margin-top: 0;
+    backdrop-filter: blur(20px);
+  }
+
+  .notification-list {
+    max-height: none;
+  }
+
+  .no-notifications {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    font-size: 14px;
+    color: #6b7280;
+  }
+
+  .no-notifications p {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+  }
+}
+
+/* Tablet/Desktop: compact absolute panel */
+@media (min-width: 641px) {
+  .notification-dropdown {
+    position: absolute;
+    top: 48px;
+    right: 0;
+    left: auto;
+    width: 360px;
+    border-radius: 12px;
+    margin-top: 0;
+  }
+}
 </style> 

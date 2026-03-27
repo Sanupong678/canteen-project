@@ -191,21 +191,25 @@ export default {
 
 .modal-header h3 {
   margin: 0;
-  font-size: 20px;
+  font-size: clamp(1.1rem, 4.5vw, 1.25rem);
   color: #333;
 }
 
 .close-btn {
   background: none;
   border: none;
-  font-size: 20px;
+  font-size: clamp(1.1rem, 5vw, 1.25rem);
   color: #666;
   cursor: pointer;
-  padding: 5px;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: color 0.2s;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  line-height: 1;
 }
 
 .close-btn:hover {
@@ -221,7 +225,8 @@ export default {
 
 .shop-image-container {
   width: 100%;
-  height: 300px;
+  height: auto;
+  aspect-ratio: 16 / 9;
   margin-bottom: 20px;
   border-radius: 8px;
   overflow: hidden;
@@ -319,7 +324,7 @@ export default {
   background: rgba(255, 255, 255, 0.2);
   border: none;
   color: white;
-  font-size: 28px;
+  font-size: clamp(1.4rem, 7vw, 1.75rem);
   cursor: pointer;
   padding: 10px 15px;
   border-radius: 50%;
@@ -364,10 +369,11 @@ export default {
   background: none;
   border: none;
   color: #666;
-  font-size: 24px;
+  font-size: clamp(1.2rem, 6vw, 1.5rem);
   cursor: pointer;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -382,12 +388,20 @@ export default {
 }
 
 @media (max-width: 768px) {
+  .modal-content {
+    padding: 16px;
+  }
+
+  .shop-info {
+    padding: 1rem;
+  }
+
   .modal-body {
     grid-template-columns: 1fr;
   }
 
   .shop-image-container {
-    height: 200px;
+    aspect-ratio: 16 / 9;
   }
 
   .detail-item {
