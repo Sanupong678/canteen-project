@@ -6,10 +6,13 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // เชื่อมต่อกับ MongoDB
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/test';
+const MONGODB_URI = process.env.MONGODB_URI;
 
 async function resetBills() {
   try {
+    if (!MONGODB_URI) {
+      throw new Error('MONGODB_URI is required');
+    }
     console.log('กำลังเชื่อมต่อกับ MongoDB...');
     await mongoose.connect(MONGODB_URI);
     console.log('เชื่อมต่อ MongoDB สำเร็จ');

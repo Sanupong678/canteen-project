@@ -37,12 +37,19 @@ export default {
     await this.loadWelcomeImage();
   },
   methods: {
+    getBackendBaseUrl() {
+      const fromAxios = this.$axios?.defaults?.baseURL || '';
+      if (fromAxios) return fromAxios.replace(/\/$/, '');
+
+      // Use same-origin as the safest runtime fallback for deployments behind reverse proxy
+      return process.client ? window.location.origin : '';
+    },
     async loadWelcomeImage() {
       try {
-        const response = await this.$axios.get('/api/welcome/data');
+        const backendBaseUrl = this.getBackendBaseUrl();
+        const response = await this.$axios.get(`${backendBaseUrl}/api/welcome/data`);
         if (response.data.success && response.data.data.bannerImage) {
-          // ใช้ full URL ไปยัง backend server
-          this.welcomeImage = `http://localhost:4000/uploads/welcomepage/${response.data.data.bannerImage}`;
+          this.welcomeImage = `${backendBaseUrl}/uploads/welcomepage/${response.data.data.bannerImage}`;
         }
       } catch (error) {
         console.log('No welcome image found or error loading:', error);

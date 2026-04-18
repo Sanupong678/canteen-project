@@ -28,7 +28,7 @@ export const ensureConnection = async () => {
   console.warn(`⚠️ MongoDB connection not ready: ${state}, attempting to reconnect...`);
   
   try {
-    const mongoUri = process.env.MONGODB_URI || mongoose.connection._connectionString;
+    const mongoUri = process.env.MONGODB_URI;
     if (!mongoUri) {
       throw new Error('MONGODB_URI is not defined');
     }

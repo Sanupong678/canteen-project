@@ -1,6 +1,23 @@
 // nuxt.config.ts
 import { defineNuxtConfig } from 'nuxt/config'
 
+const apiBase = process.env.API_BASE_URL || ''
+const publicSiteUrl = process.env.NUXT_PUBLIC_SITE_URL || ''
+const connectSrc = [
+  "'self'",
+  apiBase,
+  publicSiteUrl,
+  'https:',
+  'wss:'
+].filter(Boolean).join(' ')
+
+const imgSrc = [
+  "'self'",
+  'data:',
+  'https:',
+  apiBase
+].filter(Boolean).join(' ')
+
 export default defineNuxtConfig({
   css: ['vuetify/styles', '@mdi/font/css/materialdesignicons.min.css', 'cropperjs/dist/cropper.css', '~/assets/css/responsive.css'],
 
@@ -10,7 +27,7 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      apiBase: process.env.API_BASE_URL || 'http://localhost:4000',
+      apiBase,
       googleClientId: process.env.NUXT_PUBLIC_GOOGLE_CLIENT_ID || ''
     }
   },
@@ -52,13 +69,14 @@ export default defineNuxtConfig({
   routeRules: {
     '/**': {
       headers: {
-        'Content-Security-Policy': "default-src 'self'; connect-src 'self' http://localhost:3000 http://localhost:4000 ws://localhost:3000 ws://localhost:4000; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com; img-src 'self' data: https: http://localhost:4000 http://127.0.0.1:4000; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; frame-src https://accounts.google.com;"
+        'Content-Security-Policy': `default-src 'self'; connect-src ${connectSrc}; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com; img-src ${imgSrc}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; frame-src https://accounts.google.com;`
       }
     }
   },
 
   // Register plugins
   plugins: [
+    { src: '~/plugins/axios.js' },
     { src: '~/plugins/socket.client.js', mode: 'client' },
     { src: '~/plugins/vuetify.js' }
   ]

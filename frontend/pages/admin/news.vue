@@ -31,7 +31,7 @@
               <div class="card-image">
                 <img 
                   v-if="item.imageFilename" 
-                  :src="`${backendUrl}/api/news/${item._id}/image`" 
+                  :src="getNewsImageUrl(item._id)" 
                   :alt="item.title"
                   class="news-image"
                   @error="handleImageError"
@@ -137,6 +137,14 @@ import { ref, onMounted, computed } from 'vue'
 import LayoutAdmin from '@/components/LayoutAdmin.vue'
 import axios from 'axios'
 
+const getBackendBaseUrl = () => {
+  const fromAxios = axios.defaults.baseURL || ''
+  if (fromAxios) return fromAxios.replace(/\/$/, '')
+  return process.client ? window.location.origin : ''
+}
+
+const getNewsImageUrl = (id) => `${getBackendBaseUrl()}/api/news/${id}/image`
+
 const news = ref([])
 const loading = ref(true)
 const selectedNews = ref(null)
@@ -147,8 +155,6 @@ const yearMonthGroups = ref({})
 const years = ref([])
 const yearOpen = ref({})
 const filter = ref({ year: null, month: null })
-
-const backendUrl = process.env.NODE_ENV === 'production' ? 'https://your-production-domain.com' : 'http://localhost:4000'
 
 const editDialog = ref(false)
 const deleteDialog = ref(false)
@@ -164,7 +170,7 @@ const fileInput = ref(null)
 const loadNews = async () => {
   try {
     loading.value = true
-    const response = await axios.get(`${backendUrl}/api/news`)
+    const response = await axios.get('/api/news')
     if (response.data.success) {
       news.value = (response.data.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       // group by year/month
@@ -263,7 +269,7 @@ const editNews = (item) => {
   selectedNews.value = item
   formTitle.value = item.title || ''
   formContent.value = item.content || ''
-  imagePreview.value = item.imageFilename ? `${backendUrl}/api/news/${item._id}/image` : null
+  imagePreview.value = item.imageFilename ? getNewsImageUrl(item._id) : null
   editDialog.value = true
 }
 
@@ -296,9 +302,9 @@ const saveNews = async () => {
 
     let res
     if (isCreating.value) {
-      res = await axios.post(`${backendUrl}/api/news`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      res = await axios.post('/api/news', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
     } else if (selectedNews.value) {
-      res = await axios.put(`${backendUrl}/api/news/${selectedNews.value._id}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      res = await axios.put(`/api/news/${selectedNews.value._id}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
     }
 
     if (res && res.data && res.data.success) {
@@ -321,7 +327,7 @@ const deleteNews = async () => {
   if (!selectedNews.value) return
   saving.value = true
   try {
-    const res = await axios.delete(`${backendUrl}/api/news/${selectedNews.value._id}`)
+    const res = await axios.delete(`/api/news/${selectedNews.value._id}`)
     if (res.data && res.data.success) {
       await loadNews()
       deleteDialog.value = false

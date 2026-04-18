@@ -6,7 +6,7 @@ export default defineNuxtPlugin((nuxtApp) => {
   if (!process.client) return
 
   const config = useRuntimeConfig()
-  const baseUrl = config.public.apiBase || 'http://localhost:4000'
+  const baseUrl = config.public.apiBase || ''
 
   // Get token with state
   const { token, state } = getTokenWithState()

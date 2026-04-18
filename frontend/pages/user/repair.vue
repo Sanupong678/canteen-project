@@ -9,6 +9,12 @@
             <p class="page-subtitle">ปัญหาที่แจ้งและปัญหาทั้งหมดในระบบ</p>
           </div>
           <div class="header-actions">
+            <GuidePopup
+              storage-key="user-repair-guide"
+              title="คู่มือการแจ้งปัญหา"
+              intro="ทำตามขั้นตอนนี้เพื่อให้ทีมงานตรวจสอบและแก้ไขได้เร็วขึ้น"
+              :steps="repairGuideSteps"
+            />
             <v-btn
               outlined
               class="filter-btn"
@@ -560,6 +566,7 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
 import LayoutUser from '@/components/LayoutUser.vue'
+import GuidePopup from '@/components/user/GuidePopup.vue'
 import axios from 'axios'
 import { format } from 'date-fns'
 
@@ -586,6 +593,14 @@ const isEditMode = ref(false)
 const searchQuery = ref('')
 const filterStatus = ref(null)
 const filterCategory = ref(null)
+
+const repairGuideSteps = [
+  'กดปุ่ม "แจ้งปัญหา" และเลือกหมวดหมู่ให้ตรงกับปัญหาจริง',
+  'พิมพ์รายละเอียดปัญหาให้ชัดเจน เช่น จุดที่พบปัญหา และอาการที่เกิดขึ้น',
+  'แนบรูปภาพประกอบเพื่อให้ผู้ดูแลเห็นปัญหาได้ชัดขึ้น',
+  'ส่งเรื่องแล้วติดตามสถานะได้ในหน้าเดียวกัน',
+  'หากสถานะยังเป็น "รอดำเนินการ" สามารถแก้ไขหรือลบรายการได้'
+]
 
 // Pagination
 const pageSize = 10
@@ -955,37 +970,39 @@ onMounted(async () => {
 
 <style scoped>
 .repair-page {
-  padding: 24px;
-  background-color: #f5f5f5;
+  padding: 1.5rem;
+  background-color: #f9fafb;
   min-height: calc(100vh - 64px);
 }
 
 .page-header {
-  margin-bottom: 16px;
+  margin-bottom: 1.5rem;
 }
 
 .header-content {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
+  margin-bottom: 1rem;
 }
 
 .page-title {
-  font-size: clamp(1.2rem, 3.2vw, 1.5rem);
+  font-size: 1.5rem;
   font-weight: 600;
-  color: #1a1a1a;
-  margin-bottom: 4px;
+  color: #1f2937;
+  margin: 0 0 0.25rem 0;
 }
 
 .page-subtitle {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: #6b7280;
   margin: 0;
 }
 
 .header-actions {
   display: flex;
-  gap: 8px;
+  gap: 0.75rem;
+  align-items: center;
 }
 
 .filter-btn,
@@ -994,16 +1011,16 @@ onMounted(async () => {
 }
 
 .repair-card {
-  border-radius: 16px;
+  border-radius: 1rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .card-content {
-  padding: 16px;
+  padding: 1rem;
 }
 
 .search-section {
-  margin-bottom: 16px;
+  margin-bottom: 1rem;
 }
 
 .search-input {
@@ -1012,12 +1029,13 @@ onMounted(async () => {
 
 .table-wrapper {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .repair-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .repair-table thead {
@@ -1025,15 +1043,15 @@ onMounted(async () => {
 }
 
 .repair-table th {
-  padding: 12px 8px;
+  padding: 0.75rem 1rem;
   text-align: left;
   font-weight: 500;
   color: #6b7280;
-  font-size: 12px;
+  font-size: 0.875rem;
 }
 
 .repair-table td {
-  padding: 12px 8px;
+  padding: 0.75rem 1rem;
   border-bottom: 1px solid #f3f4f6;
 }
 
@@ -1046,7 +1064,7 @@ onMounted(async () => {
 }
 
 .time-text {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #9ca3af;
 }
 
@@ -1084,21 +1102,24 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 16px;
-  padding-top: 16px;
+  margin-top: 1rem;
+  padding-top: 1rem;
   border-top: 1px solid #e5e7eb;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: #6b7280;
 }
 
 .pagination {
   display: flex;
-  gap: 4px;
+  gap: 0.25rem;
 }
 
 .page-btn {
-  min-width: 44px;
-  height: 44px;
+  min-width: 2rem;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
 }
 
@@ -1238,27 +1259,58 @@ onMounted(async () => {
 /* Responsive */
 @media (max-width: 768px) {
   .repair-page {
-    padding: 16px;
-}
+    padding: 0.75rem;
+  }
 
   .header-content {
     flex-direction: column;
-    gap: 16px;
-}
+    align-items: flex-start;
+    gap: 1rem;
+  }
 
   .header-actions {
     width: 100%;
-}
+    flex-wrap: wrap;
+  }
 
   .filter-btn,
   .add-btn {
     flex: 1;
-}
+    font-size: clamp(13px, 3vw, 14px);
+  }
+
+  .repair-table {
+    font-size: clamp(11px, 2.8vw, 13px);
+  }
+
+  .repair-table th {
+    font-size: clamp(10px, 2.5vw, 12px);
+    padding: 0.5rem 0.45rem;
+  }
+
+  .repair-table td {
+    padding: 0.5rem 0.45rem;
+    vertical-align: top;
+  }
+
+  .issue-cell {
+    max-width: min(200px, 38vw);
+    word-break: break-word;
+  }
+
+  .time-text {
+    font-size: clamp(10px, 2.4vw, 11px);
+  }
 
   .table-footer {
     flex-direction: column;
-    gap: 12px;
+    gap: 1rem;
     align-items: flex-start;
+    font-size: clamp(0.8rem, 2.8vw, 0.875rem);
+  }
+
+  .text-sm {
+    font-size: clamp(10px, 2.6vw, 12px);
   }
 }
 </style> 

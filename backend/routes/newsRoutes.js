@@ -4,6 +4,7 @@ import {
   getAllNews, 
   getNewsById, 
   createNews, 
+  updateNews,
   deleteNews, 
   getNewsImage
 } from '../controllers/newsController.js';
@@ -22,6 +23,9 @@ router.get('/:newsId/image', getNewsImage);
 
 // Create news (admin only)
 router.post('/', verifyToken, isAdmin, uploadNewsImage.single('image'), createNews);
+
+// Update news (admin only)
+router.put('/:id', verifyToken, isAdmin, uploadNewsImage.single('image'), updateNews);
 
 // Delete news (admin only)
 router.delete('/:id', verifyToken, isAdmin, deleteNews);

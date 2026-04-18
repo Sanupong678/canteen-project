@@ -8,7 +8,7 @@
             <img src="/images/Logo.jpg" alt="Logo">
           </div>
           <div class="navbar-title">
-            <h1 class="navbar-title-text">มหาวิทยาลัยเเม่ฟ้าหลวง</h1>
+            <h1 class="navbar-title-text">มหาวิทยาลัยแม่ฟ้าหลวง</h1>
             <p class="navbar-subtitle-text">ระบบบริหารจัดการโรงอาหาร</p>
           </div>
         </div>
@@ -58,8 +58,80 @@
 
     <!-- Main Content -->
     <main class="admin-main">
+      <button class="guide-fab" type="button" @click="showGuidePopup = true">
+        <i class="fas fa-comments"></i>
+        <span>แนะนำการใช้งาน</span>
+      </button>
       <slot></slot>
     </main>
+
+    <div v-if="showGuidePopup" class="guide-popup-overlay" @click="showGuidePopup = false">
+      <div class="guide-popup-card" @click.stop>
+        <div class="guide-popup-header">
+          <div class="guide-avatar">U</div>
+          <div>
+            <h3>คู่มือการใช้งาน</h3>
+            <p>{{ currentGuide.title }}</p>
+          </div>
+          <button class="guide-close-btn" type="button" @click="showGuidePopup = false" aria-label="close guide">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <div class="guide-popup-content">
+          <div class="guide-message">
+            <p>{{ currentGuide.overview }}</p>
+          </div>
+
+          <div class="guide-section" v-if="currentGuide.mainMenus && currentGuide.mainMenus.length">
+            <h4>เมนูหลัก</h4>
+            <ul class="guide-list">
+              <li v-for="(item, index) in currentGuide.mainMenus" :key="`${$route.path}-menu-${index}`">{{ item }}</li>
+            </ul>
+          </div>
+
+          <div class="guide-section" v-if="currentGuide.steps && currentGuide.steps.length">
+            <h4>ขั้นตอนการใช้งาน</h4>
+            <ol class="guide-steps">
+              <li v-for="(step, index) in currentGuide.steps" :key="`${$route.path}-step-${index}`">{{ step }}</li>
+            </ol>
+          </div>
+
+          <div class="guide-section" v-if="currentGuide.features && currentGuide.features.length">
+            <h4>ฟังก์ชันสำคัญ</h4>
+            <ul class="guide-list">
+              <li v-for="(feature, index) in currentGuide.features" :key="`${$route.path}-feature-${index}`">{{ feature }}</li>
+            </ul>
+          </div>
+
+          <div class="guide-section" v-if="currentGuide.scoring && currentGuide.scoring.length">
+            <h4>การคำนวณและการแปลผล</h4>
+            <ul class="guide-list">
+              <li v-for="(item, index) in currentGuide.scoring" :key="`${$route.path}-scoring-${index}`">{{ item }}</li>
+            </ul>
+          </div>
+
+          <div class="guide-section" v-if="currentGuide.filters && currentGuide.filters.length">
+            <h4>การค้นหาและกรองข้อมูล</h4>
+            <ul class="guide-list">
+              <li v-for="(item, index) in currentGuide.filters" :key="`${$route.path}-filter-${index}`">{{ item }}</li>
+            </ul>
+          </div>
+
+          <div class="guide-section" v-if="currentGuide.notes && currentGuide.notes.length">
+            <h4>ข้อแนะนำสำคัญ</h4>
+            <ul class="guide-list">
+              <li v-for="(note, index) in currentGuide.notes" :key="`${$route.path}-note-${index}`">{{ note }}</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="guide-popup-actions">
+          <button class="guide-btn-secondary" type="button" @click="showGuidePopup = false">ปิด</button>
+          <button class="guide-btn-primary" type="button" @click="showGuidePopup = false">เข้าใจแล้ว</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Welcome Page Edit Modal -->
     <div v-if="showWelcomeEditModal" class="modal-overlay" @click="closeWelcomeEditModal">
@@ -174,6 +246,7 @@ export default {
     return {
       showUserMenu: false,
       displayName: sessionStorage.getItem('displayName') || 'Admin User',
+      showGuidePopup: false,
       showWelcomeEditModal: false,
       selectedImage: null,
       selectedImagePreview: null,
@@ -186,6 +259,191 @@ export default {
       const parts = (this.displayName || '').trim().split(' ')
       const initials = parts.filter(Boolean).slice(0, 2).map(p => p[0]).join('')
       return initials || 'A'
+    },
+    currentGuide() {
+      const guidesByRoute = {
+        '/admin': {
+          title: 'คู่มือการใช้งานหน้าแรกผู้ดูแล',
+          overview: 'หน้านี้เป็นหน้าภาพรวมของระบบผู้ดูแล ใช้ตรวจสอบข้อมูลสำคัญล่าสุดก่อนเข้าไปจัดการในแต่ละเมนู',
+          steps: [
+            'ตรวจสอบความเคลื่อนไหวล่าสุดจากแบนเนอร์และข่าว',
+            'คลิกเมนูด้านบนเพื่อเข้าสู่หน้าจัดการที่ต้องการ',
+            'กลับมาตรวจสอบหน้าแรกอีกครั้งหลังแก้ไขข้อมูลสำคัญ'
+          ],
+          notes: [
+            'ใช้หน้านี้เป็นจุดเริ่มงานประจำวัน',
+            'ควรตรวจความถูกต้องของข้อมูลก่อนส่งต่อให้ผู้ใช้รับทราบ'
+          ]
+        },
+        '/admin/management': {
+          title: 'คู่มือการใช้งานหน้าการจัดการ',
+          overview: 'หน้านี้ใช้จัดการข้อมูลหลักของร้านค้าและรายการที่เกี่ยวข้องกับการแสดงผลในระบบ',
+          steps: [
+            'เลือกรายการที่ต้องการแก้ไขจากตารางหรือเมนูย่อย',
+            'อัปเดตข้อมูลให้ครบถ้วนตามแบบฟอร์ม',
+            'บันทึกข้อมูลและตรวจสอบผลลัพธ์บนหน้าที่ผู้ใช้มองเห็นจริง'
+          ],
+          notes: [
+            'ควรอัปเดตข้อมูลที่กระทบผู้ใช้จำนวนมากก่อน',
+            'ตรวจสอบความถูกต้องก่อนบันทึกทุกครั้ง'
+          ]
+        },
+        '/admin/ranking': {
+          title: 'คู่มือการใช้งานระบบประเมินร้านค้า (Ranking System)',
+          overview: 'ระบบนี้ใช้สำหรับประเมินและจัดอันดับร้านค้า โดยผู้ใช้งานสามารถกำหนดหัวข้อประเมิน ให้คะแนนร้านค้า ตรวจสอบผลย้อนหลัง และส่งออกข้อมูลผลการประเมิน',
+          mainMenus: [
+            'Control (ตัวควบคุม)',
+            'Add Topic (เพิ่มหัวข้อ)',
+            'View Topic (ดูหัวข้อ)',
+            'Evaluation (ทำแบบประเมิน)',
+            'History (ประวัติย้อนหลัง)'
+          ],
+          steps: [
+            'นำเข้าข้อมูลรายได้: กดปุ่ม Import Excel แล้วอัปโหลดไฟล์ .xlsx, .xls หรือ .csv ขนาดไม่เกิน 10MB จากนั้นตรวจสอบว่าข้อมูลรายได้ของแต่ละร้านถูกต้อง',
+            'จัดการหัวข้อประเมิน: ไปที่เมนู Add Topic หรือ View Topic เพื่อเพิ่มหัวข้อ กำหนดคะแนนเต็ม และแก้ไขหรือลบหัวข้อเมื่อจำเป็น',
+            'เปิดระบบประเมิน: ไปที่เมนู Control แล้วเปิดสวิตช์ระบบประเมิน เพื่อเริ่มรอบการประเมินของช่วงเวลาที่ต้องการ',
+            'ทำแบบประเมินร้านค้า: ไปที่เมนู Evaluation เลือกร้านที่ต้องการ กดประเมินสำหรับร้านใหม่ หรือกดแก้ไขสำหรับร้านที่เคยประเมินแล้ว จากนั้นกรอกคะแนนตามหัวข้อ',
+            'ตรวจสอบผลการประเมิน: ไปที่เมนู History เพื่อตรวจคะแนนรวม สถานะผ่านหรือไม่ผ่าน และเปิดดูรายละเอียดรายข้อย้อนหลัง',
+            'ส่งออกข้อมูล: Export เป็นไฟล์ CSV เพื่อนำไปใช้รายงานหรือส่งให้ผู้เกี่ยวข้อง'
+          ],
+          features: [
+            'Control: ดูสถานะร้าน เสร็จแล้วหรือรอดำเนินการ เปิดหรือปิดระบบประเมิน และรีเซ็ตคะแนนทั้งหมด',
+            'Add Topic: เพิ่มหัวข้อประเมินใหม่ พร้อมชื่อ คำอธิบาย และคะแนนเต็ม',
+            'View Topic: ดูหัวข้อทั้งหมด ดูคะแนนรวม และจัดการแก้ไขหรือลบหัวข้อ',
+            'Evaluation: ให้คะแนนร้านค้าและแก้ไขคะแนนย้อนหลัง',
+            'History: ดูผลประเมินย้อนหลัง ตรวจสถานะผ่านหรือไม่ผ่าน และดูรายละเอียดแต่ละรอบ'
+          ],
+          scoring: [
+            'ระบบจะรวมคะแนนจากทุกหัวข้อที่กำหนดไว้',
+            'คะแนนรวมจะถูกเปรียบเทียบกับคะแนนเต็มรวม',
+            'ผลลัพธ์จะแสดงเป็นสถานะผ่านหรือไม่ผ่าน'
+          ],
+          filters: [
+            'ค้นหาชื่อร้าน',
+            'กรองตามโรงอาหารและหมวดหมู่',
+            'เรียงคะแนนจากมากไปน้อยหรือจากน้อยไปมาก',
+            'ใช้การแบ่งหน้าเพื่อดูข้อมูลจำนวนมาก'
+          ],
+          notes: [
+            'ควร Import รายได้ก่อนทุกครั้งก่อนเริ่มประเมิน',
+            'ตรวจสอบหัวข้อให้ตรงกับรอบประเมินปัจจุบัน',
+            'เปิดระบบก่อนเริ่มให้คะแนน',
+            'ตรวจสอบผลใน History ก่อน Export ทุกครั้ง'
+          ]
+        },
+        '/admin/repair': {
+          title: 'คู่มือการใช้งานหน้าแจ้งซ่อม',
+          overview: 'หน้านี้ใช้สำหรับรับงานแจ้งซ่อม ติดตามความคืบหน้า และปิดงานเมื่อแก้ไขเสร็จ',
+          steps: [
+            'เปิดรายการแจ้งซ่อมและตรวจสอบรายละเอียดปัญหา',
+            'จัดลำดับความสำคัญตามผลกระทบและความเร่งด่วน',
+            'อัปเดตสถานะงานทุกครั้งเมื่อมีความคืบหน้า',
+            'บันทึกผลการแก้ไขและปิดงานเมื่อดำเนินการเรียบร้อย'
+          ],
+          notes: [
+            'งานที่กระทบการใช้งานหลักควรดำเนินการก่อน',
+            'ควรบันทึกรายละเอียดการแก้ไขเพื่อใช้อ้างอิงย้อนหลัง'
+          ]
+        },
+        '/admin/leave': {
+          title: 'คู่มือการใช้งานหน้าแจ้งลา',
+          overview: 'หน้านี้ใช้สำหรับตรวจสอบและอนุมัติคำขอลาให้เป็นไปตามขั้นตอนที่ชัดเจน',
+          steps: [
+            'ตรวจสอบชื่อผู้ยื่น วันที่ลา และเหตุผลการลา',
+            'พิจารณาคำขอจากข้อมูลที่ครบถ้วน',
+            'อนุมัติหรือปฏิเสธพร้อมบันทึกผลการพิจารณา',
+            'แจ้งผลให้ผู้ยื่นรับทราบตามเวลา'
+          ],
+          notes: [
+            'หากข้อมูลไม่ครบควรติดต่อผู้ยื่นก่อนตัดสินใจ',
+            'ควรพิจารณาคำขอภายในระยะเวลาที่กำหนด'
+          ]
+        },
+        '/admin/bill': {
+          title: 'คู่มือการใช้งานหน้าบิล',
+          overview: 'หน้านี้ใช้ตรวจสอบรายการบิล รายรับรายจ่าย และความถูกต้องของยอดรวม',
+          steps: [
+            'เลือกช่วงเวลาที่ต้องการตรวจสอบข้อมูลบิล',
+            'ตรวจยอดรวมและเทียบกับรายละเอียดแต่ละรายการ',
+            'ตรวจสอบความผิดปกติและแก้ไขข้อมูลหากจำเป็น',
+            'บันทึกหรือส่งออกข้อมูลเพื่อเก็บเป็นหลักฐาน'
+          ],
+          notes: [
+            'ควรตรวจความสอดคล้องของจำนวนรายการกับยอดรวมทุกครั้ง',
+            'เมื่อพบข้อมูลผิดปกติควรตรวจซ้ำก่อนสรุปผล'
+          ]
+        },
+        '/admin/banner': {
+          title: 'คู่มือการใช้งานหน้าจัดการแบนเนอร์',
+          overview: 'หน้านี้ใช้เพิ่ม แก้ไข เปิดหรือปิดการใช้งานแบนเนอร์ที่จะแสดงให้ผู้ใช้เห็นในหน้าแรก',
+          steps: [
+            'กรอกชื่อแบนเนอร์และลิงก์ปลายทางถ้ามี',
+            'อัปโหลดภาพแบนเนอร์ที่ต้องการใช้งาน',
+            'กดบันทึกเพื่อเพิ่มแบนเนอร์เข้าสู่ระบบ',
+            'จัดการสถานะเปิดหรือปิดของแต่ละแบนเนอร์',
+            'ตรวจสอบหน้าแสดงผลจริงหลังอัปเดต'
+          ],
+          notes: [
+            'ควรใช้ภาพที่อ่านง่ายทั้งมือถือและคอมพิวเตอร์',
+            'ตรวจสอบความถูกต้องของลิงก์ก่อนเปิดใช้งาน'
+          ]
+        },
+        '/admin/news': {
+          title: 'คู่มือการใช้งานหน้าจัดการข่าว',
+          overview: 'หน้านี้ใช้เผยแพร่และจัดการข่าวสารหรือประกาศให้ผู้ใช้รับทราบอย่างถูกต้องและทันเวลา',
+          steps: [
+            'สร้างข่าวใหม่โดยกรอกหัวข้อและรายละเอียดให้ครบ',
+            'ตรวจสอบวันเวลาและเนื้อหาก่อนเผยแพร่',
+            'เผยแพร่ข่าวเมื่อพร้อมใช้งาน',
+            'แก้ไขหรือปิดการแสดงผลข่าวที่หมดอายุ'
+          ],
+          notes: [
+            'หัวข้อข่าวควรสั้น ชัดเจน และตรงประเด็น',
+            'ควรทบทวนเนื้อหาก่อนเผยแพร่ทุกครั้ง'
+          ]
+        },
+        '/admin/background': {
+          title: 'คู่มือการใช้งานหน้าพื้นหลังระบบ',
+          overview: 'หน้านี้ใช้เปลี่ยนภาพพื้นหลังของระบบเพื่อให้ภาพรวมหน้าใช้งานสอดคล้องกับแบรนด์และยังอ่านข้อมูลได้ชัด',
+          steps: [
+            'เลือกภาพพื้นหลังที่ต้องการใช้งาน',
+            'อัปโหลดและบันทึกการเปลี่ยนแปลง',
+            'ตรวจสอบการแสดงผลบนหลายขนาดหน้าจอ',
+            'ยืนยันว่าข้อความและปุ่มยังอ่านง่ายหลังเปลี่ยนภาพ'
+          ],
+          notes: [
+            'เลือกภาพที่ไม่รบกวนการอ่านเนื้อหาหลัก',
+            'ควรทดสอบทั้งบนมือถือและเดสก์ท็อป'
+          ]
+        },
+        '/admin/evaluation': {
+          title: 'คู่มือการใช้งานหน้าผลประเมิน',
+          overview: 'หน้านี้ใช้วิเคราะห์ผลคะแนนและความคิดเห็นจากผู้ใช้ เพื่อวางแผนพัฒนาคุณภาพการให้บริการ',
+          steps: [
+            'เลือกช่วงข้อมูลที่ต้องการวิเคราะห์',
+            'ตรวจสอบคะแนนเฉลี่ยและหัวข้อที่คะแนนต่ำ',
+            'อ่านข้อเสนอแนะของผู้ใช้ประกอบการตัดสินใจ',
+            'วางแผนปรับปรุงและติดตามผลในรอบถัดไป'
+          ],
+          notes: [
+            'ควรให้ความสำคัญกับหัวข้อที่คะแนนต่ำก่อน',
+            'ใช้ข้อมูลทั้งเชิงปริมาณและเชิงความคิดเห็นร่วมกัน'
+          ]
+        }
+      }
+      return guidesByRoute[this.$route.path] || {
+        title: 'คู่มือการใช้งานหน้านี้',
+        overview: 'หน้านี้ใช้สำหรับดูและจัดการข้อมูลของระบบ กรุณาตรวจสอบความถูกต้องก่อนบันทึกทุกครั้ง',
+        steps: [
+          'ตรวจสอบข้อมูลก่อนเริ่มแก้ไข',
+          'บันทึกหลังแก้ไขเสร็จในแต่ละส่วน',
+          'ตรวจผลลัพธ์ที่แสดงบนหน้าจออีกครั้ง'
+        ],
+        notes: [
+          'หากข้อมูลไม่อัปเดตให้รีเฟรชหน้า',
+          'ควรบันทึกงานเป็นระยะเพื่อลดการสูญหายของข้อมูล'
+        ]
+      }
     }
   },
   methods: {
@@ -490,6 +748,12 @@ export default {
   font-size: var(--font-sm);
 }
 
+.username {
+  font-weight: 600;
+  color: #111827;
+  font-size: var(--font-md);
+}
+
 .user-menu {
   position: absolute;
   top: 100%;
@@ -604,6 +868,71 @@ export default {
 
 /* Mobile navigation (hamburger) */
 @media (max-width: 768px) {
+  .navbar-top {
+    padding: 4px 0;
+  }
+
+  .navbar-top .navbar-container {
+    padding: 0 10px;
+    column-gap: 8px;
+  }
+
+  .brand {
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .logo img {
+    height: clamp(34px, 8.5vw, 46px);
+  }
+
+  .navbar-title {
+    min-width: 0;
+  }
+
+  .navbar-title-text {
+    font-size: clamp(0.78rem, 3.1vw, 0.92rem);
+    line-height: 1.2;
+  }
+
+  .navbar-subtitle-text {
+    font-size: clamp(0.58rem, 2.2vw, 0.7rem);
+    letter-spacing: 0.03em;
+    align-self: flex-start;
+    text-align: left;
+    line-height: 1.15;
+  }
+
+  .user-actions {
+    gap: 6px;
+  }
+
+  .user-profile {
+    gap: 4px;
+    min-width: 0;
+    max-width: min(46vw, 200px);
+  }
+
+  .username {
+    font-size: clamp(0.65rem, 2.6vw, 0.78rem);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .avatar {
+    width: 28px;
+    height: 28px;
+    font-size: clamp(0.6rem, 2.2vw, 0.72rem);
+    flex-shrink: 0;
+  }
+
+  .caret {
+    flex-shrink: 0;
+    font-size: 0.65rem;
+  }
+
   .navbar-bottom .navbar-container {
     position: relative;
     padding: 0 16px;
@@ -676,6 +1005,178 @@ export default {
   flex: 1;
   padding: var(--page-padding);
   background-color: #f5f6fa;
+  position: relative;
+}
+
+.guide-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 1001;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.35);
+}
+
+.guide-fab:hover {
+  transform: translateY(-1px);
+}
+
+.guide-popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.guide-popup-card {
+  width: min(560px, 100%);
+  max-height: 86vh;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #dbeafe;
+  box-shadow: 0 22px 48px rgba(15, 23, 42, 0.28);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.guide-popup-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.guide-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #1d4ed8;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.guide-popup-header h3 {
+  margin: 0;
+  font-size: 15px;
+  color: #0f172a;
+}
+
+.guide-popup-header p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.guide-close-btn {
+  margin-left: auto;
+  border: none;
+  background: #f1f5f9;
+  color: #475569;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.guide-message {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.guide-message p {
+  margin: 0;
+  color: #1e3a8a;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.guide-popup-content {
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.guide-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.guide-list li + li {
+  margin-top: 6px;
+}
+
+.guide-section {
+  margin-top: 12px;
+}
+
+.guide-section h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.guide-steps {
+  margin: 0;
+  padding-left: 18px;
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.guide-steps li + li {
+  margin-top: 6px;
+}
+
+.guide-popup-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.guide-btn-secondary,
+.guide-btn-primary {
+  border: none;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.guide-btn-secondary {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.guide-btn-primary {
+  background: #1d4ed8;
+  color: #fff;
 }
 
 /* Footer */
@@ -721,6 +1222,12 @@ export default {
   line-height: 1.5;
 }
 
+.contact-item span {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
 .contact-item i {
   width: 20px;
   height: 20px;
@@ -729,6 +1236,7 @@ export default {
   justify-content: center;
   font-size: var(--font-md);
   color: #ffd700;
+  flex-shrink: 0;
 }
 
 .social-links {
@@ -752,6 +1260,12 @@ export default {
   min-height: 44px;
 }
 
+.social-link span {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
 .social-link:hover {
   background-color: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.2);
@@ -771,6 +1285,7 @@ export default {
   justify-content: center;
   font-size: var(--font-md);
   color: #ffd700;
+  flex-shrink: 0;
 }
 
 .social-link.facebook i {
@@ -1020,19 +1535,77 @@ export default {
   .menu-text {
     font-size: 13px;
   }
-  
+
+  .admin-footer {
+    padding: 16px 12px;
+  }
+
+  .guide-fab {
+    right: 12px;
+    bottom: 12px;
+    border-radius: 14px;
+    width: calc(100% - 24px);
+    justify-content: center;
+  }
+
+  .guide-popup-card {
+    padding: 14px;
+    border-radius: 14px;
+    max-height: 90vh;
+  }
+
+  .guide-message p,
+  .guide-list,
+  .guide-steps {
+    font-size: 13px;
+  }
+
   .footer-content {
-    flex-direction: column;
-    gap: 30px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 16px;
+    text-align: left;
+    justify-content: stretch;
+    max-width: 960px;
   }
-  
+
+  .footer-section {
+    min-width: 0;
+  }
+
   .footer-title {
-    font-size: 20px;
+    font-size: clamp(12px, 3.2vw, 14px);
+    font-weight: 700;
+    margin: 0 0 8px 0;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.28);
   }
-  
+
+  .contact-info,
+  .social-links {
+    align-items: stretch;
+  }
+
   .contact-item,
   .social-link {
-    font-size: 14px;
+    align-items: flex-start;
+    font-size: clamp(11px, 2.8vw, 13px);
+    line-height: 1.45;
+    margin-bottom: 6px;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    min-height: auto;
+    gap: 6px;
+  }
+
+  .contact-item i,
+  .social-link i {
+    width: 16px;
+    height: 16px;
+    font-size: 13px;
+    margin-top: 2px;
   }
 }
 </style>

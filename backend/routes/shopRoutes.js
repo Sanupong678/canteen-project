@@ -3,6 +3,10 @@ import Shop from '../models/shopModel.js';
 import User from '../models/userModel.js';
 import bcrypt from 'bcryptjs';
 import Evaluation from '../models/Evaluation.js'; // Added import for Evaluation
+import Bill from '../models/billModel.js';
+import Leave from '../models/leaveModel.js';
+import Repair from '../models/repairModel.js';
+import Ranking from '../models/rankingModel.js';
 import multer from 'multer';
 import xlsx from 'xlsx';
 import fs from 'fs';
@@ -433,11 +437,41 @@ router.put('/:id', updateShop);
 // Delete a shop
 router.delete('/:id', async (req, res) => {
   try {
-    const shop = await Shop.findByIdAndDelete(req.params.id);
+    const shop = await Shop.findById(req.params.id);
     if (!shop) {
       return res.status(404).json({ message: 'Shop not found' });
     }
-    res.json({ message: 'Shop deleted successfully' });
+
+    // ลบข้อมูลที่ผูกกับ shopId ออกทั้งหมดก่อนลบร้าน
+    // เพื่อป้องกันข้อมูลค้างในหน้า repair/leave/bill/ranking(evaluation)
+    const [repairResult, leaveResult, billResult, evaluationResult, rankingResult] = await Promise.all([
+      Repair.deleteMany({ shopId: shop._id }),
+      Leave.deleteMany({ shopId: shop._id }),
+      Bill.deleteMany({ shopId: shop._id }),
+      Evaluation.deleteMany({ shopId: shop._id }),
+      Ranking.deleteMany({ shopName: shop.name })
+    ]);
+
+    // ลบร้าน
+    await Shop.findByIdAndDelete(shop._id);
+
+    // ลบ user ที่ถูกสร้างให้ร้านค้านี้ (ถ้ามี)
+    if (shop.userId) {
+      await User.findByIdAndDelete(shop.userId);
+    }
+
+    res.json({
+      message: 'Shop and related data deleted successfully',
+      deleted: {
+        shopId: shop._id,
+        userId: shop.userId || null,
+        repairs: repairResult.deletedCount || 0,
+        leaves: leaveResult.deletedCount || 0,
+        bills: billResult.deletedCount || 0,
+        evaluations: evaluationResult.deletedCount || 0,
+        rankings: rankingResult.deletedCount || 0
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

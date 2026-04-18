@@ -8,7 +8,10 @@ dotenv.config();
 // เชื่อมต่อ database
 const connectDB = async () => {
   try {
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/canteen-project';
+    const mongoUri = process.env.MONGODB_URI;
+    if (!mongoUri) {
+      throw new Error('MONGODB_URI is required');
+    }
     
     const options = {
       useNewUrlParser: true,
@@ -19,9 +22,7 @@ const connectDB = async () => {
       maxPoolSize: 10,
       minPoolSize: 2,
       maxIdleTimeMS: 30000,
-      family: 4,
-      keepAlive: true,
-      keepAliveInitialDelay: 300000
+      family: 4
     };
 
     await mongoose.connect(mongoUri, options);

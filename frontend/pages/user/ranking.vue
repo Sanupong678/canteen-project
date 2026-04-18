@@ -8,6 +8,14 @@
           <h1 class="page-title">การจัดอันดับ</h1>
           <p class="page-subtitle">สรุปคะแนนเฉลี่ยขอเดือน {{ currentMonthName }}</p>
         </div>
+        <div class="header-actions">
+          <GuidePopup
+            storage-key="user-ranking-guide"
+            title="คู่มือหน้าการจัดอันดับ"
+            intro="ทำความเข้าใจคะแนนและรายได้รายเดือนของร้านจากหน้านี้"
+            :steps="rankingGuideSteps"
+          />
+        </div>
       </div>
 
       <!-- Metric Cards -->
@@ -97,6 +105,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import LayoutUser from '~/components/LayoutUser.vue'
+import GuidePopup from '@/components/user/GuidePopup.vue'
 import axios from 'axios'
 import { getTokenWithState, getTokenFingerprint } from '@/utils/tokenUtils'
 
@@ -109,6 +118,14 @@ const currentData = ref({
 
 // Money history data
 const moneyHistory = ref([])
+
+const rankingGuideSteps = [
+  'การ์ดด้านบนแสดงข้อมูลเดือนปัจจุบัน: รายได้, คะแนนเฉลี่ย และสถานะคะแนน',
+  'หากขึ้น "รออัปเดต" หมายถึงเดือนนี้ยังไม่มีข้อมูลรายได้หรือผลประเมินล่าสุด',
+  'ตารางประวัติใช้ดูแนวโน้มย้อนหลังรายเดือนทั้งรายได้และคะแนน',
+  'สถานะคะแนน: ดีเยี่ยม (75-100), ดี (50-74), ปรับปรุง (0-49)',
+  'ใช้ข้อมูลหน้านี้วางแผนปรับปรุงคุณภาพร้านและรายได้ในเดือนถัดไป'
+]
 
 // Methods
 const formatMoney = (amount) => {
@@ -358,6 +375,12 @@ onMounted(async () => {
 .page-header {
   margin-bottom: 24px;
   text-align: center;
+  position: relative;
+}
+.header-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 .page-title {
   font-size: 26px;
@@ -421,6 +444,7 @@ onMounted(async () => {
 }
 .table-wrapper {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .date-info {
   font-size: 12px;
@@ -735,7 +759,22 @@ onMounted(async () => {
 
 @media (max-width: 768px) {
   .ranking-page {
-    padding: 16px;
+    padding: 12px 12px 20px;
+  }
+
+  .page-title {
+    font-size: clamp(1.1rem, 4.2vw, 1.45rem);
+  }
+
+  .page-subtitle {
+    font-size: clamp(0.78rem, 2.9vw, 0.9rem);
+  }
+
+  .header-actions {
+    position: static;
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
   }
   
   .metric-grid {
@@ -743,13 +782,55 @@ onMounted(async () => {
     gap: 12px;
   }
 
+  .metric-label {
+    font-size: clamp(11px, 2.8vw, 13px);
+  }
+
   .metric-value {
-    font-size: 22px;
+    font-size: clamp(1.15rem, 5vw, 1.35rem);
+  }
+
+  .section {
+    padding: 12px;
+  }
+
+  .section-header {
+    font-size: clamp(0.88rem, 3.2vw, 1rem);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+  }
+
+  .history-table {
+    font-size: clamp(11px, 2.8vw, 13px);
+  }
+
+  .history-table th {
+    font-size: clamp(10px, 2.6vw, 12px);
   }
 
   .history-table th,
   .history-table td {
-    padding: 8px 10px;
+    padding: 8px 6px;
+    vertical-align: top;
+  }
+
+  .badge {
+    font-size: clamp(10px, 2.5vw, 12px);
+    padding: 5px 9px;
+  }
+
+  .date-info {
+    font-size: clamp(10px, 2.4vw, 11px);
+    line-height: 1.55;
+  }
+
+  .no-data {
+    padding: 36px 14px;
+    min-height: 160px;
+  }
+
+  .no-data p {
+    font-size: clamp(13px, 3vw, 15px);
   }
 }
 </style> 

@@ -109,14 +109,13 @@ input, button, select, textarea { max-width: 100%; }
   .nav .nav-actions { display: flex; gap: 8px; }
 
   /* Banner: full-bleed, keep aspect ratio and reduce height */
-  .full-bleed-banner, .card-image, .news-image-container {
+  .full-bleed-banner, .card-image {
     margin-left: -16px; margin-right: -16px; width: calc(100% + 32px);
   }
-  .full-bleed-banner img, .card-image img, .news-image { height: auto; max-height: 220px; object-fit: cover; }
+  .full-bleed-banner img, .card-image img { height: auto; max-height: 220px; object-fit: cover; }
 
-  /* News: switch to single column cards */
+  /* News page layout stack; grid columns overridden in page/component scoped CSS */
   .news-layout { grid-template-columns: 1fr; }
-  .news-list { grid-template-columns: 1fr; }
 
   /* Tables: allow intentional horizontal scroll when wrapped */
   .table-wrapper,

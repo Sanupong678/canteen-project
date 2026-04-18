@@ -34,22 +34,6 @@ welcomeSchema.pre('save', async function(next) {
   next();
 });
 
-// Use the same connection as the main app but with different database name
-const getWelcomeModel = () => {
-  const isTest = process.env.NODE_ENV === 'test';
-  const dbName = isTest ? 'welcomepage_test' : 'welcomepage';
-  
-  // Use mongoose.connection if available, otherwise create new connection
-  if (mongoose.connection.readyState === 1) {
-    // Use existing connection with different database
-    const welcomeConnection = mongoose.connection.useDb(dbName);
-    return welcomeConnection.model('Welcome', welcomeSchema);
-  } else {
-    // Fallback: use default connection (will be created when mongoose.connect is called)
-    return mongoose.model('Welcome', welcomeSchema);
-  }
-};
-
-const Welcome = getWelcomeModel();
+const Welcome = mongoose.models.Welcome || mongoose.model('Welcome', welcomeSchema);
 
 export default Welcome;

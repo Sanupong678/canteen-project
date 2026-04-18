@@ -227,6 +227,12 @@ import { ref, onMounted, computed } from 'vue'
 import LayoutAdmin from '@/components/LayoutAdmin.vue'
 import axios from 'axios'
 
+const getBackendBaseUrl = () => {
+  const fromAxios = axios.defaults.baseURL || ''
+  if (fromAxios) return fromAxios.replace(/\/$/, '')
+  return process.client ? window.location.origin : ''
+}
+
 const banners = ref([])
 const uploading = ref(false)
 const deleting = ref(false)
@@ -242,22 +248,18 @@ const newBanner = ref({
   active: true
 })
 
-const backendUrl = process.env.NODE_ENV === 'production' 
-  ? 'https://your-production-domain.com' 
-  : 'http://localhost:4000'
-
 const activeBannersCount = computed(() => {
   return banners.value.filter(b => b.isActive).length
 })
 
 const getImageUrl = (banner) => {
-  return `${backendUrl}/api/backgrounds/${banner._id}/image`
+  return `${getBackendBaseUrl()}/api/backgrounds/${banner._id}/image`
 }
 
 // Fetch banners from API
 const loadBanners = async () => {
   try {
-    const response = await axios.get(`${backendUrl}/api/backgrounds`)
+    const response = await axios.get('/api/backgrounds')
     if (response.data.success) {
       banners.value = response.data.data
     }
@@ -325,7 +327,7 @@ const addBanner = async () => {
     formData.append('image', newBanner.value.image)
     formData.append('description', newBanner.value.link || '')
 
-    const response = await axios.post(`${backendUrl}/api/backgrounds`, formData, {
+    const response = await axios.post('/api/backgrounds', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
@@ -356,7 +358,7 @@ const deleteBanner = async () => {
 
   deleting.value = true
   try {
-    await axios.delete(`${backendUrl}/api/backgrounds/${bannerToDelete.value._id}`)
+    await axios.delete(`/api/backgrounds/${bannerToDelete.value._id}`)
     banners.value = banners.value.filter(banner => banner._id !== bannerToDelete.value._id)
     showDeleteDialog.value = false
     bannerToDelete.value = null
@@ -372,7 +374,7 @@ const deleteBanner = async () => {
 // Toggle banner status
 const toggleBannerStatus = async (banner) => {
   try {
-    const response = await axios.patch(`${backendUrl}/api/backgrounds/${banner._id}/toggle`, {})
+    const response = await axios.patch(`/api/backgrounds/${banner._id}/toggle`, {})
     
     if (response.data.success) {
       const index = banners.value.findIndex(b => b._id === banner._id)

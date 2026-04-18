@@ -160,7 +160,7 @@ export default {
 
     async markAllAsRead() {
       try {
-        await this.$axios.put('/api/notifications/read-all');
+        await this.$axios.put('/api/notifications/mark-all-read');
         await this.fetchNotifications();
       } catch (error) {
         console.error('Error marking all notifications as read:', error);

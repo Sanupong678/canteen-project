@@ -127,14 +127,21 @@ export const googleAuthCallback = async (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const redirectUri = process.env.GOOGLE_REDIRECT_URI;
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const frontendUrl = process.env.FRONTEND_URL;
+
+  if (!frontendUrl) {
+    return res.status(500).json({
+      success: false,
+      message: 'FRONTEND_URL is required for Google OAuth callback'
+    });
+  }
 
   if (!code) {
     return res.redirect(`${frontendUrl}/login?error=missing_code`);
   }
 
-  if (!clientId || !clientSecret || !redirectUri) {
-    console.error('GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET or GOOGLE_REDIRECT_URI is not set');
+  if (!clientId || !clientSecret || !redirectUri || !frontendUrl) {
+    console.error('GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, or FRONTEND_URL is not set');
     return res.redirect(`${frontendUrl}/login?error=config_missing`);
   }
 
@@ -237,7 +244,7 @@ export const login = async (req, res) => {
   
   try {
     // ตรวจสอบ admin ก่อนเป็นอันดับแรก
-    if (username === 'admin' && password === '1234') {
+    if (username === 'admin' && password === 'lto6rd@MFU2026') {
       console.log('Admin login successful');
       
       // สร้าง token สำหรับ admin

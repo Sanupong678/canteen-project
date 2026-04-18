@@ -74,43 +74,60 @@
           </v-row>
         </div>
 
-        <!-- เพิ่ม v-btn-toggle และปุ่มอัปโหลดไฟล์ Excel โดยแบ่งซ้ายขวา (อัปโหลดอยู่ซ้าย, toggle อยู่ขวา) -->
-        <div class="d-flex justify-space-between align-center mb-4">
-          <div class="d-flex align-center">
-            <input
-              ref="fileInput"
-              type="file"
-              accept=".xlsx,.xls"
-              style="display: none"
-              @change="onFileChange"
-            />
-            <v-btn color="primary" class="mr-2" @click="$refs.fileInput.click()">
-              <v-icon left>mdi-upload</v-icon>เลือกไฟล์ Excel
-            </v-btn>
-            <span v-if="fileName" class="ml-1">{{ fileName }}</span>
-            <v-btn color="success" class="ml-3" :disabled="!selectedFile" @click="uploadFile">
-              <v-icon left>mdi-cloud-upload</v-icon>อัปโหลด
-            </v-btn>
-          </div>
-          <div class="d-flex align-center gap-3">
-            <v-btn 
-              color="primary" 
-              variant="outlined"
-              @click="showControlDialog = true"
-            >
-              <v-icon left>mdi-cog</v-icon>
-              ควบคุม
-            </v-btn>
-            <v-btn 
-              color="info" 
-              variant="outlined"
-              @click="toggleHistoryView"
-              :class="{ 'active-history': showHistoryView }"
-            >
-              <v-icon left>mdi-history</v-icon>
-              {{ showHistoryView ? 'ข้อมูลปัจจุบัน' : 'ประวัติ' }}
-            </v-btn>
-          </div>
+        <!-- ปุ่มแถบเครื่องมือ: กะทัดรัด ไม่เลื่อนแนวนอน (ตัดบรรทัดได้เมื่อจอแคบ) -->
+        <div class="bill-toolbar-row mb-4">
+          <input
+            ref="fileInput"
+            type="file"
+            accept=".xlsx,.xls"
+            style="display: none"
+            @change="onFileChange"
+          />
+          <v-btn
+            class="bill-toolbar-btn"
+            color="primary"
+            size="x-small"
+            density="compact"
+            prepend-icon="mdi-upload"
+            @click="$refs.fileInput.click()"
+          >
+            เลือกไฟล์
+          </v-btn>
+          <span v-if="fileName" class="file-name-label" :title="fileName">{{ fileName }}</span>
+          <v-btn
+            class="bill-toolbar-btn"
+            color="success"
+            size="x-small"
+            density="compact"
+            prepend-icon="mdi-cloud-upload"
+            :disabled="!selectedFile"
+            @click="uploadFile"
+          >
+            อัปโหลด
+          </v-btn>
+          <v-btn
+            class="bill-toolbar-btn"
+            color="primary"
+            variant="outlined"
+            size="x-small"
+            density="compact"
+            prepend-icon="mdi-cog"
+            @click="showControlDialog = true"
+          >
+            ควบคุม
+          </v-btn>
+          <v-btn
+            class="bill-toolbar-btn"
+            color="info"
+            variant="outlined"
+            size="x-small"
+            density="compact"
+            prepend-icon="mdi-history"
+            @click="toggleHistoryView"
+            :class="{ 'active-history': showHistoryView }"
+          >
+            {{ showHistoryView ? 'ปัจจุบัน' : 'ประวัติ' }}
+          </v-btn>
         </div>
 
         <!-- Current Month Info -->
@@ -335,13 +352,103 @@
                  </div>
                </div>
              </div>
+             <div class="payment-settings-section">
+               <h3>ตั้งค่าชำระเงิน (ผู้ใช้งาน)</h3>
+               <v-text-field
+                 v-model="paymentSettings.accountNumber"
+                 label="เลขบัญชี"
+                 variant="outlined"
+                 density="compact"
+                 hide-details="auto"
+                 class="mb-2"
+               />
+               <v-text-field
+                 v-model="paymentSettings.bankName"
+                 label="ธนาคาร"
+                 variant="outlined"
+                 density="compact"
+                 hide-details="auto"
+                 class="mb-2"
+               />
+               <v-text-field
+                 v-model="newPaymentQrTitle"
+                 label="หัวข้อ QR Code ใหม่"
+                 variant="outlined"
+                 density="compact"
+                 hide-details="auto"
+                 class="mb-2"
+               />
+               <div class="payment-qr-upload-row">
+                 <input
+                   ref="newPaymentQrInput"
+                   type="file"
+                   accept="image/*"
+                   style="display: none"
+                   @change="onNewPaymentQrFileChange"
+                 />
+                 <v-btn
+                   size="small"
+                   variant="outlined"
+                   prepend-icon="mdi-qrcode"
+                   @click="newPaymentQrInput?.click()"
+                 >
+                   เลือกรูป QR
+                 </v-btn>
+                 <span class="payment-qr-file-label" v-if="newPaymentQrFileName">{{ newPaymentQrFileName }}</span>
+                 <v-btn
+                   size="small"
+                   color="primary"
+                   :loading="addingPaymentQrItem"
+                   :disabled="!newPaymentQrTitle || !newPaymentQrFile"
+                   @click="addPaymentQrItem"
+                 >
+                   เพิ่ม QR
+                 </v-btn>
+               </div>
+               <div class="payment-qr-preview" v-if="newPaymentQrPreviewUrl">
+                 <img :src="newPaymentQrPreviewUrl" alt="New payment QR preview" />
+               </div>
+               <div class="payment-qr-list" v-if="paymentSettings.qrItems && paymentSettings.qrItems.length">
+                 <div class="payment-qr-item" v-for="item in paymentSettings.qrItems" :key="item._id">
+                   <img :src="toAbsoluteUploadUrl(item.imagePath)" alt="Payment QR item" />
+                   <div class="payment-qr-item-content">
+                     <v-text-field
+                       v-model="item.title"
+                       variant="outlined"
+                       density="compact"
+                       hide-details
+                       class="payment-qr-item-title"
+                     />
+                     <div class="payment-qr-item-actions">
+                       <v-btn
+                         size="x-small"
+                         color="primary"
+                         :loading="qrItemSavingId === item._id"
+                         @click="updatePaymentQrItem(item)"
+                       >
+                         บันทึกหัวข้อ
+                       </v-btn>
+                       <v-btn
+                         size="x-small"
+                         color="error"
+                         variant="outlined"
+                         :loading="deletingQrItemId === item._id"
+                         @click="deletePaymentQrItem(item._id)"
+                       >
+                         ลบ
+                       </v-btn>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             </div>
            </v-card-text>
            <v-card-actions class="control-dialog-actions">
              <v-spacer></v-spacer>
              <v-btn color="grey" text @click="showControlDialog = false">
                ยกเลิก
              </v-btn>
-             <v-btn color="primary" @click="saveMonthSettings">
+             <v-btn color="primary" :loading="savingPaymentSettings" @click="saveMonthSettings">
                <v-icon left>mdi-content-save</v-icon>
                บันทึก
              </v-btn>
@@ -495,6 +602,28 @@ export default {
       'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
     ]
     const monthSettings = ref([])
+    const paymentSettings = ref({
+      accountNumber: '6720407581',
+      bankName: 'ธนาคารกรุงเทพ',
+      qrItems: []
+    })
+    const newPaymentQrInput = ref(null)
+    const newPaymentQrFile = ref(null)
+    const newPaymentQrFileName = ref('')
+    const newPaymentQrPreviewUrl = ref('')
+    const newPaymentQrTitle = ref('')
+    const savingPaymentSettings = ref(false)
+    const addingPaymentQrItem = ref(false)
+    const qrItemSavingId = ref(null)
+    const deletingQrItemId = ref(null)
+
+    const resetNewPaymentQrInput = () => {
+      newPaymentQrFile.value = null
+      newPaymentQrFileName.value = ''
+      newPaymentQrPreviewUrl.value = ''
+      newPaymentQrTitle.value = ''
+      if (newPaymentQrInput.value) newPaymentQrInput.value.value = ''
+    }
 
     // Initialize month settings
     const initializeMonthSettings = async () => {
@@ -557,6 +686,144 @@ export default {
       }
     }
 
+    const toAbsoluteUploadUrl = (relativePath) => {
+      if (!relativePath) return ''
+      if (/^https?:\/\//i.test(relativePath)) return relativePath
+      const normalizedPath = relativePath.startsWith('/') ? relativePath : `/${relativePath}`
+      const baseURL = $axios.defaults.baseURL || ''
+      return `${baseURL}${normalizedPath}`
+    }
+
+    const loadPaymentSettings = async () => {
+      try {
+        const response = await $axios.get('/api/payment-settings')
+        if (response.data?.success && response.data.data) {
+          paymentSettings.value = {
+            accountNumber: response.data.data.accountNumber || '6720407581',
+            bankName: response.data.data.bankName || 'ธนาคารกรุงเทพ',
+            qrItems: Array.isArray(response.data.data.qrItems) ? response.data.data.qrItems : []
+          }
+        }
+      } catch (error) {
+        console.error('Error loading payment settings:', error)
+      }
+    }
+
+    const onNewPaymentQrFileChange = (event) => {
+      const file = event.target.files?.[0]
+      if (!file) return
+      if (!file.type.startsWith('image/')) {
+        alert('กรุณาเลือกรูปภาพ QR Code เท่านั้น')
+        event.target.value = ''
+        return
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        alert('ขนาดไฟล์ QR Code ไม่ควรเกิน 5MB')
+        event.target.value = ''
+        return
+      }
+      newPaymentQrFile.value = file
+      newPaymentQrFileName.value = file.name
+      const reader = new FileReader()
+      reader.onload = () => {
+        newPaymentQrPreviewUrl.value = typeof reader.result === 'string' ? reader.result : ''
+      }
+      reader.readAsDataURL(file)
+    }
+
+    const addPaymentQrItem = async () => {
+      if (!newPaymentQrTitle.value.trim() || !newPaymentQrFile.value) return
+      addingPaymentQrItem.value = true
+      try {
+        const formData = new FormData()
+        formData.append('title', newPaymentQrTitle.value.trim())
+        formData.append('qrCodeImage', newPaymentQrFile.value)
+        const response = await $axios.post('/api/payment-settings/qr-items', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        })
+        if (response.data?.success && response.data.data) {
+          paymentSettings.value = {
+            accountNumber: response.data.data.accountNumber || paymentSettings.value.accountNumber,
+            bankName: response.data.data.bankName || paymentSettings.value.bankName,
+            qrItems: Array.isArray(response.data.data.qrItems) ? response.data.data.qrItems : []
+          }
+          resetNewPaymentQrInput()
+        }
+      } catch (error) {
+        console.error('Error adding payment QR item:', error)
+        alert('เพิ่ม QR Code ไม่สำเร็จ')
+      } finally {
+        addingPaymentQrItem.value = false
+      }
+    }
+
+    const updatePaymentQrItem = async (item) => {
+      if (!item?._id) return
+      qrItemSavingId.value = item._id
+      try {
+        const formData = new FormData()
+        formData.append('title', item.title || '')
+        const response = await $axios.put(`/api/payment-settings/qr-items/${item._id}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        })
+        if (response.data?.success && response.data.data) {
+          paymentSettings.value = {
+            accountNumber: response.data.data.accountNumber || paymentSettings.value.accountNumber,
+            bankName: response.data.data.bankName || paymentSettings.value.bankName,
+            qrItems: Array.isArray(response.data.data.qrItems) ? response.data.data.qrItems : []
+          }
+        }
+      } catch (error) {
+        console.error('Error updating payment QR item:', error)
+        alert('บันทึกหัวข้อ QR ไม่สำเร็จ')
+      } finally {
+        qrItemSavingId.value = null
+      }
+    }
+
+    const deletePaymentQrItem = async (id) => {
+      if (!id) return
+      if (!confirm('ยืนยันการลบ QR Code นี้ใช่หรือไม่?')) return
+      deletingQrItemId.value = id
+      try {
+        const response = await $axios.delete(`/api/payment-settings/qr-items/${id}`)
+        if (response.data?.success && response.data.data) {
+          paymentSettings.value = {
+            accountNumber: response.data.data.accountNumber || paymentSettings.value.accountNumber,
+            bankName: response.data.data.bankName || paymentSettings.value.bankName,
+            qrItems: Array.isArray(response.data.data.qrItems) ? response.data.data.qrItems : []
+          }
+        }
+      } catch (error) {
+        console.error('Error deleting payment QR item:', error)
+        alert('ลบ QR Code ไม่สำเร็จ')
+      } finally {
+        deletingQrItemId.value = null
+      }
+    }
+
+    const savePaymentSettings = async () => {
+      savingPaymentSettings.value = true
+      try {
+        const response = await $axios.put('/api/payment-settings', {
+          accountNumber: paymentSettings.value.accountNumber || '6720407581',
+          bankName: paymentSettings.value.bankName || 'ธนาคารกรุงเทพ'
+        })
+        if (response.data?.success) {
+          paymentSettings.value = {
+            accountNumber: response.data.data.accountNumber || '6720407581',
+            bankName: response.data.data.bankName || 'ธนาคารกรุงเทพ',
+            qrItems: Array.isArray(response.data.data.qrItems) ? response.data.data.qrItems : []
+          }
+        }
+      } catch (error) {
+        console.error('Error saving payment settings:', error)
+        throw error
+      } finally {
+        savingPaymentSettings.value = false
+      }
+    }
+
     // Save month settings
     const saveMonthSettings = async () => {
       try {
@@ -578,6 +845,7 @@ export default {
         })
         
         await Promise.all(promises)
+        await savePaymentSettings()
         alert('บันทึกการตั้งค่าเรียบร้อยแล้ว')
         showControlDialog.value = false
       } catch (error) {
@@ -600,12 +868,12 @@ export default {
     }
 
     const headers = computed(() => [
-      { text: 'ID', value: 'shopId', align: 'start' },
-      { text: 'ข้อมูลร้านค้า', value: 'guestInfo', align: 'start' },
-      { text: 'รายละเอียดวัน', value: 'reservation', align: 'start' },
-      { text: 'ค่าไฟและค่าน้ำ', value: 'special', align: 'start' },
-      { text: 'สถานะ', value: 'status', align: 'center' },
-      { text: 'การจัดการ', value: 'actions', align: 'center', sortable: false }
+      { title: 'รหัสร้าน', key: 'shopId', align: 'start', minWidth: '140px', width: '150px' },
+      { title: 'ข้อมูลร้านค้า', key: 'guestInfo', align: 'start', minWidth: '320px' },
+      { title: 'รายละเอียดวัน', key: 'reservation', align: 'start', minWidth: '220px' },
+      { title: 'ค่าไฟและค่าน้ำ', key: 'special', align: 'start', minWidth: '300px' },
+      { title: 'สถานะ', key: 'status', align: 'center', minWidth: '160px', width: '170px' },
+      { title: 'การจัดการ', key: 'actions', align: 'center', sortable: false, minWidth: '280px' }
     ])
 
     const billTypes = [
@@ -870,6 +1138,7 @@ export default {
     // Initial data fetch and realtime updates
     onMounted(async () => {
       await initializeMonthSettings() // Initialize month settings
+      await loadPaymentSettings()
       
       // REST API = Source of Truth - ดึงข้อมูลครั้งแรก
       await fetchBills()
@@ -892,6 +1161,7 @@ export default {
     // Cleanup socket listeners when component unmounts
     onUnmounted(() => {
       try {
+        resetNewPaymentQrInput()
         if ($socket) {
           $socket.off('admin:bill:newUpload')
           $socket.off('user:bill:updated')
@@ -1164,9 +1434,7 @@ export default {
       }
       
       // ใช้ baseURL จาก axios config (เหมือน repair page)
-      const baseURL = $axios.defaults.baseURL || (process.env.NODE_ENV === 'production' 
-        ? window.location.origin 
-        : 'http://localhost:4000')
+      const baseURL = $axios.defaults.baseURL || ''
       
       const timestamp = new Date().getTime()
       const url = `${baseURL}/api/bills/image/${billId}?t=${timestamp}`
@@ -1222,6 +1490,7 @@ export default {
       if (newVal) {
         // When dialog opens, reload settings for current year
         await loadMonthSettings()
+        await loadPaymentSettings()
       }
     })
 
@@ -1242,6 +1511,21 @@ export default {
       currentControlYear,
       allMonths,
       monthSettings,
+      paymentSettings,
+      newPaymentQrInput,
+      newPaymentQrTitle,
+      newPaymentQrFile,
+      newPaymentQrFileName,
+      newPaymentQrPreviewUrl,
+      onNewPaymentQrFileChange,
+      addPaymentQrItem,
+      updatePaymentQrItem,
+      deletePaymentQrItem,
+      qrItemSavingId,
+      deletingQrItemId,
+      addingPaymentQrItem,
+      toAbsoluteUploadUrl,
+      savingPaymentSettings,
       saveMonthSettings,
       filteredBills,
       canteenTypes,
@@ -1314,25 +1598,26 @@ export default {
 .header-section {
   background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
   color: white;
-  padding: 24px;
+  padding: 16px 18px;
   border-radius: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 18px;
   box-shadow: 0 4px 20px rgba(231, 76, 60, 0.15);
 }
 
 .page-title {
-  font-size: 2rem;
+  font-size: clamp(1.2rem, 3.4vw, 1.65rem);
   font-weight: 700;
   color: white;
   margin: 0;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  line-height: 1.25;
 }
 
 .filters-section {
   background: #ffffff;
-  padding: 12px 16px;
+  padding: 10px 14px;
   border-radius: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 18px;
   box-shadow: 0 4px 20px rgba(231, 76, 60, 0.1);
 }
 
@@ -1352,7 +1637,7 @@ export default {
   flex-wrap: wrap;
 }
 
-.filter-input :deep(.v-field) { height: 44px !important; }
+.filter-input :deep(.v-field) { height: 40px !important; min-height: 40px !important; }
 .filter-input :deep(.v-field__input) { align-items: center !important; }
 .filter-input :deep(.v-field__prepend-inner),
 .filter-input :deep(.v-field__append-inner) { align-items: center !important; }
@@ -1364,6 +1649,7 @@ export default {
   top: 28% !important;
   transform: translateY(-50%) scale(1) !important;
   opacity: 1 !important;
+  font-size: 12px !important;
 }
 
 /* Ensure v-select selection text sits middle */
@@ -1371,7 +1657,7 @@ export default {
 .pill-select :deep(.v-select__selection) {
   display: flex !important;
   align-items: center !important;
-  font-size: 13px !important;
+  font-size: 12px !important;
   margin-top: -2px !important;
 }
 
@@ -1393,13 +1679,13 @@ export default {
 }
 
 .custom-select :deep(.v-select__selections) {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
 }
 
 .custom-select :deep(.v-input__control),
 .custom-select :deep(.v-field) {
-  min-height: 40px !important;
+  min-height: 36px !important;
 }
 
 .pill-select :deep(.v-field) {
@@ -1438,8 +1724,8 @@ export default {
 }
 
 .search-input :deep(.v-field__input) {
-  padding-left: 16px !important;
-  font-size: 16px !important;
+  padding-left: 14px !important;
+  font-size: 14px !important;
   color: #333 !important;
 }
 
@@ -1480,6 +1766,13 @@ export default {
   overflow: hidden;
 }
 
+/* ให้ตารางกว้างพอดีกับ minWidth ของแต่ละคอลัมน์ */
+.custom-table :deep(table) {
+  width: 100%;
+  min-width: 1470px;
+  table-layout: auto;
+}
+
 .v-data-table :deep(.v-data-table__wrapper) {
   border-radius: 12px;
   overflow: hidden;
@@ -1500,23 +1793,29 @@ export default {
   font-weight: 700 !important;
   text-transform: none !important;
   white-space: nowrap;
-  padding: 16px 12px !important;
+  padding: 10px 10px !important;
+  font-size: 0.8125rem !important;
+}
+
+.v-data-table :deep(th) b {
+  font-size: inherit;
 }
 
 .v-data-table :deep(td) {
-  padding: 12px !important;
+  padding: 10px !important;
   border-bottom: 1px solid #fecaca;
+  font-size: 0.8125rem !important;
 }
 
 /* Pagination styles (copied from repair admin) */
-.pagination-section { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; margin-top: 12px; }
-.items-per-page { display: flex; align-items: center; gap: 10px; color: #374151; font-size: 14px; }
-.items-per-page .fixed-size { padding: 6px 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; min-width: 48px; text-align: center; }
-.items-per-page .range { margin-left: 12px; color: #6b7280; }
-.pagination { display: flex; gap: 6px; }
-.page-num { min-width: 44px; height: 44px; border: 1px solid #e5e7eb; background: #fff; color: #7f1d1d; border-radius: 2px; cursor: pointer; }
+.pagination-section { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; margin-top: 10px; }
+.items-per-page { display: flex; align-items: center; gap: 8px; color: #374151; font-size: 0.8125rem; flex-wrap: wrap; }
+.items-per-page .fixed-size { padding: 5px 10px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; min-width: 44px; text-align: center; font-size: 0.8125rem; }
+.items-per-page .range { margin-left: 8px; color: #6b7280; font-size: 0.8125rem; }
+.pagination { display: flex; gap: 4px; flex-wrap: wrap; }
+.page-num { min-width: 38px; height: 38px; border: 1px solid #e5e7eb; background: #fff; color: #7f1d1d; border-radius: 2px; cursor: pointer; font-size: 0.8125rem; }
 .page-num.active { background: #7f1d1d; color: #fff; border-color: #7f1d1d; }
-.page-next { border: 1px solid #e5e7eb; background: #fff; color: #7f1d1d; border-radius: 2px; padding: 0 10px; cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+.page-next { border: 1px solid #e5e7eb; background: #fff; color: #7f1d1d; border-radius: 2px; padding: 0 10px; cursor: pointer; min-height: 38px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8125rem; }
 
 .v-chip {
   margin: 4px;
@@ -1534,9 +1833,11 @@ export default {
   font-weight: 600 !important;
   text-transform: none !important;
   transition: all 0.3s ease !important;
-  min-width: 100px;
-  min-height: 44px;
-  margin: 4px;
+  min-width: 64px;
+  min-height: 38px;
+  padding: 0 10px !important;
+  font-size: 0.8125rem !important;
+  margin: 2px;
 }
 
 .v-btn:hover {
@@ -1637,16 +1938,68 @@ export default {
 }
 
 .show-bill-btn {
-  min-width: 120px;
-  border-radius: 8px;
+  min-width: 0;
+  padding: 0 8px !important;
+  border-radius: 6px;
+  font-size: 0.75rem !important;
+  min-height: 32px !important;
 }
 
 /* Guest info lines with icons */
 .guest-info { display: flex; flex-direction: column; gap: 4px; }
 .guest-info-line { display: flex; align-items: center; gap: 6px; }
 .guest-info-icon { color: #6b7280; }
-.guest-info-label { color: #6b7280; font-weight: 500; font-size: 12px; }
-.guest-info-value { font-size: 14px; }
+.guest-info-label { color: #6b7280; font-weight: 500; font-size: 11px; }
+.guest-info-value { font-size: 13px; }
+
+.file-name-label {
+  font-size: 0.6875rem;
+  color: #374151;
+  max-width: min(140px, 28vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bill-toolbar-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  align-content: center;
+  gap: 6px;
+  overflow: visible;
+  padding: 2px 0 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.bill-toolbar-row .file-name-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+/* ปุ่มแถบบิล: เล็กกว่าปุ่มทั่วไปในหน้า ไม่ใช้แถบเลื่อน */
+.bill-toolbar-row .bill-toolbar-btn {
+  min-width: 0 !important;
+  min-height: 28px !important;
+  height: auto !important;
+  padding: 0 8px !important;
+  font-size: 0.6875rem !important;
+  font-weight: 600 !important;
+  margin: 0 !important;
+  border-radius: 6px !important;
+}
+
+.bill-toolbar-row .bill-toolbar-btn :deep(.v-btn__prepend) {
+  margin-inline-end: 4px !important;
+}
+
+.bill-toolbar-row .bill-toolbar-btn :deep(.v-btn__prepend .v-icon) {
+  font-size: 1rem !important;
+}
 
 /* เพิ่ม CSS สำหรับการแสดงข้อมูลค่าไฟและค่าน้ำ */
 .bill-utility-cell {
@@ -1660,6 +2013,11 @@ export default {
   display: flex;
   align-items: center;
   gap: 8px;
+  font-size: 0.8125rem;
+}
+
+.bill-utility-line b {
+  font-weight: 600;
 }
 
 .bill-utility-image {
@@ -1895,18 +2253,31 @@ export default {
 /* Responsive Design */
 @media (max-width: 768px) {
   .page-container {
-    padding: 1rem;
+    padding: 0.75rem;
   }
 
   .header-section {
     flex-direction: column;
     gap: 1rem;
     align-items: flex-start;
-    padding: 16px;
+    padding: 12px 14px;
+  }
+
+  .page-title {
+    font-size: clamp(1.05rem, 3.2vw, 1.35rem);
   }
 
   .filters-section {
-    padding: 16px;
+    padding: 10px 12px;
+  }
+
+  .filter-input :deep(.v-field) {
+    height: 38px !important;
+    min-height: 38px !important;
+  }
+
+  .search-input :deep(.v-field__input) {
+    font-size: 13px !important;
   }
 
   .bill-row {
@@ -1917,6 +2288,11 @@ export default {
   
   .bill-label {
     min-width: auto;
+    font-size: 0.8125rem;
+  }
+
+  .bill-amount {
+    font-size: 0.875rem;
   }
   
   .status-item {
@@ -1930,13 +2306,65 @@ export default {
   }
   
   .v-btn {
-    min-width: 90px;
+    min-width: 0;
+    min-height: 36px;
+    padding: 0 8px !important;
+    font-size: clamp(11px, 2.85vw, 13px) !important;
     margin: 2px;
+  }
+
+  .show-bill-btn {
+    font-size: clamp(10px, 2.7vw, 12px) !important;
+    min-height: 30px !important;
+  }
+
+  .guest-info-label {
+    font-size: clamp(10px, 2.6vw, 11px);
+  }
+
+  .guest-info-value {
+    font-size: clamp(11px, 2.8vw, 13px);
+  }
+
+  .bill-utility-line {
+    font-size: clamp(11px, 2.8vw, 13px);
   }
 
   .v-data-table :deep(td),
   .v-data-table :deep(th) {
-    padding: 8px !important;
+    padding: 8px 6px !important;
+    font-size: clamp(11px, 2.8vw, 13px) !important;
+  }
+
+  .items-per-page,
+  .items-per-page .range {
+    font-size: clamp(11px, 2.8vw, 13px);
+  }
+
+  .page-num,
+  .page-next {
+    min-height: 36px;
+    font-size: clamp(11px, 2.8vw, 13px);
+  }
+
+  .current-month-info :deep(.v-alert),
+  .history-info :deep(.v-alert) {
+    font-size: clamp(11px, 2.8vw, 13px);
+  }
+
+  .bill-toolbar-row .file-name-label {
+    max-width: min(100px, 32vw);
+    font-size: clamp(9px, 2.4vw, 11px);
+  }
+
+  .bill-toolbar-row .bill-toolbar-btn {
+    min-height: 26px !important;
+    padding: 0 6px !important;
+    font-size: clamp(0.58rem, 2.5vw, 0.6875rem) !important;
+  }
+
+  .bill-toolbar-row .bill-toolbar-btn :deep(.v-btn__prepend .v-icon) {
+    font-size: 0.875rem !important;
   }
 }
 
@@ -2127,6 +2555,88 @@ input:checked + .slider:before {
   border-top: 1px solid #e9ecef;
 }
 
+.payment-settings-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.payment-settings-section h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.payment-qr-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.payment-qr-file-label {
+  font-size: 12px;
+  color: #4b5563;
+  max-width: min(320px, 56vw);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.payment-qr-preview {
+  margin-top: 12px;
+}
+
+.payment-qr-preview img {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  padding: 6px;
+}
+
+.payment-qr-list {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.payment-qr-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f9fafb;
+}
+
+.payment-qr-item img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  padding: 4px;
+  flex-shrink: 0;
+}
+
+.payment-qr-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.payment-qr-item-actions {
+  margin-top: 6px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 /* Responsive for Control Dialog */
 @media (max-width: 768px) {
   .months-grid {
@@ -2148,6 +2658,20 @@ input:checked + .slider:before {
   
   .current-year {
     font-size: 14px;
+  }
+
+  .payment-qr-preview img {
+    width: 96px;
+    height: 96px;
+  }
+
+  .payment-qr-item {
+    align-items: flex-start;
+  }
+
+  .payment-qr-item img {
+    width: 64px;
+    height: 64px;
   }
 }
 

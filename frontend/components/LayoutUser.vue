@@ -8,7 +8,7 @@
             <img src="/images/Logo.jpg" alt="Logo">
           </div>
           <div class="navbar-title">
-            <h1 class="navbar-title-text">มหาวิทยาลัยเเม่ฟ้าหลวง</h1>
+            <h1 class="navbar-title-text">มหาวิทยาลัยแม่ฟ้าหลวง</h1>
             <p class="navbar-subtitle-text">ระบบบริหารจัดการโรงอาหาร</p>
           </div>
         </div>
@@ -643,6 +643,9 @@ export default {
   background-color: white;
   padding: 6px 0;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: visible;
+  position: relative;
+  z-index: 100;
 }
 
 .navbar-top-container {
@@ -671,6 +674,7 @@ export default {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
+  overflow: visible;
 }
 
 .area-left { justify-self: start; }
@@ -718,6 +722,7 @@ export default {
   display: flex;
   align-items: center;
   gap: var(--gap);
+  overflow: visible;
 }
 
 .notification {
@@ -760,6 +765,12 @@ export default {
 .caret {
   color: #6b7280;
   font-size: var(--font-sm);
+}
+
+.username {
+  font-weight: 600;
+  color: #111827;
+  font-size: var(--font-md);
 }
 
 .user-menu {
@@ -876,6 +887,71 @@ export default {
 
 /* Mobile navigation (hamburger) */
 @media (max-width: 768px) {
+  .navbar-top {
+    padding: 4px 0;
+  }
+
+  .navbar-top .navbar-container {
+    padding: 0 10px;
+    column-gap: 8px;
+  }
+
+  .brand {
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .logo img {
+    height: clamp(34px, 8.5vw, 46px);
+  }
+
+  .navbar-title {
+    min-width: 0;
+  }
+
+  .navbar-title-text {
+    font-size: clamp(0.78rem, 3.1vw, 0.92rem);
+    line-height: 1.2;
+  }
+
+  .navbar-subtitle-text {
+    font-size: clamp(0.58rem, 2.2vw, 0.7rem);
+    letter-spacing: 0.03em;
+    align-self: flex-start;
+    text-align: left;
+    line-height: 1.15;
+  }
+
+  .user-actions {
+    gap: 6px;
+  }
+
+  .user-profile {
+    gap: 4px;
+    min-width: 0;
+    max-width: min(46vw, 200px);
+  }
+
+  .username {
+    font-size: clamp(0.65rem, 2.6vw, 0.78rem);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .avatar {
+    width: 28px;
+    height: 28px;
+    font-size: clamp(0.6rem, 2.2vw, 0.72rem);
+    flex-shrink: 0;
+  }
+
+  .caret {
+    flex-shrink: 0;
+    font-size: 0.65rem;
+  }
+
   .navbar-bottom .navbar-container {
     position: relative;
     padding: 0 16px;
@@ -993,6 +1069,12 @@ export default {
   line-height: 1.5;
 }
 
+.contact-item span {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
 .contact-item i {
   width: 20px;
   height: 20px;
@@ -1001,6 +1083,7 @@ export default {
   justify-content: center;
   font-size: var(--font-md);
   color: #ffd700;
+  flex-shrink: 0;
 }
 
 .social-links {
@@ -1024,6 +1107,12 @@ export default {
   min-height: 44px;
 }
 
+.social-link span {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
 .social-link:hover {
   background-color: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.2);
@@ -1043,6 +1132,7 @@ export default {
   justify-content: center;
   font-size: var(--font-md);
   color: #ffd700;
+  flex-shrink: 0;
 }
 
 .social-link.facebook i {
@@ -1066,67 +1156,57 @@ export default {
   .menu-text {
     font-size: 13px;
   }
-  
-  .footer-content {
-    flex-direction: column;
-    gap: 30px;
-  }
-  
-  .footer-title {
-    font-size: 20px;
-  }
-  
-  .contact-item,
-  .social-link {
-    font-size: 14px;
-  }
-}
 
-@media (max-width: 640px) {
   .user-footer {
-    padding: 16px;
+    padding: 16px 12px;
   }
 
   .footer-content {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 12px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 16px;
     text-align: left;
+    justify-content: stretch;
+    max-width: 960px;
   }
 
   .footer-section {
-    flex: 1;
-    min-width: 140px;
+    min-width: 0;
   }
 
   .footer-title {
-    font-size: 13px;
-    font-weight: 600;
-    margin-bottom: 8px;
+    font-size: clamp(12px, 3.2vw, 14px);
+    font-weight: 700;
+    margin: 0 0 8px 0;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.28);
+  }
+
+  .contact-info,
+  .social-links {
+    align-items: stretch;
   }
 
   .contact-item,
   .social-link {
-    font-size: 12px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    align-items: flex-start;
+    font-size: clamp(11px, 2.8vw, 13px);
+    line-height: 1.45;
     margin-bottom: 6px;
     padding: 0;
     border: none;
     border-radius: 0;
     background: transparent;
     min-height: auto;
+    gap: 6px;
   }
 
   .contact-item i,
   .social-link i {
-    font-size: 14px;
     width: 16px;
     height: 16px;
-    flex-shrink: 0;
+    font-size: 13px;
+    margin-top: 2px;
   }
 }
 

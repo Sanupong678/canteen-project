@@ -533,17 +533,28 @@ export const importBillExcel = async (req, res) => {
     // ใช้ bulk operations เพื่อเพิ่มประสิทธิภาพ
     const updateOperations = [];
     const errors = [];
+    let skippedRowsWithoutShopId = 0;
+    let candidateRows = 0;
     
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const rowNum = i + 2; // +2 เพราะ row 1 คือ header, row 2 คือ data แถวแรก
       
-      // ตรวจสอบ required fields
-      if (!row.shopId) {
-        errors.push(`Row ${rowNum}: Missing shopId`);
+      // รองรับไฟล์ที่มีหลายบรรทัดบัญชีต่อ 1 ร้าน โดยข้ามแถวที่ไม่มี shopId
+      const customId = row.shopId !== undefined && row.shopId !== null
+        ? String(row.shopId).trim()
+        : '';
+      if (!customId) {
+        skippedRowsWithoutShopId += 1;
         continue;
       }
-      if (!row.billType) {
+      candidateRows += 1;
+
+      // ตรวจสอบ required fields
+      const normalizedBillType = row.billType !== undefined && row.billType !== null
+        ? String(row.billType).trim().toLowerCase()
+        : '';
+      if (!normalizedBillType) {
         errors.push(`Row ${rowNum}: Missing billType`);
         continue;
       }
@@ -568,8 +579,8 @@ export const importBillExcel = async (req, res) => {
       }
       
       // ตรวจสอบ billType
-      const validBillTypes = ['water', 'electricity', 'utilities', 'Utilities'];
-      if (!validBillTypes.includes(row.billType)) {
+      const validBillTypes = ['water', 'electricity', 'utilities'];
+      if (!validBillTypes.includes(normalizedBillType)) {
         errors.push(`Row ${rowNum}: Invalid billType "${row.billType}". Must be one of: ${validBillTypes.join(', ')}`);
         continue;
       }
@@ -589,7 +600,6 @@ export const importBillExcel = async (req, res) => {
       }
       
       // ตรวจสอบ shopId (customId) format - ต้องเป็น string เช่น RRN002, E2005
-      const customId = String(row.shopId).trim();
       if (!customId || customId.length < 2) {
         errors.push(`Row ${rowNum}: Invalid shopId (customId) format. Expected shop code like RRN002, E2005, got: ${row.shopId}`);
         continue;
@@ -606,7 +616,7 @@ export const importBillExcel = async (req, res) => {
         updateOne: {
           filter: {
             shopId: shopObjectId, // ใช้ ObjectId จาก Shop
-            billType: row.billType.toLowerCase(),
+            billType: normalizedBillType,
             month: month,
             year: year
           },
@@ -615,13 +625,23 @@ export const importBillExcel = async (req, res) => {
       });
     }
     
-    // ถ้ามี errors มากเกินไป ให้ return error
-    if (errors.length > 0 && errors.length === rows.length) {
+    // ถ้าไม่มีแถวที่มี shopId เลย ให้แจ้งเตือนชัดเจน
+    if (candidateRows === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No valid rows with shopId found in Excel file.',
+        skippedRowsWithoutShopId
+      });
+    }
+
+    // ถ้าทุกแถวที่พยายามประมวลผลมีข้อผิดพลาด ให้ return error
+    if (errors.length > 0 && errors.length === candidateRows) {
       return res.status(400).json({ 
         success: false, 
         message: 'All rows have errors. Please check your Excel file format.',
         errors: errors.slice(0, 10), // แสดงแค่ 10 errors แรก
-        totalErrors: errors.length
+        totalErrors: errors.length,
+        skippedRowsWithoutShopId
       });
     }
     
@@ -770,7 +790,9 @@ export const importBillExcel = async (req, res) => {
         emitToAdmin('admin:bill:importCompleted', { 
           updated, 
           notFound,
-          totalRows: rows.length
+          totalRows: rows.length,
+          candidateRows,
+          skippedRowsWithoutShopId
         });
         
         if (isDev) {
@@ -799,6 +821,8 @@ export const importBillExcel = async (req, res) => {
       updated, 
       notFound,
       totalRows: rows.length,
+      candidateRows,
+      skippedRowsWithoutShopId,
       validRows: updateOperations.length,
       errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
       totalErrors: errors.length > 0 ? errors.length : undefined
@@ -872,7 +896,7 @@ export const getBillImage = async (req, res) => {
         if (isDev) console.log('✅ Image found, sending');
         
         // Set CORS headers
-        res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'http://localhost:3000');
+        res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL || req.headers.origin || '*');
         res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
         res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
         res.header('Access-Control-Allow-Credentials', 'true');

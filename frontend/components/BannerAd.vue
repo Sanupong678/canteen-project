@@ -95,6 +95,11 @@ export default {
     }
   },
   methods: {
+    getBackendBaseUrl() {
+      const fromAxios = axios.defaults.baseURL || ''
+      if (fromAxios) return fromAxios.replace(/\/$/, '')
+      return process.client ? window.location.origin : ''
+    },
     triggerFileInput() {
       this.$refs.fileInput.click()
     },
@@ -168,12 +173,11 @@ export default {
                 const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.9))
                 if (!blob) { cleanup(); return }
                 // ใช้ axios interceptor (validate token อัตโนมัติ)
-                const backendUrl = this.getBackendUrl()
                 const formData = new FormData()
                 formData.append('image', new File([blob], 'banner.jpg', { type: 'image/jpeg' }))
                 formData.append('title', 'Banner')
                 formData.append('description', 'Banner advertisement')
-                const response = await axios.post(`${backendUrl}/api/backgrounds`, formData, {
+                const response = await axios.post('/api/backgrounds', formData, {
                   headers: {
                     'Content-Type': 'multipart/form-data'
                   }
@@ -206,9 +210,8 @@ export default {
     },
     async removeImage() {
       try {
-        const backendUrl = this.getBackendUrl()
         console.log('🔍 Debugging removeImage:')
-        console.log('- Backend URL:', backendUrl)
+        console.log('- Axios base URL:', axios.defaults.baseURL)
         console.log('- Backgrounds:', this.backgrounds)
         console.log('- Current Index:', this.currentIndex)
         
@@ -219,7 +222,7 @@ export default {
         if (current) {
           // ใช้ axios interceptor (validate token อัตโนมัติ)
           console.log('- Deleting background ID:', current._id)
-          const response = await axios.delete(`${backendUrl}/api/backgrounds/${current._id}`)
+          const response = await axios.delete(`/api/backgrounds/${current._id}`)
           
           console.log('- Delete response:', response.data)
           await this.loadBackgrounds()
@@ -253,16 +256,9 @@ export default {
       console.log('- Read Only:', this.readOnly)
       console.log('- Current Image:', this.currentImage)
     },
-    // กำหนด backend URL
-    getBackendUrl() {
-      return process.env.NODE_ENV === 'production' 
-        ? 'https://your-production-domain.com' 
-        : 'http://localhost:4000'
-    },
     async loadBackgrounds() {
       try {
-        const backendUrl = this.getBackendUrl()
-        const response = await axios.get(`${backendUrl}/api/backgrounds`)
+        const response = await axios.get('/api/backgrounds')
         if (response.data.success) {
           this.backgrounds = response.data.data
           this.currentIndex = 0
@@ -295,8 +291,7 @@ export default {
       }
     },
     getImageUrl(bg) {
-      const backendUrl = this.getBackendUrl()
-      return `${backendUrl}/api/backgrounds/${bg._id}/image`
+      return `${this.getBackendBaseUrl()}/api/backgrounds/${bg._id}/image`
     }
   },
   computed: {

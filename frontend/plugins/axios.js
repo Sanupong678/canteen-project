@@ -2,10 +2,9 @@ import axios from 'axios'
 import { getTokenWithState, clearInvalidToken, TokenState, logTokenState, getTokenFingerprint } from '@/utils/tokenUtils'
 
 export default defineNuxtPlugin((nuxtApp) => {
-  // ตั้งค่า base URL และ credentials
-  const baseURL = process.env.NODE_ENV === 'production' 
-    ? window.location.origin 
-    : 'http://localhost:4000'
+  // ตั้งค่า base URL จาก runtime config กลาง
+  const config = useRuntimeConfig()
+  const baseURL = config.public.apiBase
   
   // ตั้งค่า timeout และ defaults
   axios.defaults.baseURL = baseURL

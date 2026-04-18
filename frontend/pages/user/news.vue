@@ -29,7 +29,7 @@
               <div class="card-image">
                 <img 
                   v-if="item.imageFilename" 
-                  :src="`${backendUrl}/api/news/${item._id}/image`" 
+                  :src="getNewsImageUrl(item._id)" 
                   :alt="item.title"
                   class="news-image"
                   @error="handleImageError"
@@ -101,7 +101,7 @@
             <div class="news-detail-image">
               <img 
                 v-if="selectedNews.imageFilename" 
-                :src="`${backendUrl}/api/news/${selectedNews._id}/image`" 
+                :src="getNewsImageUrl(selectedNews._id)" 
                 :alt="selectedNews.title"
                 @error="handleImageError"
               />
@@ -134,6 +134,14 @@ import { ref, onMounted, computed } from 'vue'
 import LayoutUser from '@/components/LayoutUser.vue'
 import axios from 'axios'
 
+const getBackendBaseUrl = () => {
+  const fromAxios = axios.defaults.baseURL || ''
+  if (fromAxios) return fromAxios.replace(/\/$/, '')
+  return process.client ? window.location.origin : ''
+}
+
+const getNewsImageUrl = (id) => `${getBackendBaseUrl()}/api/news/${id}/image`
+
 const news = ref([])
 const loading = ref(true)
 const selectedNews = ref(null)
@@ -145,16 +153,11 @@ const years = ref([])
 const yearOpen = ref({})
 const filter = ref({ year: null, month: null })
 
-// กำหนด backend URL
-const backendUrl = process.env.NODE_ENV === 'production' 
-  ? 'https://your-production-domain.com' 
-  : 'http://localhost:4000'
-
 // Fetch news from API
 const loadNews = async () => {
   try {
     loading.value = true
-    const response = await axios.get(`${backendUrl}/api/news`)
+    const response = await axios.get('/api/news')
     if (response.data.success) {
       news.value = (response.data.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       // group by year for sidebar
@@ -187,7 +190,7 @@ const loadNews = async () => {
 const viewNewsDetail = async (item) => {
   try {
     // Fetch full news detail to increment views
-    const response = await axios.get(`${backendUrl}/api/news/${item._id}`)
+    const response = await axios.get(`/api/news/${item._id}`)
     if (response.data.success) {
       selectedNews.value = response.data.data
       
@@ -616,10 +619,87 @@ const filterByYearMonth = (y, m) => {
 }
 
 @media (max-width: 768px) {
+  .section-header {
+    margin: 0 0 10px 0;
+  }
+
+  .section-title {
+    font-size: clamp(1rem, 3.5vw, 1.2rem);
+    padding-bottom: 4px;
+    border-bottom-width: 4px;
+  }
+
+  .years-title {
+    font-size: clamp(1rem, 3.2vw, 1.15rem);
+  }
+
+  .year-header {
+    padding: 10px 12px;
+    font-size: 0.9rem;
+  }
+
+  .month-btn {
+    padding: 8px 10px;
+    font-size: 0.85rem;
+  }
+
   .news-layout { grid-template-columns: 1fr; }
-  .news-list { grid-template-columns: 1fr; }
-  .card-image { height: 200px; }
-  .card-meta { justify-content: center; }
+  .news-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .news-card {
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    min-width: 0;
+  }
+
+  .card-image {
+    height: auto;
+    aspect-ratio: 4 / 3;
+    margin-bottom: 0;
+  }
+
+  .card-body {
+    padding: 4px 4px 5px;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .sdgs {
+    display: none;
+  }
+
+  .card-title {
+    font-size: clamp(10px, 2.7vw, 11px);
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin: 0;
+  }
+
+  .card-excerpt {
+    display: none;
+    margin: 0;
+  }
+
+  .card-meta {
+    display: none;
+  }
+
+  .meta-item {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .modal-content { margin: 10px; }
 }
 </style> 

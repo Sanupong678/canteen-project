@@ -208,9 +208,7 @@ export default {
       deleteId: null,
       isSubmitting: false,
       isDeleting: false,
-      backendUrl: process.env.NODE_ENV === 'production' 
-        ? 'https://your-production-domain.com' 
-        : 'http://localhost:4000'
+      backendUrl: ''
     }
   },
   computed: {
@@ -225,10 +223,15 @@ export default {
     }
   },
   methods: {
+    getBackendBaseUrl() {
+      const fromAxios = axios.defaults.baseURL || ''
+      if (fromAxios) return fromAxios.replace(/\/$/, '')
+      return process.client ? window.location.origin : ''
+    },
     async loadNews() {
       try {
         console.log('🔄 Loading news from API...')
-        const response = await axios.get(`${this.backendUrl}/api/news`)
+        const response = await axios.get('/api/news')
         if (response.data.success) {
           this.newsList = response.data.data
           console.log('✅ Loaded news:', this.newsList.length)
@@ -346,7 +349,7 @@ export default {
         formData.append('content', this.newNews.content)
         formData.append('image', this.newNews.image)
 
-        const response = await axios.post(`${this.backendUrl}/api/news`, formData, {
+        const response = await axios.post('/api/news', formData, {
           headers: {
             'Content-Type': 'multipart/form-data'
           }
@@ -379,7 +382,7 @@ export default {
         console.log('🔄 Deleting news...')
         
         // ใช้ axios interceptor (validate token อัตโนมัติ)
-        const response = await axios.delete(`${this.backendUrl}/api/news/${this.deleteId}`)
+        const response = await axios.delete(`/api/news/${this.deleteId}`)
         
         if (response.data.success) {
           this.newsList = this.newsList.filter(news => news._id !== this.deleteId)
@@ -423,6 +426,7 @@ export default {
     }
   },
   mounted() {
+    this.backendUrl = this.getBackendBaseUrl()
     this.loadNews()
   }
 }
@@ -465,45 +469,6 @@ export default {
 @media (max-width: 900px) {
   .news-container {
     grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 600px) {
-  .news-container {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Extra-small mobile (320-640px): scale down cards */
-@media (max-width: 640px) {
-  .news-container {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-
-  .news-image-container {
-    border-radius: 8px;
-  }
-
-  .news-text h3 {
-    font-size: clamp(13px, 3.5vw, 15px);
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  .news-text p {
-    font-size: 13px;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  .news-meta {
-    font-size: 12px;
-    color: #6b7280;
   }
 }
 
@@ -864,5 +829,73 @@ export default {
   .modal-buttons { margin-top: 16px; gap: 8px; }
   .delete-btn { top: 8px; right: 8px; }
   .close-preview-btn { top: -36px; right: -36px; }
+
+  /*
+   * การ์ดข่าว 3 คอลัมน์บนมือถือ — ต้องอยู่ท้ายไฟล์ หลัง .news-text / .news-meta
+   * มิฉะนั้นกฎพื้นฐานจะ override display:none แล้วข้อความยาว (เช่น Administrator) จะล้น
+   */
+  .title {
+    font-size: clamp(1.05rem, 3.8vw, 1.3rem);
+  }
+
+  .divider {
+    height: 3px;
+    margin: 6px 0 12px 0;
+  }
+
+  .news-container {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    overflow: hidden;
+  }
+
+  .add-news-btn,
+  .add-news-form {
+    grid-column: 1 / -1;
+  }
+
+  .news-item {
+    display: flex;
+    flex-direction: column;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    min-width: 0;
+  }
+
+  .news-image-container {
+    border-radius: 6px 6px 0 0;
+    aspect-ratio: 4 / 3;
+    margin-bottom: 0;
+  }
+
+  .news-text {
+    padding: 4px 4px 5px;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* หัวข้อ ~11px: เหมาะกับคอลัมน์แคบ; เนื้อหาหลักเว็บมือถือมักใช้ 14–16px */
+  .news-text h3 {
+    font-size: clamp(10px, 2.7vw, 11px);
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin: 0;
+  }
+
+  .news-text p {
+    display: none;
+    margin: 0;
+  }
+
+  .news-meta {
+    display: none;
+  }
 }
 </style> 

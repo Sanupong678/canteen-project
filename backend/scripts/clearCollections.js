@@ -18,7 +18,10 @@ const COLLECTIONS_TO_CLEAR = [
 // เชื่อมต่อ database
 const connectDB = async () => {
   try {
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/canteen-project';
+    const mongoUri = process.env.MONGODB_URI;
+    if (!mongoUri) {
+      throw new Error('MONGODB_URI is required');
+    }
     
     const options = {
       useNewUrlParser: true,

@@ -53,13 +53,22 @@
                 accept=".xlsx,.xls,.csv" 
                 style="display: none;"
               />
-              <button class="import-btn" @click="triggerFileSelect">
-                <i class="fas fa-upload"></i>
-                Import Excel
+              <button type="button" class="import-btn" @click="triggerFileSelect">
+                <i class="fas fa-upload" aria-hidden="true"></i>
+                <span class="btn-label">Import Excel</span>
               </button>
-              <button class="export-btn" @click="exportData">
-                <i class="fas fa-download"></i>
-                Export CSV
+              <button type="button" class="export-btn" @click="exportData">
+                <i class="fas fa-download" aria-hidden="true"></i>
+                <span class="btn-label">Export CSV</span>
+              </button>
+              <button
+                v-if="activeMenu === 'control'"
+                type="button"
+                class="reset-btn"
+                @click="resetScores"
+              >
+                <i class="fas fa-redo" aria-hidden="true"></i>
+                <span class="btn-label">Reset คะแนน</span>
               </button>
             </div>
             </div>
@@ -163,10 +172,6 @@
                   {{ evaluationSystemEnabled ? 'เปิดระบบประเมิน' : 'ปิดระบบประเมิน' }}
                 </span>
               </div>
-              <button class="reset-btn" @click="resetScores">
-                <i class="fas fa-redo"></i>
-                Reset คะแนน
-              </button>
             </div>
           </div>
         </div>
@@ -261,7 +266,8 @@
         </div>
 
         <!-- Data Table for Control and Evaluation -->
-        <div class="data-table" v-if="(activeMenu === 'control' || activeMenu === 'evaluation') && !isLoading">
+        <div class="data-table data-table--with-footer" v-if="(activeMenu === 'control' || activeMenu === 'evaluation') && !isLoading">
+        <div class="data-table-scroll">
         <div class="table-header">
           <div class="header-cell">ลำดับ</div>
             <div class="header-cell">Shop ID</div>
@@ -316,9 +322,14 @@
             </button>
         </div>
       </div>
+        </div>
 
       <!-- Pagination Controls -->
       <div class="pagination-container" v-if="filteredShops.length > 0">
+        <div class="pagination-range">
+          {{ startItem }}-{{ endItem }} of {{ filteredShops.length }}
+        </div>
+
         <div class="pagination-info">
           <span>Items per page:</span>
           <select v-model="itemsPerPage" @change="onItemsPerPageChange" class="items-per-page-select">
@@ -328,11 +339,7 @@
             <option value="50">50</option>
           </select>
         </div>
-        
-        <div class="pagination-range">
-          {{ startItem }}-{{ endItem }} of {{ filteredShops.length }}
-        </div>
-        
+
         <div class="pagination-buttons">
           <button 
             class="pagination-btn prev-btn" 
@@ -1658,7 +1665,17 @@ export default {
         })
         
         if (response.data.success) {
-          alert(`Import สำเร็จ! อัปเดตรายได้ ${response.data.updatedCount || 0} ร้านค้า`)
+          const updatedCount =
+            response.data?.summary?.successCount ??
+            response.data?.successCount ??
+            response.data?.updatedCount ??
+            0
+          const errorCount =
+            response.data?.summary?.errorCount ??
+            response.data?.errorCount ??
+            0
+
+          alert(`Import สำเร็จ! อัปเดตรายได้ ${updatedCount} ร้านค้า${errorCount > 0 ? ` (มีข้อผิดพลาด ${errorCount} รายการ)` : ''}`)
           // โหลดข้อมูลใหม่
           await this.loadShops()
           this.filteredShops = this.shops
@@ -1815,8 +1832,13 @@ export default {
 .import-buttons {
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
+  align-items: stretch;
 }
 
+.import-buttons .reset-btn {
+  min-width: 0;
+}
 
 .import-btn {
   background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
@@ -1942,15 +1964,15 @@ export default {
   background: #dc3545;
   color: white;
   border: none;
-  padding: 10px 20px;
+  padding: 10px 16px;
   border-radius: 4px;
   font-size: 13px;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
   transition: all 0.3s ease;
-  min-width: 190px;
+  min-width: 0;
   justify-content: center;
   min-height: 44px;
   line-height: 1;
@@ -2023,24 +2045,50 @@ export default {
   border: 1px solid #e5e7eb;
 }
 
+.data-table--with-footer {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.data-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+  min-width: 0;
+}
+
 .table-header,
 .table-row {
   display: grid;
-  grid-template-columns: 80px 120px 2fr 1fr 1.5fr 1fr 1fr 1fr 1fr;
+  /* คอลัมน์เท่ากันชัดเจน: ความกว้างขั้นต่ำต่อช่อง + แบ่งพื้นที่เท่ากัน (1fr) */
+  grid-template-columns: repeat(9, minmax(104px, 1fr));
   font-size: 14px;
   gap: 0;
+  width: 100%;
+  min-width: max(100%, calc(9 * 104px));
+  box-sizing: border-box;
 }
 
 /* Grid layout for evaluation menu (10 columns) */
 .table-header:has(.header-cell:nth-child(10)),
 .table-row:has(.cell:nth-child(10)) {
-  grid-template-columns: 80px 120px 2fr 1fr 1.5fr 1fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: repeat(10, minmax(104px, 1fr));
+  min-width: max(100%, calc(10 * 104px));
 }
 
 /* Grid layout for history menu (11 columns) */
 .table-header:has(.header-cell:nth-child(11):last-child),
 .table-row:has(.cell:nth-child(11):last-child) {
-  grid-template-columns: 80px 120px 2fr 1fr 1.5fr 1fr 1fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: repeat(11, minmax(104px, 1fr));
+  min-width: max(100%, calc(11 * 104px));
+}
+
+.data-table--with-footer .table-row:last-child {
+  border-radius: 0;
 }
 
 .table-header {
@@ -2058,6 +2106,10 @@ export default {
   border-right: 1px solid #e5e7eb;
   display: flex;
   align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .header-cell:last-child,
@@ -2077,6 +2129,11 @@ export default {
   color: #374151;
   font-size: 12px;
   font-weight: 400;
+}
+
+.cell .evaluate-btn,
+.cell .details-btn {
+  flex-shrink: 0;
 }
 
 .table-row {
@@ -2207,24 +2264,48 @@ export default {
   box-shadow: 0 4px 8px rgba(220, 53, 69, 0.4);
 }
 
-/* Pagination */
+/* Pagination: กลาง = Items per page, ซ้าย = ช่วงรายการ, ขวา = ปุ่ม */
 .pagination-container {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  margin-top: 20px;
+  gap: 10px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  margin-top: 0;
   padding: 15px 20px;
   background: #f8f9fa;
-  border-radius: 6px;
+  border-radius: 0 0 8px 8px;
   border: 1px solid #e5e7eb;
+}
+
+.pagination-range {
+  grid-column: 1;
+  justify-self: start;
+  font-size: 14px;
+  color: #374151;
+  font-weight: 500;
 }
 
 .pagination-info {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   font-size: 14px;
   color: #374151;
+  justify-self: center;
+  grid-column: 2;
+}
+
+.pagination-buttons {
+  grid-column: 3;
+  justify-self: end;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 
 .items-per-page-select {
@@ -2233,17 +2314,6 @@ export default {
   border-radius: 4px;
   font-size: 14px;
   background: white;
-}
-
-.pagination-range {
-  font-size: 14px;
-  color: #374151;
-  font-weight: 500;
-}
-
-.pagination-buttons {
-  display: flex;
-  gap: 4px;
 }
 
 .pagination-btn {
@@ -2725,71 +2795,244 @@ input:checked + .slider:before {
   }
 
   .sidebar-header {
-    padding: 16px;
+    padding: 12px 14px;
+  }
+
+  .sidebar-header h2 {
+    font-size: clamp(0.92rem, 3.2vw, 1.08rem);
+  }
+
+  .sidebar-menu {
+    padding: 10px 0;
   }
 
   .menu-item {
-    padding: 10px 14px;
-    margin: 0 8px 6px;
+    padding: 8px 12px;
+    margin: 0 6px 4px;
+  }
+
+  .menu-item i {
+    width: 18px;
+    margin-right: 10px;
+    font-size: 14px;
+  }
+
+  .menu-item span {
+    font-size: clamp(12px, 2.9vw, 13px);
+  }
+
+  .main-content {
+    padding: 12px 14px;
+  }
+
+  .content-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+  }
+
+  .content-header h1 {
+    font-size: clamp(0.92rem, 3.2vw, 1.08rem);
+  }
+
+  .header-right {
+    width: 100%;
+  }
+
+  .import-buttons {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .import-btn,
+  .export-btn,
+  .import-buttons .reset-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 7px 4px;
+    font-size: clamp(9px, 2.6vw, 11px);
+    gap: 4px;
+    border-radius: 6px;
+    min-height: 40px;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    line-height: 1.2;
+    white-space: normal;
+  }
+
+  .import-buttons .btn-label {
+    display: block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .import-btn i,
+  .export-btn i,
+  .import-buttons .reset-btn i {
+    font-size: 11px;
+    flex-shrink: 0;
   }
 
   .filters-section {
     flex-direction: column;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 10px 12px;
+  }
+
+  .filter-group,
+  .search-group {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .filter-group label,
+  .search-group label {
+    font-size: clamp(11px, 2.8vw, 12px);
+  }
+
+  .filter-group select,
+  .search-input {
+    font-size: clamp(12px, 2.9vw, 13px);
+    padding: 7px 10px;
+    min-height: 40px;
+    border-radius: 6px;
+  }
+
+  .search-input {
+    padding-left: 32px;
+  }
+
+  .search-icon {
+    left: 8px;
+    font-size: 12px;
   }
 
   .stats-section {
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding: 10px;
+  }
+
+  .stat-item {
+    flex: 1 1 0;
+    min-width: 0;
+    gap: 4px;
+    padding: 4px 2px;
+  }
+
+  .stat-icon {
+    font-size: clamp(0.98rem, 3vw, 1.12rem);
+    margin-bottom: 0;
+  }
+
+  .stat-label {
+    font-size: clamp(10px, 2.6vw, 11px);
+    line-height: 1.2;
+  }
+
+  .stat-value {
+    font-size: clamp(0.82rem, 2.7vw, 0.95rem);
+    margin-top: 2px;
   }
 
   .table-header,
   .table-row {
-    grid-template-columns: 60px 100px 1.5fr 1fr 1fr 1fr 1fr 1fr 1fr;
-    font-size: 12px;
+    grid-template-columns: repeat(9, minmax(76px, 1fr));
+    min-width: max(100%, calc(9 * 76px));
+    font-size: clamp(10px, 2.8vw, 12px);
   }
 
-  /* Mobile grid layout for evaluation menu (10 columns) */
+  /* 10 คอลัมน์: ทำแบบประเมิน + ประวัติ */
   .table-header:has(.header-cell:nth-child(10)),
   .table-row:has(.cell:nth-child(10)) {
-    grid-template-columns: 60px 100px 1.5fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
-  }
-
-  /* Mobile grid layout for history menu (10 columns) */
-  .table-header:has(.header-cell:nth-child(10):last-child),
-  .table-row:has(.cell:nth-child(10):last-child) {
-    grid-template-columns: 60px 100px 1.5fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
+    grid-template-columns: repeat(10, minmax(76px, 1fr));
+    min-width: max(100%, calc(10 * 76px));
   }
 
   .header-cell,
   .cell {
-    padding: 12px 8px;
+    padding: 8px 6px;
+  }
+
+  .header-cell {
+    font-size: clamp(9px, 2.3vw, 10px);
   }
 
   .status-badge {
-    padding: 6px 12px;
-    font-size: 11px;
-    min-width: 70px;
+    padding: 4px 8px;
+    font-size: 10px;
+    min-width: 0;
   }
 
   .evaluate-btn {
-    padding: 6px 12px;
-    font-size: 11px;
+    padding: 6px 8px;
+    font-size: clamp(9px, 2.6vw, 11px);
+    min-height: 40px;
   }
 
   .control-container {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 15px;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 4px 0;
   }
 
   .control-switch-container {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
     gap: 8px;
   }
 
   .switch-text {
-    min-width: auto;
-    font-size: 12px;
+    min-width: 0;
+    font-size: clamp(11px, 2.8vw, 12px);
+  }
+
+  .pagination-container {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    width: 100%;
+    max-width: 100%;
+    gap: 10px;
+    padding: 10px 12px;
+    margin-top: 0;
+  }
+
+  .pagination-range,
+  .pagination-info,
+  .pagination-buttons {
+    grid-column: 1;
+    justify-self: center;
+  }
+
+  .pagination-range {
+    justify-self: center;
+  }
+
+  .pagination-buttons {
+    justify-content: center;
+  }
+
+  .pagination-info,
+  .pagination-range {
+    font-size: clamp(11px, 2.8vw, 13px);
+  }
+
+  .pagination-btn {
+    min-height: 40px;
+    font-size: clamp(12px, 2.9vw, 13px);
+    padding: 6px 10px;
   }
 
   .loading-container {
@@ -2803,7 +3046,7 @@ input:checked + .slider:before {
   }
 
   .loading-text {
-    font-size: 14px;
+    font-size: clamp(12px, 2.9vw, 14px);
   }
 
   .section-actions {
@@ -2812,9 +3055,13 @@ input:checked + .slider:before {
     align-items: flex-end;
   }
 
+  .section-header h3 {
+    font-size: clamp(1rem, 3.2vw, 1.2rem);
+  }
+
   .toggle-btn {
     padding: 6px 12px;
-    font-size: 12px;
+    font-size: clamp(11px, 2.8vw, 12px);
   }
 
   .toggle-btn i {

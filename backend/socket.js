@@ -24,16 +24,22 @@ const getJwtSecret = () => {
 export const initSocket = (server) => {
   if (ioInstance) return ioInstance;
 
-  const corsOrigins = [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'http://localhost:3001',
-    'http://127.0.0.1:3001'
-  ];
+  const corsOrigins = (
+    process.env.CORS_ORIGINS ||
+    process.env.FRONTEND_URL ||
+    'http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001'
+  )
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 
   const io = new Server(server, {
     cors: {
-      origin: corsOrigins,
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (corsOrigins.includes(origin)) return callback(null, true);
+        return callback(new Error(`Socket CORS origin not allowed: ${origin}`));
+      },
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       credentials: true,
       allowedHeaders: ['content-type', 'authorization']

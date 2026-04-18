@@ -27,6 +27,7 @@ import {
   deleteBill,
   cleanupExpiredImages
 } from '../controllers/billController.js';
+import { getPaymentSettings, upsertPaymentSettings } from '../controllers/paymentSettingsController.js';
 
 // ===== Middleware =====
 import { verifyToken, isAdmin } from '../middleware/authMiddleware.js';
@@ -145,11 +146,42 @@ const excelUpload = multer({
   }
 });
 
+// === Multer for payment QR code ===
+const paymentQrStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = 'uploads/payment-settings/';
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, `payment-qr-${uniqueSuffix}${path.extname(file.originalname)}`);
+  }
+});
+
+const paymentQrUpload = multer({
+  storage: paymentQrStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed for QR code'), false);
+    }
+  }
+});
+
 // === Public route (no token needed) ===
 router.get('/image/:billId', getBillImage);
 
 // === Protected routes ===
 router.use(verifyToken);
+
+// Payment settings routes
+router.get('/payment-settings', getPaymentSettings);
+router.put('/payment-settings', isAdmin, paymentQrUpload.single('qrCodeImage'), upsertPaymentSettings);
 
 // Upload bill slip
 router.post('/upload', 

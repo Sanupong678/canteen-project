@@ -71,7 +71,7 @@ export default {
   computed: {
     googleAuthUrl() {
       const config = typeof useRuntimeConfig === 'function' ? useRuntimeConfig() : {}
-      const apiBase = config?.public?.apiBase || 'http://localhost:4000'
+      const apiBase = config?.public?.apiBase || ''
       return `${apiBase}/api/auth/google`
     }
   },

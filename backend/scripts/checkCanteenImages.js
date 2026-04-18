@@ -2,10 +2,13 @@ import mongoose from 'mongoose';
 import Canteen from '../models/canteenModel.js';
 
 // กำหนดการเชื่อมต่อ MongoDB
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/canteen-project';
+const MONGODB_URI = process.env.MONGODB_URI;
 
 async function checkCanteenImages() {
   try {
+    if (!MONGODB_URI) {
+      throw new Error('MONGODB_URI is required');
+    }
     console.log('🔗 Connecting to MongoDB...');
     await mongoose.connect(MONGODB_URI);
     console.log('✅ Connected to MongoDB successfully');

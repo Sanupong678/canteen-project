@@ -41,7 +41,6 @@
             >
               {{ getNotificationIcon(notification.type) }}
             </span>
-            <!-- แสดงจุดแดงสำหรับข้อมูลใหม่ -->
             <div v-if="isNewNotification(notification.createdAt)" class="new-indicator"></div>
           </div>
           
@@ -268,7 +267,6 @@ export default {
       return diffInMinutes < 10; // เพิ่มเป็น 10 นาที
     };
 
-    // Close dropdown when clicking outside
     const handleClickOutside = (event) => {
       if (!event.target.closest('.notification-container')) {
         showDropdown.value = false
@@ -318,6 +316,7 @@ export default {
 .notification-container {
   position: relative;
   display: inline-block;
+  z-index: 1;
 }
 
 .notification-icon {
@@ -364,7 +363,7 @@ export default {
   position: absolute;
   top: 100%;
   right: 0;
-  width: 420px;
+  width: min(420px, calc(100vw - 20px));
   max-height: 500px;
   background: white;
   border-radius: 16px;
@@ -374,6 +373,7 @@ export default {
   margin-top: 12px;
   border: 1px solid rgba(0, 0, 0, 0.1);
   backdrop-filter: blur(20px);
+  box-sizing: border-box;
 }
 
 .notification-header {
@@ -390,6 +390,22 @@ export default {
   font-size: 18px;
   font-weight: 700;
   color: #1e293b;
+}
+
+.mark-all-read-btn {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.mark-all-read-btn:hover {
+  background: #2563eb;
 }
 
 .notification-list {
@@ -592,26 +608,76 @@ export default {
   justify-content: center;
 }
 
-/* Mobile: make dropdown fixed and full-width */
-@media (max-width: 640px) {
+/* Mobile / tablet: ป๊อปอัปเล็กชิดขวา — กันถูกตัดที่แถบนำทาง */
+@media (max-width: 768px) {
+  .notification-container {
+    z-index: 10050;
+  }
+
   .notification-dropdown {
     position: fixed;
-    top: 56px;
-    left: 0;
-    right: 0;
-    width: 100%;
-    max-height: 60vh;
-    overflow-y: auto;
+    top: clamp(52px, 12vw, 88px);
+    right: max(8px, env(safe-area-inset-right, 0px));
+    left: auto;
+    width: min(300px, calc(100vw - 16px));
+    max-height: min(52vh, 340px);
     overflow-x: hidden;
-    z-index: 9999;
-    border-radius: 0 0 12px 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    overflow-y: hidden;
+    z-index: 10050;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
     margin-top: 0;
     backdrop-filter: blur(20px);
   }
 
+  .notification-header {
+    padding: 12px 14px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .notification-header h3 {
+    font-size: clamp(14px, 3.5vw, 17px);
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mark-all-read-btn {
+    font-size: 11px;
+    padding: 6px 10px;
+    white-space: nowrap;
+  }
+
   .notification-list {
-    max-height: none;
+    max-height: min(40vh, 270px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .notification-item {
+    padding: 10px 12px;
+    flex-wrap: wrap;
+  }
+
+  .notification-item:hover {
+    transform: none;
+  }
+
+  .notification-title {
+    font-size: clamp(13px, 3.2vw, 15px);
+    flex-wrap: wrap;
+  }
+
+  .notification-message {
+    font-size: clamp(12px, 2.9vw, 14px);
+    word-break: break-word;
+  }
+
+  .notification-status {
+    margin-left: 0;
+    flex: 0 0 100%;
+    justify-content: flex-start;
+    padding-top: 4px;
   }
 
   .no-notifications {
@@ -619,28 +685,28 @@ export default {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 40px 20px;
+    padding: 36px 16px;
     font-size: 14px;
     color: #6b7280;
   }
 
   .no-notifications p {
     margin: 0;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
   }
 }
 
-/* Tablet/Desktop: compact absolute panel */
-@media (min-width: 641px) {
+@media (min-width: 769px) {
   .notification-dropdown {
     position: absolute;
-    top: 48px;
+    top: 100%;
     right: 0;
     left: auto;
-    width: 360px;
+    width: min(400px, calc(100vw - 24px));
+    max-height: 500px;
     border-radius: 12px;
-    margin-top: 0;
+    margin-top: 12px;
   }
 }
 </style> 

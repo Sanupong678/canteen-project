@@ -5,6 +5,35 @@ import { createLeaveNotification } from './notificationController.js';
 import { createAdminLeaveNotification } from './adminNotificationController.js';
 import { emitToShop, emitToAdmin } from '../socket.js';
 
+const validateLeaveDatePolicy = (startDate, endDate) => {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (start > end) {
+    return 'วันที่เริ่มต้นต้องไม่มากกว่าวันที่สิ้นสุด';
+  }
+
+  if (start < today) {
+    return 'ไม่สามารถลาย้อนหลังได้';
+  }
+
+  const minAdvanceDate = new Date(today);
+  minAdvanceDate.setDate(minAdvanceDate.getDate() + 3);
+  if (start < minAdvanceDate) {
+    return 'ต้องแจ้งลาล่วงหน้าอย่างน้อย 3 วัน';
+  }
+
+  const diffTime = Math.abs(end - start);
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  if (diffDays > 3) {
+    return 'ระยะเวลาในการลาสูงสุดได้ 3 วันเท่านั้น';
+  }
+
+  return null;
+};
+
 // Get all leaves (admin)
 export const getLeaves = async (req, res) => {
   try {
@@ -120,6 +149,14 @@ export const createLeave = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'ไม่พบข้อมูลร้านค้าหรือผู้ใช้ กรุณาติดต่อผู้ดูแลระบบ'
+      });
+    }
+
+    const leaveDateError = validateLeaveDatePolicy(startDate, endDate);
+    if (leaveDateError) {
+      return res.status(400).json({
+        success: false,
+        message: leaveDateError
       });
     }
 
@@ -271,33 +308,11 @@ export const updateLeave = async (req, res) => {
 
     // ตรวจสอบวันที่
     if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      
-      if (start > end) {
+      const leaveDateError = validateLeaveDatePolicy(startDate, endDate);
+      if (leaveDateError) {
         return res.status(400).json({
           success: false,
-          message: 'วันที่เริ่มต้นต้องไม่มากกว่าวันที่สิ้นสุด'
-        });
-      }
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      if (start < today) {
-        return res.status(400).json({
-          success: false,
-          message: 'ไม่สามารถลาย้อนหลังได้'
-        });
-      }
-
-      const diffTime = Math.abs(end - start);
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-
-      if (diffDays > 3) {
-        return res.status(400).json({
-          success: false,
-          message: 'ระยะเวลาในการลาสูงสุดได้ 3 วันเท่านั้น'
+          message: leaveDateError
         });
       }
     }

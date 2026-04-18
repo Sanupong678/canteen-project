@@ -5,10 +5,13 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // เชื่อมต่อกับ MongoDB
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/test';
+const MONGODB_URI = process.env.MONGODB_URI;
 
 async function deleteBillsByMonth() {
   try {
+    if (!MONGODB_URI) {
+      throw new Error('MONGODB_URI is required');
+    }
     const targetMonths = [7, 8]; // เดือนที่ต้องการลบ
     
     console.log('กำลังเชื่อมต่อกับ MongoDB...');

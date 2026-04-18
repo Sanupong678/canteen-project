@@ -156,9 +156,8 @@
         },
         
         getFullImageUrl(imagePath) {
+          const backendUrl = this.$axios.defaults.baseURL || ''
           if (!imagePath) {
-            // ใช้ backend URL สำหรับ default image จาก uploads/canteen
-            const backendUrl = 'http://localhost:4000'
             return `${backendUrl}/uploads/canteen/canteen-c5.png`
           }
           
@@ -167,13 +166,10 @@
             return imagePath
           }
           
-          // สร้าง full URL โดยอิงจาก backend
-          const backendUrl = 'http://localhost:4000'
           return `${backendUrl}${imagePath}`
         },
         handleImageError(event) {
-          // เมื่อรูปภาพโหลดไม่ได้ ให้ใช้รูปภาพ default จาก uploads/canteen
-          const backendUrl = 'http://localhost:4000'
+          const backendUrl = this.$axios.defaults.baseURL || ''
           event.target.src = `${backendUrl}/uploads/canteen/canteen-c5.png`
           console.log('🖼️ Image failed to load, using default image from uploads/canteen')
         },
@@ -183,63 +179,7 @@
             this.canteens = response.data
           } catch (error) {
             console.error('Error loading canteens:', error)
-            // ใช้ข้อมูล default ถ้าไม่สามารถโหลดจาก backend ได้
-            this.canteens = [
-              {
-                _id: '1',
-                name: 'โรงอาหาร C5',
-                image: '/uploads/canteen/canteen-c5.png',
-                path: '/admin/canteen/c5',
-              },
-              {
-                _id: '2',
-                name: 'โรงอาหาร D1',
-                image: '/uploads/canteen/canteen-d1.png',
-                path: '/admin/canteen/d1',
-              },
-              {
-                _id: '3',
-                name: 'โรงอาหาร Dormity',
-                image: '/uploads/canteen/canteen-dorm.png',
-                path: '/admin/canteen/dormity',
-              },
-              {
-                _id: '4',
-                name: 'โรงอาหาร Epark',
-                image: '/uploads/canteen/canteen-epark.png',
-                path: '/admin/canteen/epark',
-              },
-              {
-                _id: '5',
-                name: 'โรงอาหาร E1',
-                image: '/uploads/canteen/canteen-e1.png',
-                path: '/admin/canteen/e1',
-              },
-              {
-                _id: '6',
-                name: 'โรงอาหาร E2',
-                image: '/uploads/canteen/canteen-e2.png',
-                path: '/admin/canteen/e2',
-              },
-              {
-                _id: '7',
-                name: 'โรงอาหาร Msquare',
-                image: '/uploads/canteen/canteen-msquare.png',
-                path: '/admin/canteen/msquare',
-              },
-              {
-                _id: '8',
-                name: 'โรงอาหาร RuemRim',
-                image: '/uploads/canteen/canteen-ruem.png',
-                path: '/admin/canteen/ruemrim',
-              },
-              {
-                _id: '9',
-                name: 'โรงอาหาร S2',
-                image: '/uploads/canteen/canteen-s2.png',
-                path: '/admin/canteen/s2',
-              }
-            ]
+            this.canteens = []
           } finally {
             this.isLoading = false
           }

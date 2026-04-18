@@ -426,13 +426,14 @@ export default {
   position: absolute;
   top: 100%;
   right: 0;
-  width: 400px;
+  width: min(400px, calc(100vw - 20px));
   max-height: 500px;
   background: white;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 1000;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .admin-notification-header {
@@ -602,6 +603,91 @@ export default {
   100% {
     transform: scale(1);
     opacity: 1;
+  }
+}
+
+/* มือถือ / แท็บเล็ต: กล่องเต็มความกว้างจอ กันหลุดซ้าย-ขวา */
+@media (max-width: 768px) {
+  .admin-notification-dropdown {
+    position: fixed;
+    top: clamp(52px, 12vw, 88px);
+    right: max(8px, env(safe-area-inset-right, 0px));
+    left: auto;
+    width: min(300px, calc(100vw - 16px));
+    max-height: min(52vh, 340px);
+    margin-top: 0;
+    border-radius: 12px;
+    z-index: 10050;
+    overflow-x: hidden;
+    overflow-y: hidden;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  }
+
+  .admin-notification-header {
+    padding: 10px 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .admin-notification-header h3 {
+    font-size: clamp(13px, 3.4vw, 15px);
+    line-height: 1.25;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mark-all-read-btn {
+    font-size: 11px;
+    padding: 6px 10px;
+    white-space: nowrap;
+  }
+
+  .admin-notification-list {
+    max-height: min(40vh, 270px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-notification-item {
+    padding: 10px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 6px 8px;
+  }
+
+  .admin-notification-icon-wrapper {
+    margin-right: 10px;
+  }
+
+  .admin-notification-title {
+    font-size: clamp(13px, 3.2vw, 15px);
+    flex-wrap: wrap;
+  }
+
+  .admin-notification-message {
+    font-size: clamp(12px, 2.9vw, 14px);
+    word-break: break-word;
+  }
+
+  .admin-notification-details {
+    font-size: 11px;
+    word-break: break-word;
+  }
+
+  .admin-notification-status {
+    margin-left: 0;
+    flex: 0 0 100%;
+    justify-content: flex-start;
+    padding-top: 2px;
+  }
+
+  .no-notifications {
+    padding: 28px 14px;
+  }
+
+  .no-notifications p {
+    font-size: 13px;
   }
 }
 </style> 

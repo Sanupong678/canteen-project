@@ -57,7 +57,7 @@
 
               <div class="shop-row" v-for="(shop, index) in filteredActiveShops" :key="shop.id">
                 <div class="row-item">{{ index + 1 }}</div>
-                <div class="row-item">{{ shop.name }}</div>
+                <div class="row-item cell-ellipsis" :title="shop.name">{{ shop.name }}</div>
                 <div class="row-item">{{ getShopTypeLabel(shop.type) }}</div>
                 <div class="row-item">
                   <span class="status-badge active">
@@ -104,7 +104,7 @@
 
               <div class="shop-row expired" v-for="(shop, index) in filteredExpiredShops" :key="shop.id">
                 <div class="row-item">{{ filteredActiveShops.length + index + 1 }}</div>
-                <div class="row-item">{{ shop.name }}</div>
+                <div class="row-item cell-ellipsis" :title="shop.name">{{ shop.name }}</div>
                 <div class="row-item">{{ getShopTypeLabel(shop.type) }}</div>
                 <div class="row-item">
                   <span class="status-badge expired">
@@ -787,6 +787,7 @@ h2 {
 }
 
 .action-btn {
+  position: relative;
   padding: 8px 16px;
   border: none;
   border-radius: 20px;
@@ -829,51 +830,194 @@ h2 {
 
 @media (max-width: 768px) {
   .canteen-detail {
-    padding: 16px;
+    padding: 10px;
   }
 
   .shop-management {
-    padding: 16px;
+    padding: 10px 12px;
+    border-radius: 6px;
   }
 
   .shop-header {
     flex-direction: column;
-    gap: 15px;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  h2 {
+    font-size: clamp(0.88rem, 3.2vw, 1.02rem);
+    line-height: 1.25;
+    text-align: center;
+    margin: 0;
+    padding: 0 4px;
   }
 
   .search-container {
     flex-direction: column;
+    gap: 8px;
   }
 
   .search-box {
     width: 100%;
   }
 
+  .search-input {
+    padding: 7px 32px 7px 11px;
+    font-size: clamp(12px, 2.9vw, 13px);
+    border-radius: 6px;
+  }
+
+  .search-icon {
+    right: 10px;
+    font-size: 0.85rem;
+  }
+
   .category-select {
     width: 100%;
+    padding: 7px 10px;
+    font-size: clamp(12px, 2.9vw, 13px);
+    min-height: 42px;
+    border-radius: 6px;
   }
 
   .add-btn {
     width: 100%;
     justify-content: center;
+    font-size: clamp(12px, 2.9vw, 13px);
+    padding: 8px 12px;
+    min-height: 42px;
+    border-radius: 6px;
+    gap: 6px;
   }
 
+  .shop-loading {
+    padding: 20px 0;
+    font-size: clamp(12px, 2.9vw, 13px);
+  }
+
+  .empty-state {
+    padding: 14px;
+    font-size: clamp(12px, 2.9vw, 13px);
+  }
+
+  .section-title {
+    font-size: clamp(13px, 3.1vw, 15px);
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+  }
+
+  .shop-list {
+    gap: 10px;
+  }
+
+  .shop-section {
+    margin-bottom: 20px;
+  }
+
+  .shop-table {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-top: 12px;
+    border-radius: 8px;
+  }
+
+  /* คอลัมน์คงที่สำหรับปุ่ม — ซ่อนข้อความในปุ่ม เหลือไอคอนกลม กันทับกัน */
   .table-header,
   .shop-row {
-    grid-template-columns: 48px 2fr 1fr 1.5fr 1fr 1fr 1fr;
-    padding: 8px 12px;
-    font-size: 0.9rem;
+    grid-template-columns:
+      32px
+      minmax(0, 1.35fr)
+      46px
+      minmax(0, 1fr)
+      42px
+      42px
+      42px;
+    column-gap: 4px;
+    padding: 8px 8px;
+  }
+
+  .table-header .header-item,
+  .shop-row .row-item {
+    min-width: 0;
+  }
+
+  .header-item {
+    font-size: clamp(9px, 2.4vw, 11px);
+    line-height: 1.15;
+    padding: 0 1px;
+    hyphens: manual;
+    word-break: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .shop-row {
+    font-size: clamp(10px, 2.7vw, 12px);
+  }
+
+  .shop-row .row-item:first-child {
+    font-weight: 600;
+    justify-content: center;
+  }
+
+  .cell-ellipsis {
+    display: block;
+    justify-self: stretch;
+    align-self: center;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .shop-row .row-item:nth-child(3) {
+    justify-content: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .shop-row .row-item:nth-child(4) {
+    justify-content: center;
   }
 
   .status-badge {
-    font-size: 0.8rem;
-    padding: 2px 4px;
+    font-size: clamp(9px, 2.3vw, 10px);
+    padding: 4px 6px;
+    line-height: 1.25;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .status-badge i {
+    margin-right: 4px;
+    flex-shrink: 0;
   }
 
   .action-btn {
-    width: 44px;
-    height: 44px;
-    min-height: 44px;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0;
+    border-radius: 50%;
+    gap: 0;
+  }
+
+  .action-btn span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .action-btn i {
+    font-size: 15px;
+    margin: 0;
   }
 }
 

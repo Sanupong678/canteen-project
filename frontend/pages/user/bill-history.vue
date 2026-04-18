@@ -4,22 +4,24 @@
       <!-- Header -->
       <div class="page-header">
         <div class="header-content">
-          <div>
+          <div class="header-text">
             <h1 class="page-title">ประวัติบิลค่าบริการ</h1>
             <p class="page-subtitle">รายการบิลที่ตรวจสอบแล้วและรอตรวจสอบ</p>
           </div>
           <div class="header-actions">
             <v-btn
               variant="outlined"
-              class="filter-btn"
+              class="filter-btn bill-user-toolbar-btn"
+              size="x-small"
+              density="compact"
+              prepend-icon="mdi-filter"
               @click="showFilterDialog = true"
             >
-              <v-icon left size="small">mdi-filter</v-icon>
               กรองข้อมูล
             </v-btn>
             <router-link to="/user/bill" class="back-link">
-              <v-icon left size="small">mdi-arrow-left</v-icon>
-              กลับไปหน้ารายการปัจจุบัน
+              <v-icon size="small">mdi-arrow-left</v-icon>
+              <span>กลับไปหน้ารายการปัจจุบัน</span>
             </router-link>
           </div>
         </div>
@@ -514,8 +516,8 @@ const fetchBills = async () => {
           billMonth: new Date(bill.year, bill.month ? bill.month-1 : 0),
           createdAt: bill.createdAt,
           dueDate: bill.dueDate || bill.contractEndDate,
-          accountNumber: 'XXX-X-XXXXX-X',
-          accountName: bill.shopName || localStorage.getItem('displayName') || 'มหาวิทยาลัย',
+          accountNumber: '6720407581',
+          accountName: 'ธนาคารกรุงเทพ',
           paymentDate: bill.payment_date || null,
           status: bill.status || 'รอดำเนินการ',
           image: bill.image || null
@@ -550,9 +552,17 @@ onMounted(() => {
 
 .header-content {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  text-align: center;
+  gap: 1rem;
   margin-bottom: 1rem;
+  width: 100%;
+}
+
+.header-text {
+  width: 100%;
 }
 
 .page-title {
@@ -570,22 +580,37 @@ onMounted(() => {
 
 .header-actions {
   display: flex;
-  gap: 0.75rem;
+  flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
+  align-content: center;
+  gap: 6px;
+  width: 100%;
 }
 
 .filter-btn {
   text-transform: none;
 }
 
+.bill-user-toolbar-btn {
+  min-width: 0 !important;
+  min-height: 28px !important;
+  padding: 0 8px !important;
+  font-size: 0.6875rem !important;
+  font-weight: 600 !important;
+}
+
 .back-link {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  gap: 4px;
   color: #2563eb;
   text-decoration: none;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   font-weight: 500;
-  padding: 0.5rem 1rem;
+  padding: 0.35rem 0.65rem;
   border-radius: 0.375rem;
   transition: all 0.2s;
 }
@@ -597,11 +622,13 @@ onMounted(() => {
 
 /* Tabs */
 .tabs-container {
-  display: inline-flex;
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto 1.5rem;
   background-color: #f3f4f6;
   border-radius: 0.75rem;
   padding: 0.25rem;
-  margin-bottom: 1.5rem;
 }
 
 .tab-button {
@@ -633,15 +660,20 @@ onMounted(() => {
 
 .search-section {
   margin-bottom: 1rem;
+  display: flex;
+  justify-content: center;
 }
 
 .search-input {
   max-width: 24rem;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* Table */
 .table-wrapper {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .bill-history-table {
@@ -805,24 +837,58 @@ onMounted(() => {
 /* Responsive */
 @media (max-width: 768px) {
   .bill-history-page {
-    padding: 1rem;
+    padding: 0.75rem;
   }
 
   .header-content {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
+    align-items: center;
+    text-align: center;
+    gap: 0.75rem;
   }
 
   .header-actions {
     width: 100%;
-    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .bill-user-toolbar-btn {
+    min-height: 26px !important;
+    font-size: clamp(0.58rem, 2.5vw, 0.6875rem) !important;
+    padding: 0 6px !important;
+  }
+
+  .back-link {
+    font-size: clamp(0.65rem, 2.5vw, 0.75rem);
+    padding: 0.3rem 0.5rem;
+  }
+
+  .bill-history-table {
+    font-size: clamp(11px, 2.8vw, 13px);
+  }
+
+  .bill-history-table th {
+    font-size: clamp(10px, 2.5vw, 12px);
+    padding: 0.5rem 0.45rem;
+  }
+
+  .bill-history-table td {
+    padding: 0.5rem 0.45rem;
+    vertical-align: top;
+  }
+
+  .amount-text {
+    font-size: clamp(0.82rem, 3vw, 0.95rem);
+  }
+
+  .time-text {
+    font-size: clamp(10px, 2.4vw, 11px);
   }
 
   .table-footer {
     flex-direction: column;
     gap: 1rem;
     align-items: flex-start;
+    font-size: clamp(0.8rem, 2.8vw, 0.875rem);
   }
 }
 </style>

@@ -21,7 +21,7 @@
 
         <div class="shop-row" v-for="(shop, index) in filteredActiveShops" :key="shop.id">
           <div class="row-item">{{ index + 1 }}</div>
-          <div class="row-item">{{ shop.name }}</div>
+          <div class="row-item cell-ellipsis" :title="shop.name">{{ shop.name }}</div>
           <div class="row-item">{{ getShopTypeLabel(shop.type) }}</div>
           <div class="row-item">
             <span class="status-badge active">
@@ -72,7 +72,7 @@
 
         <div class="shop-row expired" v-for="(shop, index) in filteredExpiredShops" :key="shop.id">
           <div class="row-item">{{ filteredActiveShops.length + index + 1 }}</div>
-          <div class="row-item">{{ shop.name }}</div>
+          <div class="row-item cell-ellipsis" :title="shop.name">{{ shop.name }}</div>
           <div class="row-item">{{ getShopTypeLabel(shop.type) }}</div>
           <div class="row-item">
             <span class="status-badge expired">
@@ -272,6 +272,7 @@ export default {
 }
 
 .action-btn {
+  position: relative;
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -313,25 +314,97 @@ export default {
 
   .section-title {
     padding: 12px 16px;
+    font-size: clamp(15px, 3.5vw, 17px);
+  }
+
+  .shop-table {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .table-header,
   .shop-row {
-    grid-template-columns: 48px 2fr 1fr 1.5fr 1fr 1fr 1fr 1fr;
-    padding: 8px 12px;
-    font-size: 0.9rem;
+    grid-template-columns:
+      32px
+      minmax(0, 1.25fr)
+      44px
+      minmax(0, 1fr)
+      40px
+      40px
+      40px
+      40px;
+    column-gap: 4px;
+    padding: 8px 8px;
+  }
+
+  .table-header .header-item,
+  .shop-row .row-item {
+    min-width: 0;
+  }
+
+  .header-item {
+    font-size: clamp(9px, 2.4vw, 11px);
+    line-height: 1.15;
+    text-align: center;
+    padding: 0 1px;
+    overflow-wrap: anywhere;
+  }
+
+  .shop-row {
+    font-size: clamp(10px, 2.7vw, 12px);
+  }
+
+  .cell-ellipsis {
+    display: block;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .shop-row .row-item:nth-child(3) {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    justify-content: center;
   }
 
   .status-badge {
-    font-size: 0.8rem;
-    padding: 2px 4px;
+    font-size: clamp(9px, 2.3vw, 10px);
+    padding: 4px 6px;
+    line-height: 1.25;
+    white-space: normal;
+  }
+
+  .notification-link {
+    font-size: clamp(10px, 2.6vw, 11px);
   }
 
   .action-btn {
-    width: 44px;
-    height: 44px;
-    min-height: 44px;
-    min-width: 44px;
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    min-width: 40px;
+    padding: 0;
+    border-radius: 50%;
+    gap: 0;
+  }
+
+  .action-btn span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .action-btn i {
+    font-size: 15px;
+    margin: 0;
   }
 }
 </style> 

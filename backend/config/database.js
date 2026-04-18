@@ -7,8 +7,6 @@ const connectDB = async () => {
     }
 
     const options = {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
       serverSelectionTimeoutMS: parseInt(process.env.DB_SERVER_SELECTION_TIMEOUT) || 30000,
       socketTimeoutMS: parseInt(process.env.DB_SOCKET_TIMEOUT) || 300000, // เพิ่มเป็น 5 นาที
       connectTimeoutMS: parseInt(process.env.DB_CONNECT_TIMEOUT) || 30000,
@@ -17,13 +15,9 @@ const connectDB = async () => {
       minPoolSize: parseInt(process.env.DB_MIN_POOL_SIZE) || 5, // เพิ่มจาก 2 เป็น 5
       maxIdleTimeMS: parseInt(process.env.DB_MAX_IDLE_TIME) || 300000, // เพิ่มเป็น 5 นาที (300000ms)
       heartbeatFrequencyMS: 10000, // ส่ง heartbeat ทุก 10 วินาที
-      family: 4,
       // เพิ่ม retry logic
       retryWrites: true,
       retryReads: true,
-      // เพิ่ม options สำหรับความเสถียร
-      maxStalenessSeconds: 90, // อนุญาตให้อ่านจาก secondary ที่ stale ไม่เกิน 90 วินาที
-      readPreference: 'primaryPreferred', // อ่านจาก primary ก่อน แต่ถ้า primary ไม่มีให้อ่านจาก secondary
       // wait queue timeout: ป้องกัน connection pool exhaustion
       waitQueueTimeoutMS: parseInt(process.env.DB_WAIT_QUEUE_TIMEOUT_MS) || 60000, // default 60s
       // เพิ่ม connection pool monitoring

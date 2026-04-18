@@ -9,6 +9,12 @@
             <p class="page-subtitle">การลาที่แจ้งและประวัติการลาทั้งหมดในระบบ</p>
           </div>
           <div class="header-actions">
+            <GuidePopup
+              storage-key="user-leave-guide"
+              title="คู่มือการแจ้งลา"
+              intro="อ่านขั้นตอนสั้นๆ ก่อนใช้งาน เพื่อส่งคำขอลาได้ถูกต้อง"
+              :steps="leaveGuideSteps"
+            />
             <v-btn
               outlined
               class="filter-btn"
@@ -200,6 +206,7 @@
                     class="mb-3"
                   ></v-text-field>
                 </div>
+                <p class="notice-message">หมายเหตุ: ต้องแจ้งลาล่วงหน้าอย่างน้อย 3 วัน</p>
                 <p v-if="dateError" class="error-message">{{ dateError }}</p>
               </div>
               <v-textarea
@@ -266,6 +273,7 @@
                     class="mb-3"
                   ></v-text-field>
                 </div>
+                <p class="notice-message">หมายเหตุ: ต้องแจ้งลาล่วงหน้าอย่างน้อย 3 วัน</p>
                 <p v-if="dateError" class="error-message">{{ dateError }}</p>
               </div>
               <v-textarea
@@ -402,6 +410,7 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
 import LayoutUser from '@/components/LayoutUser.vue'
+import GuidePopup from '@/components/user/GuidePopup.vue'
 import axios from 'axios'
 import { format } from 'date-fns'
 
@@ -424,6 +433,14 @@ const isEditMode = ref(false)
 const dateError = ref('')
 const searchQuery = ref('')
 const filterStatus = ref(null)
+
+const leaveGuideSteps = [
+  'กดปุ่ม "แจ้งลา" และเลือกวันที่เริ่มลา/สิ้นสุดการลาให้ถูกต้อง',
+  'ต้องแจ้งลาล่วงหน้าอย่างน้อย 3 วันก่อนวันเริ่มลา',
+  'ระยะเวลาในการลาต่อครั้งไม่เกิน 3 วัน',
+  'กรอกเหตุผลให้ชัดเจนและส่งเรื่องเพื่อรอการอนุมัติ',
+  'ตรวจสอบสถานะในตาราง: รออนุมัติ, อนุมัติแล้ว หรือไม่อนุมัติ'
+]
 
 // Pagination
 const pageSize = 10
@@ -556,6 +573,8 @@ const validateDateRange = () => {
   const end = new Date(endDate.value)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
+  const minAdvanceDate = new Date(today)
+  minAdvanceDate.setDate(minAdvanceDate.getDate() + 3)
 
   dateError.value = ''
 
@@ -566,6 +585,11 @@ const validateDateRange = () => {
 
   if (start < today) {
     dateError.value = 'ไม่สามารถลาย้อนหลังได้'
+    return
+  }
+
+  if (start < minAdvanceDate) {
+    dateError.value = 'ต้องแจ้งลาล่วงหน้าอย่างน้อย 3 วัน'
     return
   }
 
@@ -780,37 +804,39 @@ onMounted(async () => {
 
 <style scoped>
 .leave-page {
-  padding: 24px;
-  background-color: #f5f5f5;
+  padding: 1.5rem;
+  background-color: #f9fafb;
   min-height: calc(100vh - 64px);
 }
 
 .page-header {
-  margin-bottom: 16px;
+  margin-bottom: 1.5rem;
 }
 
 .header-content {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
+  margin-bottom: 1rem;
 }
 
 .page-title {
-  font-size: clamp(1.2rem, 3.2vw, 1.5rem);
+  font-size: 1.5rem;
   font-weight: 600;
-  color: #1a1a1a;
-  margin-bottom: 4px;
+  color: #1f2937;
+  margin: 0 0 0.25rem 0;
 }
 
 .page-subtitle {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: #6b7280;
   margin: 0;
 }
 
 .header-actions {
   display: flex;
-  gap: 8px;
+  gap: 0.75rem;
+  align-items: center;
 }
 
 .filter-btn,
@@ -819,16 +845,16 @@ onMounted(async () => {
 }
 
 .leave-card {
-  border-radius: 16px;
+  border-radius: 1rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .card-content {
-  padding: 16px;
+  padding: 1rem;
 }
 
 .search-section {
-  margin-bottom: 16px;
+  margin-bottom: 1rem;
 }
 
 .search-input {
@@ -837,12 +863,13 @@ onMounted(async () => {
 
 .table-wrapper {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .leave-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .leave-table thead {
@@ -850,15 +877,15 @@ onMounted(async () => {
 }
 
 .leave-table th {
-  padding: 12px 8px;
+  padding: 0.75rem 1rem;
   text-align: left;
   font-weight: 500;
   color: #6b7280;
-  font-size: 12px;
+  font-size: 0.875rem;
 }
 
 .leave-table td {
-  padding: 12px 8px;
+  padding: 0.75rem 1rem;
   border-bottom: 1px solid #f3f4f6;
 }
 
@@ -876,13 +903,13 @@ onMounted(async () => {
 }
 
 .date-separator {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: #6b7280;
   margin: 0 4px;
 }
 
 .time-text {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #9ca3af;
 }
 
@@ -916,21 +943,24 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 16px;
-  padding-top: 16px;
+  margin-top: 1rem;
+  padding-top: 1rem;
   border-top: 1px solid #e5e7eb;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: #6b7280;
 }
 
 .pagination {
   display: flex;
-  gap: 4px;
+  gap: 0.25rem;
 }
 
 .page-btn {
-  min-width: 44px;
-  height: 44px;
+  min-width: 2rem;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
 }
 
@@ -962,6 +992,12 @@ onMounted(async () => {
 
 .error-message {
   color: #dc2626;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.notice-message {
+  color: #1d4ed8;
   font-size: 12px;
   margin-top: 4px;
 }
@@ -1027,42 +1063,77 @@ onMounted(async () => {
 /* Responsive */
 @media (max-width: 768px) {
   .leave-page {
-    padding: 16px;
+    padding: 0.75rem;
   }
 
   .header-content {
     flex-direction: column;
-    gap: 16px;
+    align-items: flex-start;
+    gap: 1rem;
   }
 
   .header-actions {
     width: 100%;
+    flex-wrap: wrap;
   }
 
   .filter-btn,
   .add-btn {
     flex: 1;
+    font-size: clamp(13px, 3vw, 14px);
   }
 
   .table-footer {
     flex-direction: column;
-    gap: 12px;
+    gap: 1rem;
     align-items: flex-start;
+    font-size: clamp(0.8rem, 2.8vw, 0.875rem);
   }
 
   .date-inputs {
     flex-direction: column;
   }
 
+  .leave-table {
+    font-size: clamp(11px, 2.8vw, 13px);
+  }
+
+  .leave-table th {
+    font-size: clamp(10px, 2.5vw, 12px);
+    padding: 0.5rem 0.45rem;
+  }
+
+  .leave-table td {
+    padding: 0.5rem 0.45rem;
+    vertical-align: top;
+  }
+
   .status-column {
-    max-width: 220px;
-    min-width: 180px;
+    max-width: 112px;
+    min-width: 88px;
     width: auto;
   }
 
-  .page-btn {
-    min-width: 44px;
-    height: 44px;
+  .issue-cell {
+    max-width: min(220px, 45vw);
+    word-break: break-word;
+  }
+
+  .date-range-cell {
+    white-space: normal;
+    font-size: clamp(10px, 2.6vw, 12px);
+  }
+
+  .date-separator {
+    font-size: clamp(10px, 2.5vw, 12px);
+  }
+
+  .time-text {
+    font-size: clamp(10px, 2.4vw, 11px);
+  }
+
+  .text-sm {
+    font-size: clamp(10px, 2.6vw, 12px);
   }
 }
 </style>

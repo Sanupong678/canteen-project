@@ -116,6 +116,50 @@ export const createNews = async (req, res) => {
   }
 };
 
+// Update news (admin only)
+export const updateNews = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, content } = req.body;
+    console.log(`📰 Updating news with ID: ${id}`);
+
+    const news = await News.findById(id);
+    if (!news) {
+      return res.status(404).json({
+        success: false,
+        error: 'News not found'
+      });
+    }
+
+    if (title) news.title = title;
+    if (content) news.content = content;
+
+    if (req.file) {
+      if (news.imageFilename) {
+        const oldImagePath = path.join(process.cwd(), 'uploads', 'news', news.imageFilename);
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+      }
+      news.imageFilename = req.file.filename;
+    }
+
+    await news.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'News updated successfully',
+      data: news
+    });
+  } catch (error) {
+    console.error('❌ Error updating news:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update news'
+    });
+  }
+};
+
 // Delete news (admin only)
 export const deleteNews = async (req, res) => {
   try {
@@ -163,14 +207,6 @@ export const getNewsImage = async (req, res) => {
     const { newsId } = req.params;
     console.log(`📰 Getting image for news ID: ${newsId}`);
     
-    // Add CORS headers
-    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
-    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.header('Cross-Origin-Embedder-Policy', 'unsafe-none');
-    
     const news = await News.findById(newsId);
     
     if (!news) {
@@ -195,6 +231,13 @@ export const getNewsImage = async (req, res) => {
         error: 'Image file not found'
       });
     }
+
+    // Allow frontend (different origin) to embed this image safely.
+    const frontendOrigin = process.env.FRONTEND_URL || req.headers.origin || '*';
+    res.setHeader('Access-Control-Allow-Origin', frontendOrigin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
     
     console.log('✅ Sending news image:', news.imageFilename);
     res.sendFile(imagePath, (err) => {

@@ -30,6 +30,7 @@ import adminNotificationRoutes from './routes/adminNotificationRoutes.js';
 import evaluationRoutes from './routes/evaluationRoutes.js';
 import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificationRoutes.js';
   import monthSettingsRoutes from './routes/monthSettingsRoutes.js';
+  import paymentSettingsRoutes from './routes/paymentSettingsRoutes.js';
   import rankingRoutes from './routes/rankingRoutes.js';
   import moneyHistoryRoutes from './routes/moneyHistoryRoutes.js';
   import welcomeRoutes from './routes/welcomeRoutes.js';
@@ -38,6 +39,22 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
   import { sanitizeInputs, auditLoggingMiddleware } from './middleware/securityMiddleware.js';
   const app = express();
   const isProduction = process.env.NODE_ENV === 'production';
+
+const parseAllowedOrigins = () => {
+  const rawOrigins =
+    process.env.CORS_ORIGINS ||
+    process.env.FRONTEND_URL ||
+    'http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001';
+
+  return rawOrigins
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+};
+
+const allowedOrigins = parseAllowedOrigins();
+const primaryAllowedOrigin = allowedOrigins[0] || 'http://localhost:3000';
+const toWsOrigin = (origin) => origin.replace(/^http:\/\//, 'ws://').replace(/^https:\/\//, 'wss://');
 
   // Get current directory
   const __filename = fileURLToPath(import.meta.url);
@@ -56,7 +73,7 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", 'data:', 'https:'],
         fontSrc: ["'self'"],
-        connectSrc: ["'self'", 'http://localhost:*', 'ws://localhost:*'],
+        connectSrc: ["'self'", ...allowedOrigins, ...allowedOrigins.map(toWsOrigin)],
         frameSrc: ["'none'"],
         objectSrc: ["'none'"],
         upgradeInsecureRequests: [] // Only in production
@@ -67,6 +84,8 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
       includeSubDomains: true,
       preload: true
     },
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginEmbedderPolicy: false,
     noSniff: true,
     xssFilter: true,
     referrerPolicy: { policy: 'no-referrer' }
@@ -78,7 +97,11 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
 
   // CORS configuration - MUST be before rate limiting
   const corsOptions = {
-    origin: ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001'],
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error(`CORS origin not allowed: ${origin}`));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
@@ -112,7 +135,13 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
 
   // Ensure CORS headers are always present (redundant but safe)
   app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
+    const requestOrigin = req.headers.origin;
+    if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+      res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+      res.setHeader('Vary', 'Origin');
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', primaryAllowedOrigin);
+    }
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     next();
   });
@@ -135,7 +164,13 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
    '/uploads',
    (req, res, next) => {
      // Allow your frontend origin to load these resources
-     res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
+     const requestOrigin = req.headers.origin;
+     if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+       res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+       res.setHeader('Vary', 'Origin');
+     } else {
+       res.setHeader('Access-Control-Allow-Origin', primaryAllowedOrigin);
+     }
      res.setHeader('Access-Control-Allow-Credentials', 'true');
  
      // Relax cross-origin resource policy so images can be embedded
@@ -221,6 +256,7 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
   app.use('/api/evaluations', evaluationRoutes);
   app.use('/api/monthly-ranking-notifications', monthlyRankingNotificationRoutes);
   app.use('/api/month-settings', monthSettingsRoutes);
+  app.use('/api/payment-settings', paymentSettingsRoutes);
   app.use('/api/rankings', rankingRoutes);
   app.use('/api/money-history', moneyHistoryRoutes);
   app.use('/api/welcome', welcomeRoutes);
