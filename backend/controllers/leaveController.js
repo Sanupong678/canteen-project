@@ -4,6 +4,7 @@ import User from '../models/userModel.js';
 import { createLeaveNotification } from './notificationController.js';
 import { createAdminLeaveNotification } from './adminNotificationController.js';
 import { emitToShop, emitToAdmin } from '../socket.js';
+import { parsePagination, toPaginationMeta } from '../utils/pagination.js';
 
 const validateLeaveDatePolicy = (startDate, endDate) => {
   const start = new Date(startDate);
@@ -37,9 +38,13 @@ const validateLeaveDatePolicy = (startDate, endDate) => {
 // Get all leaves (admin)
 export const getLeaves = async (req, res) => {
   try {
+    const { page, limit, skip } = parsePagination(req.query);
+    const total = await Leave.countDocuments();
     // ดึงข้อมูลการลาทั้งหมด
     const leaves = await Leave.find()
       .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .lean(); // ใช้ lean() เพื่อเพิ่มความเร็ว
 
     // รวบรวม shopIds และ userIds ทั้งหมด
@@ -82,7 +87,10 @@ export const getLeaves = async (req, res) => {
       };
     });
 
-    res.json({ data: leavesWithDetails });
+    res.json({
+      data: leavesWithDetails,
+      pagination: toPaginationMeta({ page, limit, total })
+    });
   } catch (error) {
     console.error('Error fetching leaves:', error);
     res.status(500).json({ message: error.message });
@@ -94,6 +102,7 @@ export const getUserLeaves = async (req, res) => {
   try {
     const userId = req.user.userId;
     const shopId = req.user.shopId;
+    const { page, limit, skip } = parsePagination(req.query);
 
     // ตรวจสอบว่ามี userId และ shopId หรือไม่
     if (!userId || !shopId) {
@@ -105,7 +114,15 @@ export const getUserLeaves = async (req, res) => {
       });
     }
 
-    const leaves = await Leave.find({ userId }).sort({ createdAt: -1 });
+    const query = { userId };
+    const [leaves, total] = await Promise.all([
+      Leave.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Leave.countDocuments(query)
+    ]);
 
     // ถ้าไม่มีประวัติการลา
     if (leaves.length === 0) {
@@ -117,19 +134,25 @@ export const getUserLeaves = async (req, res) => {
     }
 
     // ดึงข้อมูลร้านค้าและโรงอาหารเพิ่มเติม
-    const leavesWithDetails = await Promise.all(leaves.map(async (leave) => {
-      const shop = await Shop.findById(leave.shopId);
+    const shopIds = [...new Set(leaves.map(leave => leave.shopId?.toString()).filter(Boolean))];
+    const shops = await Shop.find({ _id: { $in: shopIds } })
+      .select('name customId canteenId')
+      .lean();
+    const shopMap = new Map(shops.map(shop => [shop._id.toString(), shop]));
+    const leavesWithDetails = leaves.map((leave) => {
+      const shop = shopMap.get(leave.shopId?.toString());
       return {
-        ...leave.toObject(),
+        ...leave,
         shopName: shop ? shop.name : 'ไม่ระบุร้านค้า',
         shopCode: shop ? shop.customId : 'ไม่ระบุรหัส',
         canteen: shop ? `โรงอาหาร${getCanteenName(shop.canteenId)}` : 'ไม่ระบุโรงอาหาร'
       };
-    }));
+    });
 
     res.json({ 
       data: leavesWithDetails,
-      hasHistory: true
+      hasHistory: true,
+      pagination: toPaginationMeta({ page, limit, total })
     });
   } catch (error) {
     console.error('Error fetching user leaves:', error);

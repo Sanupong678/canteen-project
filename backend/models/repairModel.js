@@ -51,6 +51,7 @@ repairSchema.index({ userId: 1 });
 repairSchema.index({ status: 1 });
 repairSchema.index({ createdAt: -1 });
 repairSchema.index({ shopId: 1, status: 1 });
+repairSchema.index({ userId: 1, createdAt: -1 });
 
 // ก่อนบันทึก ให้ตรวจสอบว่ามีข้อมูลที่จำเป็นครบถ้วน
 repairSchema.pre('save', function(next) {

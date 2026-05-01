@@ -33,5 +33,6 @@ const newsSchema = new mongoose.Schema({
 // สร้าง index เพื่อให้ค้นหาเร็วขึ้น
 newsSchema.index({ createdAt: -1 });
 newsSchema.index({ isActive: 1 });
+newsSchema.index({ isActive: 1, createdAt: -1 });
 
 export default mongoose.model('News', newsSchema, 'news');

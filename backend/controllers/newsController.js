@@ -1,21 +1,34 @@
 import News from '../models/newsModel.js';
 import path from 'path';
 import fs from 'fs';
+import { promises as fsPromises } from 'fs';
+import { parsePagination, toPaginationMeta } from '../utils/pagination.js';
+import { clearCacheByPrefix } from '../middleware/cacheMiddleware.js';
 
 // Get all news (for users)
 export const getAllNews = async (req, res) => {
   try {
-    console.log('📰 Fetching all active news...');
-    
-    const news = await News.find({ isActive: true })
+    const { page, limit, skip } = parsePagination(req.query);
+    const query = { isActive: true };
+    // Avoid expensive countDocuments on hot path by default.
+    const includeTotal = String(req.query.includeTotal || '').toLowerCase() === 'true';
+    const queryLimit = includeTotal ? limit : (limit + 1);
+    const rows = await News.find(query)
       .sort({ createdAt: -1 })
-      .select('title content imageFilename createdAt views author');
-    
-    console.log(`✅ Found ${news.length} news articles`);
-    
+      .select('title content imageFilename createdAt views author')
+      .skip(skip)
+      .limit(queryLimit)
+      .lean();
+
+    const hasNextPage = includeTotal ? rows.length === limit : rows.length > limit;
+    const news = includeTotal ? rows : rows.slice(0, limit);
+
     res.status(200).json({
       success: true,
-      data: news
+      data: news,
+      pagination: includeTotal
+        ? toPaginationMeta({ page, limit, total: await News.countDocuments(query) })
+        : { page, limit, hasNextPage }
     });
   } catch (error) {
     console.error('❌ Error fetching news:', error);
@@ -30,7 +43,6 @@ export const getAllNews = async (req, res) => {
 export const getNewsById = async (req, res) => {
   try {
     const { id } = req.params;
-    console.log(`📰 Fetching news with ID: ${id}`);
     
     const news = await News.findById(id);
     
@@ -44,8 +56,7 @@ export const getNewsById = async (req, res) => {
     // เพิ่มจำนวน views
     news.views += 1;
     await news.save();
-    
-    console.log('✅ News fetched successfully');
+    clearCacheByPrefix('/api/news');
     
     res.status(200).json({
       success: true,
@@ -95,6 +106,7 @@ export const createNews = async (req, res) => {
     });
     
     await news.save();
+    clearCacheByPrefix('/api/news');
     
     console.log('✅ News created successfully:', {
       id: news._id,
@@ -137,14 +149,13 @@ export const updateNews = async (req, res) => {
     if (req.file) {
       if (news.imageFilename) {
         const oldImagePath = path.join(process.cwd(), 'uploads', 'news', news.imageFilename);
-        if (fs.existsSync(oldImagePath)) {
-          fs.unlinkSync(oldImagePath);
-        }
+        await fsPromises.unlink(oldImagePath).catch(() => {});
       }
       news.imageFilename = req.file.filename;
     }
 
     await news.save();
+    clearCacheByPrefix('/api/news');
 
     res.status(200).json({
       success: true,
@@ -178,13 +189,11 @@ export const deleteNews = async (req, res) => {
     // ลบไฟล์รูปภาพ
     if (news.imageFilename) {
       const imagePath = path.join(process.cwd(), 'uploads', 'news', news.imageFilename);
-      if (fs.existsSync(imagePath)) {
-        fs.unlinkSync(imagePath);
-        console.log('🗑️ Deleted image file:', news.imageFilename);
-      }
+      await fsPromises.unlink(imagePath).catch(() => {});
     }
     
     await News.findByIdAndDelete(id);
+    clearCacheByPrefix('/api/news');
     
     console.log('✅ News deleted successfully');
     

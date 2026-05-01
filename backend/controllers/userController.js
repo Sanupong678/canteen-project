@@ -1,11 +1,25 @@
 import User from '../models/userModel.js';
 import bcrypt from 'bcryptjs';
 import Shop from '../models/shopModel.js';
+import { parsePagination, toPaginationMeta } from '../utils/pagination.js';
 
 export const getUsers = async (req, res) => {
   try {
-    const users = await User.find();
-    res.json(users);
+    const { page, limit, skip } = parsePagination(req.query);
+    const [users, total] = await Promise.all([
+      User.find()
+        .select('name email role shopId department position createdAt')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      User.countDocuments()
+    ]);
+
+    res.json({
+      data: users,
+      pagination: toPaginationMeta({ page, limit, total })
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

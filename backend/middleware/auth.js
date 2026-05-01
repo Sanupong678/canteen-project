@@ -35,6 +35,7 @@ const getJwtSecret = () => {
 
 // Protect routes
 export const protect = async (req, res, next) => {
+  const perfStart = process.hrtime.bigint();
   try {
     const isDev = process.env.NODE_ENV === 'development';
     
@@ -81,6 +82,7 @@ export const protect = async (req, res, next) => {
           role: req.user.role
         });
         }
+        req.perf?.mark('middleware.auth.protect', Number(process.hrtime.bigint() - perfStart) / 1_000_000);
         return next();
       }
 
@@ -133,6 +135,7 @@ export const protect = async (req, res, next) => {
       });
       }
 
+      req.perf?.mark('middleware.auth.protect', Number(process.hrtime.bigint() - perfStart) / 1_000_000);
       next();
     } catch (error) {
       if (isDev) {
@@ -153,12 +156,14 @@ export const protect = async (req, res, next) => {
 
 // Admin middleware
 export const isAdmin = async (req, res, next) => {
+  const perfStart = process.hrtime.bigint();
   try {
     const isDev = process.env.NODE_ENV === 'development';
     
     // ตรวจสอบ admin จาก token โดยตรง (สำหรับ admin login)
     if (req.user && req.user.role === 'admin') {
       if (isDev) console.log('✅ Admin access granted from token');
+      req.perf?.mark('middleware.auth.isAdmin', Number(process.hrtime.bigint() - perfStart) / 1_000_000);
       return next();
     }
 
@@ -180,6 +185,7 @@ export const isAdmin = async (req, res, next) => {
     }
 
     if (isDev) console.log('✅ Admin access granted');
+    req.perf?.mark('middleware.auth.isAdmin', Number(process.hrtime.bigint() - perfStart) / 1_000_000);
     next();
   } catch (error) {
     next(error);

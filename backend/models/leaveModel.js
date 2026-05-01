@@ -41,6 +41,7 @@ leaveSchema.index({ shopId: 1 });
 leaveSchema.index({ status: 1 });
 leaveSchema.index({ createdAt: -1 });
 leaveSchema.index({ shopId: 1, status: 1 });
+leaveSchema.index({ userId: 1, createdAt: -1 });
 leaveSchema.index({ startDate: 1, endDate: 1 });
 
 // ก่อนบันทึก ให้ตรวจสอบว่ามีข้อมูลที่จำเป็นครบถ้วน

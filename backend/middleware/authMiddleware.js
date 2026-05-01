@@ -45,6 +45,7 @@ export const generateToken = (user) => {
 };
 
 export const verifyToken = async (req, res, next) => {
+  const perfStart = process.hrtime.bigint();
   try {
     // Only log in development mode
     const isDev = process.env.NODE_ENV === 'development';
@@ -90,6 +91,7 @@ export const verifyToken = async (req, res, next) => {
     if (decoded.role === 'admin') {
       req.user = decoded;
       if (isDev) console.log('✅ Admin access granted');
+      req.perf?.mark('middleware.auth.verifyToken', Number(process.hrtime.bigint() - perfStart) / 1_000_000);
       return next();
     }
 
@@ -180,6 +182,7 @@ export const verifyToken = async (req, res, next) => {
     console.log('✅ User verified successfully');
     console.log('=== Token Verification Completed ===\n');
     }
+    req.perf?.mark('middleware.auth.verifyToken', Number(process.hrtime.bigint() - perfStart) / 1_000_000);
     next();
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
@@ -190,6 +193,7 @@ export const verifyToken = async (req, res, next) => {
 };
 
 export const isAdmin = async (req, res, next) => {
+  const perfStart = process.hrtime.bigint();
   const isDev = process.env.NODE_ENV === 'development';
   
   if (!req.user) {
@@ -203,5 +207,6 @@ export const isAdmin = async (req, res, next) => {
   }
 
   if (isDev) console.log('Admin access granted');
+  req.perf?.mark('middleware.auth.verifyAdminRole', Number(process.hrtime.bigint() - perfStart) / 1_000_000);
   next();
 }; 

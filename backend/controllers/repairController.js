@@ -8,6 +8,7 @@ import { createRepairNotification } from './notificationController.js';
 import { createAdminRepairNotification } from './adminNotificationController.js';
 import { emitToShop, emitToAdmin } from '../socket.js';
 import { validateFilePath, safePathJoin, logAuditEvent } from '../middleware/securityMiddleware.js';
+import { parsePagination, toPaginationMeta } from '../utils/pagination.js';
 
 // สร้างโฟลเดอร์ uploads/repairs ถ้ายังไม่มี
 const uploadDir = path.join(process.cwd(), 'uploads', 'repairs');
@@ -41,10 +42,14 @@ const upload = multer({
 // Get all repairs (admin)
 export const getRepairs = async (req, res) => {
   try {
+    const { page, limit, skip } = parsePagination(req.query);
+    const total = await Repair.countDocuments();
     // ดึงข้อมูลการแจ้งซ่อมทั้งหมด (ไม่ดึง images เพื่อเพิ่มประสิทธิภาพ)
     const repairs = await Repair.find()
       .select('-images') // ไม่ดึง base64 images เพื่อเพิ่มความเร็ว
       .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .lean(); // ใช้ lean() เพื่อเพิ่มความเร็ว
 
     // รวบรวม shopIds ทั้งหมด
@@ -71,7 +76,10 @@ export const getRepairs = async (req, res) => {
       };
     });
 
-    res.json({ data: repairsWithDetails });
+    res.json({
+      data: repairsWithDetails,
+      pagination: toPaginationMeta({ page, limit, total })
+    });
   } catch (error) {
     console.error('Error fetching repairs:', error);
     res.status(500).json({ message: error.message });
@@ -100,6 +108,7 @@ export const getUserRepairs = async (req, res) => {
     // ดึง userId และ shopId จาก token
     const userId = req.user.userId;
     const shopId = req.user.shopId;
+    const { page, limit, skip } = parsePagination(req.query);
 
     // ตรวจสอบว่ามี userId และ shopId หรือไม่
     if (!userId || !shopId) {
@@ -111,7 +120,16 @@ export const getUserRepairs = async (req, res) => {
       });
     }
 
-    const repairs = await Repair.find({ userId }).sort({ createdAt: -1 });
+    const query = { userId };
+    const [repairs, total] = await Promise.all([
+      Repair.find(query)
+        .sort({ createdAt: -1 })
+        .select('-images')
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Repair.countDocuments(query)
+    ]);
 
     // ถ้าไม่มีประวัติการแจ้งซ่อม
     if (repairs.length === 0) {
@@ -124,7 +142,8 @@ export const getUserRepairs = async (req, res) => {
 
     res.json({ 
       data: repairs,
-      hasHistory: true
+      hasHistory: true,
+      pagination: toPaginationMeta({ page, limit, total })
     });
   } catch (error) {
     console.error('Error fetching user repairs:', error);

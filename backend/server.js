@@ -13,6 +13,8 @@
   import compression from 'compression';
   import rateLimit from 'express-rate-limit';
   import morgan from 'morgan';
+  import { requestTimeout, logSlowRequests, startEventLoopMonitor, stopEventLoopMonitor } from './middleware/performanceMiddleware.js';
+  import { requestProfiler } from './middleware/requestProfiler.js';
 
   // Routes
   import userRoutes from './routes/userRoutes.js';
@@ -41,20 +43,36 @@ import monthlyRankingNotificationRoutes from './routes/monthlyRankingNotificatio
   const isProduction = process.env.NODE_ENV === 'production';
 
 const parseAllowedOrigins = () => {
-  const rawOrigins =
-    process.env.CORS_ORIGINS ||
-    process.env.FRONTEND_URL ||
-    'http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001';
+  const defaultOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001'
+  ];
 
-  return rawOrigins
+  const configuredOrigins = [
+    process.env.CORS_ORIGINS || '',
+    process.env.FRONTEND_URL || ''
+  ]
+    .join(',')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
+
+  return [...new Set([...configuredOrigins, ...defaultOrigins])];
 };
 
 const allowedOrigins = parseAllowedOrigins();
 const primaryAllowedOrigin = allowedOrigins[0] || 'http://localhost:3000';
 const toWsOrigin = (origin) => origin.replace(/^http:\/\//, 'ws://').replace(/^https:\/\//, 'wss://');
+const isLoadTestMode = String(process.env.LOAD_TEST_MODE || '').toLowerCase() === 'true';
+const isLoadOptimizedMode = String(process.env.LOAD_OPTIMIZED_MODE || '').toLowerCase() === 'true';
+const isLocalRequestIp = (ip = '') => {
+  const normalizedIp = String(ip).trim();
+  return normalizedIp === '127.0.0.1' ||
+    normalizedIp === '::1' ||
+    normalizedIp === '::ffff:127.0.0.1';
+};
 
   // Get current directory
   const __filename = fileURLToPath(import.meta.url);
@@ -62,10 +80,12 @@ const toWsOrigin = (origin) => origin.replace(/^http:\/\//, 'ws://').replace(/^h
 
   // Trust proxy for rate limiting
   app.set('trust proxy', 1);
+  app.use(requestProfiler);
 
   // 🛡️ Enhanced Security Headers with Helmet
   // Include CSP (Content Security Policy), HSTS, and other security headers
-  app.use(helmet({
+  if (!isLoadOptimizedMode) {
+    app.use(helmet({
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
@@ -89,11 +109,16 @@ const toWsOrigin = (origin) => origin.replace(/^http:\/\//, 'ws://').replace(/^h
     noSniff: true,
     xssFilter: true,
     referrerPolicy: { policy: 'no-referrer' }
-  }));
+    }));
+  }
   app.use(compression());
 
-  // Logging middleware (early for debugging)
-  app.use(morgan('dev'));
+  // Logging middleware (keep lightweight in production)
+  const enableHttpLog = !isProduction || String(process.env.ENABLE_HTTP_LOG || '').toLowerCase() === 'true';
+  if (enableHttpLog) {
+    app.use(morgan(isProduction ? 'tiny' : 'dev'));
+  }
+  app.use(logSlowRequests(parseInt(process.env.SLOW_REQUEST_MS, 10) || 1000));
 
   // CORS configuration - MUST be before rate limiting
   const corsOptions = {
@@ -113,11 +138,23 @@ const toWsOrigin = (origin) => origin.replace(/^http:\/\//, 'ws://').replace(/^h
   app.options('*', cors(corsOptions));
 
   // Rate limiting - AFTER CORS so preflight requests pass through
-  // Higher limit for development, lower for production
+  // Keep protection enabled in production, but relax for explicit load tests
+  const rateLimitMax = isLoadTestMode
+    ? 100000
+    : (process.env.NODE_ENV === 'production' ? 100 : 1000);
+  const rateLimitWindowMs = parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || (15 * 60 * 1000);
   const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: process.env.NODE_ENV === 'production' ? 100 : 1000, // 1000 for dev, 100 for prod
-    skip: (req, res) => req.method === 'OPTIONS' // skip preflight requests
+    windowMs: rateLimitWindowMs,
+    max: rateLimitMax,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => {
+      // Always skip preflight.
+      if (req.method === 'OPTIONS') return true;
+      // Optional: bypass limiter for localhost/internal load tests.
+      if (isLocalRequestIp(req.ip)) return true;
+      return false;
+    }
   });
   app.use(limiter);
 
@@ -129,9 +166,12 @@ const toWsOrigin = (origin) => origin.replace(/^http:\/\//, 'ws://').replace(/^h
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-  // 🛡️ Input Sanitization Middleware - Prevents XSS Attacks
-  // Sanitizes all user inputs from body, query, and params
-  app.use(sanitizeInputs);
+  // 🛡️ Input Sanitization Middleware - keep enabled, with optional bypass for GET in high-load mode
+  const skipSanitizeGet = isLoadOptimizedMode || String(process.env.SKIP_SANITIZE_GET || '').toLowerCase() === 'true';
+  app.use((req, res, next) => {
+    if (skipSanitizeGet && req.method === 'GET') return next();
+    return sanitizeInputs(req, res, next);
+  });
 
   // Ensure CORS headers are always present (redundant but safe)
   app.use((req, res, next) => {
@@ -146,14 +186,8 @@ const toWsOrigin = (origin) => origin.replace(/^http:\/\//, 'ws://').replace(/^h
     next();
   });
 
-  // Prevent 30s drops: increase per-request timeouts
-  app.use((req, res, next) => {
-    const requestTimeoutMs = parseInt(process.env.REQUEST_TIMEOUT_MS) || 0; // 0 disables
-    const responseTimeoutMs = parseInt(process.env.RESPONSE_TIMEOUT_MS) || 0; // 0 disables
-    try { req.setTimeout(requestTimeoutMs); } catch (_) {}
-    try { res.setTimeout(responseTimeoutMs); } catch (_) {}
-    next();
-  });
+  // Keep request handling bounded under concurrent load.
+  app.use(requestTimeout(parseInt(process.env.REQUEST_TIMEOUT_MS, 10) || 15000));
 
  // Static files with CORS and CORP/COEP overrides for uploads
  // NOTE:
@@ -238,7 +272,10 @@ const toWsOrigin = (origin) => origin.replace(/^http:\/\//, 'ws://').replace(/^h
 
   // 🛡️ Audit Logging Middleware - Track Admin Actions
   // Must be applied AFTER routes are defined but logs are applied to all API routes
-  app.use('/api', auditLoggingMiddleware);
+  app.use('/api', (req, res, next) => {
+    if (isLoadOptimizedMode && req.method === 'GET') return next();
+    return auditLoggingMiddleware(req, res, next);
+  });
 
   // Routes (placed BEFORE additional CORS middleware for /api)
   app.use('/api/users', userRoutes);
@@ -313,7 +350,7 @@ const toWsOrigin = (origin) => origin.replace(/^http:\/\//, 'ws://').replace(/^h
 
   // Error handling middleware
   app.use((err, req, res, next) => {
-    console.error(err.stack);
+    console.error(`[API_ERROR] ${req.method} ${req.originalUrl}`, err.stack || err.message);
     
     // Handle multer errors
     if (err.name === 'MulterError') {
@@ -346,6 +383,7 @@ const toWsOrigin = (origin) => origin.replace(/^http:\/\//, 'ws://').replace(/^h
   const server = app.listen(port, () => {
     console.log(`🚀 Server running on port ${port}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    startEventLoopMonitor();
   });
 
   // Initialize Socket.IO
@@ -433,6 +471,7 @@ const toWsOrigin = (origin) => origin.replace(/^http:\/\//, 'ws://').replace(/^h
     }
     
     isShuttingDown = true;
+    stopEventLoopMonitor();
     
     // Stop cleanup intervals
     try {
